@@ -1,3 +1,6 @@
+import { useEffect, useState } from 'react'
+import { supabase } from './lib/supabaseClient'
+
 const moduleColors = [
   { name: 'marine',  hex: '#1C3D52' },
   { name: 'canard',  hex: '#2A8FA8' },
@@ -58,6 +61,63 @@ function ColorSwatch({ name, hex }) {
   )
 }
 
+function SupabaseStatus() {
+  const [state, setState] = useState({ status: 'loading', error: null })
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+
+  useEffect(() => {
+    supabase.auth
+      .getSession()
+      .then(({ error }) => {
+        if (error) {
+          setState({ status: 'error', error: error.message })
+        } else {
+          setState({ status: 'ok', error: null })
+        }
+      })
+      .catch((err) => {
+        setState({ status: 'error', error: err?.message ?? String(err) })
+      })
+  }, [])
+
+  if (state.status === 'loading') {
+    return (
+      <div className="rounded-card border border-border bg-carte p-4">
+        <p className="text-muted text-sm">Test de connexion Supabase en cours…</p>
+      </div>
+    )
+  }
+
+  if (state.status === 'ok') {
+    return (
+      <div
+        className="rounded-card border-2 p-4"
+        style={{ borderColor: '#6B7A3A', backgroundColor: 'rgba(107,122,58,0.08)' }}
+      >
+        <p className="font-semibold text-ink mb-1">✓ Connexion Supabase OK</p>
+        <p className="text-muted text-sm">
+          URL utilisée :{' '}
+          <span className="font-mono text-ink break-all">{supabaseUrl}</span>
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="rounded-card border-2 p-4"
+      style={{ borderColor: '#D4503A', backgroundColor: 'rgba(212,80,58,0.08)' }}
+    >
+      <p className="font-semibold text-ink mb-1">✕ Erreur de connexion Supabase</p>
+      <p className="text-ink text-sm font-mono break-all">{state.error}</p>
+      <p className="text-faint text-xs mt-2">
+        URL configurée :{' '}
+        <span className="font-mono break-all">{supabaseUrl || '(non définie)'}</span>
+      </p>
+    </div>
+  )
+}
+
 export default function App() {
   return (
     <div className="min-h-screen p-6 max-w-3xl mx-auto">
@@ -69,6 +129,11 @@ export default function App() {
           Vérification visuelle de la configuration Tailwind
         </p>
       </header>
+
+      <section className="mb-10">
+        <SectionTitle>État de la connexion Supabase</SectionTitle>
+        <SupabaseStatus />
+      </section>
 
       <section className="mb-10">
         <SectionTitle>Couleurs des modules</SectionTitle>
