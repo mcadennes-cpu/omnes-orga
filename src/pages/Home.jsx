@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useRole } from '../hooks/useRole'
 import { getVisibleModules, ROLE_LABELS } from '../lib/modules'
@@ -8,6 +9,7 @@ import ModuleTile from '../components/home/ModuleTile'
 import ActivityList from '../components/home/ActivityList'
 
 export default function Home() {
+  const navigate = useNavigate()
   const { signOut } = useAuth()
   const { role, prenom, nom, email, loading } = useRole()
   const [activeTab, setActiveTab] = useState('home')
@@ -32,6 +34,10 @@ export default function Home() {
   }
 
   function handleModuleClick(moduleKey) {
+    if (moduleKey === 'trombinoscope') {
+      navigate('/trombinoscope')
+      return
+    }
     alert(`Module "${moduleKey}" à venir`)
   }
 

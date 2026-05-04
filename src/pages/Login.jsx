@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 
 export default function Login() {
-  const { signIn, signUp } = useAuth()
+  const navigate = useNavigate()
+  const { user, signIn, signUp } = useAuth()
   const [mode, setMode] = useState('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -10,6 +12,12 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false)
 
   const isSignup = mode === 'signup'
+
+  useEffect(() => {
+    if (user) {
+      navigate('/', { replace: true })
+    }
+  }, [user, navigate])
 
   function validate() {
     if (!email.trim()) return 'Veuillez saisir votre adresse e-mail.'

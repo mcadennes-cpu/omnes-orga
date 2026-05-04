@@ -28,7 +28,7 @@ export const MODULES = [
     label: 'Trombinoscope',
     icon: Users,
     color: 'canard',
-    allowedRoles: ['super_admin', 'associe_gerant', 'associe'],
+    allowedRoles: ['super_admin', 'associe_gerant', 'associe', 'remplacant'],
   },
   {
     key: 'annuaire',
