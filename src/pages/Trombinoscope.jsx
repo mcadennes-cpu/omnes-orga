@@ -49,12 +49,19 @@ export default function Trombinoscope() {
         {!loading && !error && medecins.length > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {medecins.map((m) => (
-              <MedecinCard
+              <button
                 key={m.id}
-                medecin={m}
-                canViewNotes={canViewNotes}
-                canViewSchedule={canViewSchedule}
-              />
+                type="button"
+                onClick={() => navigate(`/trombinoscope/${m.id}`)}
+                aria-label={`Ouvrir la fiche de ${m.prenom ?? ''} ${m.nom ?? ''}`.trim()}
+                className="text-left rounded-card focus:outline-none focus:ring-2 focus:ring-canard focus:ring-offset-2 focus:ring-offset-fond hover:shadow-md transition-shadow"
+              >
+                <MedecinCard
+                  medecin={m}
+                  canViewNotes={canViewNotes}
+                  canViewSchedule={canViewSchedule}
+                />
+              </button>
             ))}
           </div>
         )}

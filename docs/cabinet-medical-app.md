@@ -58,25 +58,58 @@ L'application est distribuée comme une **Progressive Web App** : pas de publica
 
 | Rôle | Identifiant BDD | Description |
 |---|---|---|
-| Super administrateur | `super_admin` | Gère les comptes, les rôles, les paramètres globaux |
-| Associé gérant | `associe_gerant` | Accès cabinet complet + accès espace SIM |
-| Associé | `associe` | Accès cabinet, pas d'accès SIM |
-| Remplaçant | `remplacant` | Accès limité selon les modules |
+| Super administrateur | `super_admin` | Gère les comptes, les rôles, les paramètres globaux. Seul à pouvoir désactiver/réactiver un médecin. |
+| Associé gérant | `associe_gerant` | Accès cabinet complet + accès espace SIM. Peut éditer toutes les fiches Trombinoscope (champs admin compris). |
+| Associé | `associe` | Accès cabinet, pas d'accès SIM. Peut éditer **sa propre** fiche Trombinoscope (champs basiques uniquement). |
+| Remplaçant | `remplacant` | Accès en lecture restreinte sur la plupart des modules. Peut éditer **sa propre** fiche Trombinoscope (champs basiques uniquement). Voit le Trombinoscope sans les champs internes (jours_disponibles, notes_internes). |
 
 ### Table `profiles` (Supabase)
 
 ```
-id          uuid      lié à auth.users
-nom         text
-prenom      text
-role        enum      super_admin / associe_gerant / associe / remplacant
-specialite  text      (optionnel)
-photo_url   text      (optionnel, Supabase Storage)
-telephone   text      (optionnel)
-email       text
-actif       boolean   pour activer/désactiver les comptes
-fcm_token   text      token Firebase pour les notifications push
+id                  uuid      lié à auth.users (FK ON DELETE CASCADE)
+nom                 text
+prenom              text
+role                enum      super_admin / associe_gerant / associe / remplacant
+specialite          text      (optionnel)
+photo_url           text      (optionnel, Supabase Storage)
+telephone           text      (optionnel)
+email               text      unique, lié à auth.users (non modifiable côté UI)
+actif               boolean   pour activer/désactiver les comptes (soft delete)
+fcm_token           text      token Firebase pour les notifications push
+jours_disponibles   text      (optionnel, ajouté en 4B-1) — jours de présence au cabinet
+notes_internes      text      (optionnel, ajouté en 4B-1) — notes libres à usage interne
+created_at          timestamp
+updated_at          timestamp
 ```
+
+**RLS en place sur `profiles` (5 policies, étape 2C-2) :**
+- `profiles_select_all_authenticated` : tous les utilisateurs authentifiés lisent toute la table (USING true). Le filtrage des champs sensibles (`jours_disponibles`, `notes_internes`) pour les remplaçants se fait **côté frontend** (approche pragmatique). Une migration vers une vue PostgreSQL est envisageable plus tard si on a besoin d'une sécurité forte.
+- `profiles_insert_own` : un user peut INSERT uniquement sa propre ligne (id = auth.uid()).
+- `profiles_update_own_safe_fields` : un user peut UPDATE sa propre ligne MAIS PAS `role` ni `actif` (subselect dans WITH CHECK).
+- `profiles_update_super_admin` : super_admin peut UPDATE n'importe quelle ligne.
+- `profiles_delete_super_admin` : super_admin seul peut DELETE (non utilisé en pratique car on a opté pour le soft delete).
+
+Un trigger `on_auth_user_created` crée automatiquement la ligne `profiles` à chaque signup auth.
+
+### Table `profiles_compta` (Supabase)
+
+Table séparée pour les informations bancaires des médecins (étape 2C-1). Distincte de `profiles` pour permettre des RLS plus restrictives sur des données sensibles (RIB).
+
+```
+id                       uuid      FK profiles(id) (ON DELETE CASCADE)
+iban                     text
+bic                      text
+nom_titulaire_compte     text
+created_at               timestamp
+updated_at               timestamp
+```
+
+**RLS en place (7 policies, étape 2C-3) :**
+- super_admin / associe_gerant / associe peuvent lire toute la table.
+- remplaçant ne lit que sa propre ligne.
+- Chaque user peut INSERT/UPDATE sa propre ligne ; super_admin peut tout modifier ; suppression réservée à super_admin.
+
+**Pas d'UI dédiée pour l'instant** — la gestion des informations bancaires sera codée dans l'étape 11 (Page Profil personnelle + gestion profiles_compta).
 
 ---
 
@@ -106,20 +139,58 @@ Les modules non accessibles selon le rôle sont **masqués** (pas affichés, pas
 
 **Type :** Cartes (une carte par médecin du cabinet)
 
-**Contenu d'une carte :**
-- Photo du médecin
+**Contenu d'une carte (vue lecture) :**
+- Photo du médecin (ou initiales sur fond canard si pas de photo)
 - Nom, prénom, spécialité
-- Téléphone, email
-- Informations utiles (jours de présence, bureau…)
+- Téléphone (cliquable, ouvre le composeur), email
+- Jours disponibles (visible aux non-remplaçants uniquement)
+- Notes internes (visibles aux non-remplaçants uniquement)
 
 **Droits :**
 | Action | super_admin | associe_gerant | associe | remplacant |
 |---|:---:|:---:|:---:|:---:|
-| Voir les cartes | ✓ | ✓ | ✓ lecture | — |
-| Créer / modifier une carte | ✓ | ✓ | — | — |
-| Supprimer une carte | ✓ | — | — | — |
+| Voir le Trombinoscope (cartes) | ✓ | ✓ | ✓ | ✓ lecture restreinte |
+| Voir jours_disponibles + notes_internes | ✓ | ✓ | ✓ | — |
+| Modifier sa propre fiche (champs basiques) | ✓ | ✓ | ✓ | ✓ |
+| Modifier la fiche d'un autre (champs basiques) | ✓ | ✓ | — | — |
+| Modifier les champs admin (rôle, actif, notes_internes) | ✓ | ✓ | — | — |
+| Désactiver / Réactiver un médecin | ✓ | — | — | — |
+
+**Champs basiques** : nom, prénom, téléphone, spécialité, jours_disponibles.
+**Champs admin** : role, actif, notes_internes.
+**Email** : non modifiable côté UI (lié à l'auth Supabase).
 
 Pas de chat dans ce module.
+
+#### Permissions fines
+
+La logique d'autorisation est centralisée dans [src/lib/permissions.js](../src/lib/permissions.js) :
+
+- `canEditMedecin({ role, currentUserId, medecinId })` — true si super_admin OU associe_gerant OU si on édite sa propre fiche.
+- `canEditPrivilegedFields(role)` — true uniquement pour super_admin et associe_gerant. Contrôle l'accès aux champs admin (rôle, actif, notes_internes) côté formulaire.
+- `canToggleActif(role)` — true uniquement pour super_admin. Contrôle la visibilité du bouton "Désactiver / Réactiver".
+- `canViewSensitiveFields(role)` — true sauf pour remplaçant. Contrôle l'affichage des jours et notes côté lecture.
+
+Côté `MedecinDetail`, un filtrage `safeValues` est aussi appliqué avant l'`update` Supabase : un utilisateur sans privilège qui tenterait de pousser `role`/`actif`/`notes_internes` via DOM trafiqué verrait son payload nettoyé côté frontend (défense en profondeur, en plus de la RLS `profiles_update_own_safe_fields`).
+
+#### Soft delete (désactivation / réactivation)
+
+Pas de suppression physique de profils dans cette étape :
+- Le bouton "Désactiver" passe `actif = false`. La fiche disparaît du Trombinoscope (le hook `useMedecins` filtre `actif = true`).
+- Le hook `useMedecin(id)` ne filtre **pas** sur `actif` — la fiche reste accessible via URL directe `/trombinoscope/:id`, ce qui permet à un super_admin de réactiver le médecin (bouton "Réactiver" qui repasse `actif = true`).
+- La confirmation avant désactivation/réactivation utilise le composant générique `ConfirmDialog` (variant `danger` pour désactiver, `primary` pour réactiver).
+
+**Création d'un médecin (workflow actuel)** : pas de bouton "+" dans l'app à ce stade. Procédure :
+1. Super_admin crée un AuthUser dans le dashboard Supabase (Authentication → Users).
+2. Le trigger `on_auth_user_created` insère automatiquement une ligne dans `profiles` avec valeurs par défaut.
+3. Super_admin se connecte à l'app et enrichit le profil via le formulaire d'édition (`/trombinoscope/:id` → "Modifier").
+
+Cette approche (option D du plan 4D) évite de manipuler `auth.admin.createUser` côté client et reste viable pour les ~30 utilisateurs cibles. Une industrialisation via une Supabase Edge Function (option C) est possible plus tard si le volume le justifie.
+
+#### Routing du module
+
+- `/trombinoscope` — liste des médecins actifs (cartes cliquables).
+- `/trombinoscope/:id` — fiche détail. Affiche en lecture par défaut ; bouton "Modifier" passe en mode édition (toggle sur la même page, pas de nouvelle route). Bouton "Désactiver / Réactiver" visible pour super_admin.
 
 ---
 
@@ -246,7 +317,7 @@ Pas de chat dans ce module.
 
 | Module | super_admin | associe_gerant | associe | remplacant |
 |---|:---:|:---:|:---:|:---:|
-| Trombinoscope | ✓ édition | ✓ édition | ✓ lecture | — |
+| Trombinoscope | ✓ édition complète | ✓ édition complète | ✓ lecture + édition de soi | ✓ lecture restreinte + édition de soi |
 | Annuaire | ✓ | ✓ | ✓ | ✓ |
 | Cabinet pratique | ✓ édition | ✓ édition | ✓ lecture | ✓ lecture |
 | Discussion | ✓ | ✓ | si invité | si invité |
@@ -273,48 +344,84 @@ Pas de chat dans ce module.
 
 ---
 
+## Architecture frontend
+
+### Routing
+
+La navigation utilise **react-router-dom v6**. `main.jsx` enveloppe l'application dans un `<BrowserRouter>`. Les routes sont définies dans `App.jsx` :
+
+| Route | Accès | Page |
+|---|---|---|
+| `/login` | publique | `Login` |
+| `/` | protégée | `Home` |
+| `/trombinoscope` | protégée | `Trombinoscope` |
+| `/trombinoscope/:id` | protégée | `MedecinDetail` (lecture + édition) |
+| `*` | — | redirect vers `/` |
+
+Mécanique :
+- `<ProtectedRoute>` (à `src/components/ProtectedRoute.jsx`) affiche un écran "Chargement…" pendant `useAuth().loading`, redirige vers `/login` si pas d'utilisateur, sinon rend `<Outlet />`. Toutes les routes protégées sont imbriquées sous ce composant.
+- `Login.jsx` redirige vers `/` si un utilisateur est déjà connecté (via `useEffect` qui surveille `useAuth().user`).
+
+### Composants réutilisables transverses
+
+- **`src/components/common/ConfirmDialog.jsx`** — modal de confirmation Tailwind générique. Props : `{ open, title, message, onConfirm, onCancel, confirmLabel, cancelLabel, confirmVariant, submitting }`. Variants : `'primary'` (bg-marine) et `'danger'` (bg-brique). A11y : `role="dialog"`, `aria-modal`, `aria-labelledby`. Bloque le scroll du body et capte la touche Escape pendant l'ouverture. Utilisé actuellement pour la désactivation/réactivation Trombinoscope, à réutiliser pour les futures suppressions (événements, entrées d'annuaire, etc.).
+
+### Helpers de permissions
+
+`src/lib/permissions.js` centralise les règles d'accès du Trombinoscope (cf. section "Permissions fines" du module 1). Les pages et composants importent ces helpers plutôt que de tester `role` directement, ce qui rend les règles modifiables d'un seul endroit.
+
+---
+
 ## Structure du projet
 
 ```
-cabinet-app/
+omnes-orga/
 ├── public/
-│   ├── icons/                      ← icônes PWA (192, 512, maskable)
-│   ├── manifest.webmanifest        ← généré par vite-plugin-pwa
-│   └── apple-touch-icon.png        ← icône spécifique iOS
+│   └── (icônes PWA, manifest — à venir étape 12)
+├── docs/
+│   ├── cabinet-medical-app.md      ← ce fichier
+│   └── sql/                        ← scripts SQL versionnés (4B-1, 4B-2, ...)
 ├── src/
-│   ├── pages/
-│   │   ├── Login.jsx
-│   │   ├── Home.jsx                ← grille des 7 icônes
-│   │   ├── Trombinoscope.jsx
-│   │   ├── Annuaire.jsx
-│   │   ├── CabinetPratique.jsx
-│   │   ├── Discussion.jsx
-│   │   ├── Evenements.jsx
-│   │   ├── SIM.jsx
-│   │   ├── Immobilier.jsx
-│   │   └── InstallGuide.jsx        ← guide d'installation iOS/Android
+│   ├── App.jsx                     ← routing react-router-dom
+│   ├── main.jsx                    ← BrowserRouter wrapper
+│   ├── index.css                   ← Tailwind directives
 │   ├── components/
-│   │   ├── Layout.jsx
 │   │   ├── ProtectedRoute.jsx
-│   │   ├── BottomNav.jsx           ← navigation mobile bas d'écran
-│   │   ├── ModuleIcon.jsx          ← icône de la page d'accueil
-│   │   ├── TrelloBoard.jsx         ← composant Kanban réutilisable
-│   │   ├── DriveFolder.jsx         ← composant Drive réutilisable
-│   │   ├── ChatThread.jsx          ← composant chat réutilisable
-│   │   └── InstallPrompt.jsx       ← invitation à installer la PWA
+│   │   ├── common/
+│   │   │   └── ConfirmDialog.jsx
+│   │   ├── home/
+│   │   │   ├── HomeHeader.jsx
+│   │   │   ├── ModuleTile.jsx
+│   │   │   └── ActivityList.jsx
+│   │   ├── layout/
+│   │   │   ├── AppLayout.jsx
+│   │   │   ├── BottomNav.jsx
+│   │   │   └── Filigrane.jsx
+│   │   └── trombinoscope/
+│   │       ├── MedecinCard.jsx
+│   │       └── MedecinForm.jsx
 │   ├── hooks/
 │   │   ├── useAuth.js
 │   │   ├── useRole.js
-│   │   ├── useNotifications.js     ← gestion FCM
-│   │   └── useInstallPrompt.js     ← détection installable PWA
-│   └── lib/
-│       ├── supabaseClient.js
-│       └── firebase.js
-├── vite.config.js                  ← configure vite-plugin-pwa
+│   │   ├── useMedecins.js          ← liste filtrée actif=true
+│   │   └── useMedecin.js           ← fiche unique, ne filtre pas actif
+│   ├── lib/
+│   │   ├── supabaseClient.js
+│   │   ├── modules.js              ← ROLES, ROLE_LABELS, MODULES, getVisibleModules
+│   │   └── permissions.js          ← helpers d'autorisation Trombinoscope
+│   └── pages/
+│       ├── Login.jsx
+│       ├── Home.jsx
+│       ├── Trombinoscope.jsx
+│       └── MedecinDetail.jsx
+├── vite.config.js
+├── tailwind.config.js
 ├── .env
 ├── .env.example
 └── README.md
 ```
+
+**Fichiers à venir (étapes ultérieures)** : pages `Annuaire`, `CabinetPratique`, `Discussion`, `Evenements`, `SIM`, `Immobilier`, `InstallGuide`, `ProfilPersonnel` ; composants `TrelloBoard`, `DriveFolder`, `ChatThread`, `InstallPrompt`, `ModuleIcon` ; hooks `useNotifications`, `useInstallPrompt` ; lib `firebase.js`.
 
 ---
 
@@ -334,20 +441,45 @@ VITE_FIREBASE_VAPID_KEY=...
 
 ## Plan de développement (ordre recommandé)
 
-1. **Étape 1** — Initialiser le projet React + Vite + Tailwind + Supabase
-2. **Étape 2** — Authentification, table `profiles`, routes protégées par rôle
-3. **Étape 3** — Page d'accueil mobile (grille 7 icônes, masquage selon rôle)
-4. **Étape 4** — Module Trombinoscope (cartes, photo, droits)
+1. ✓ **Étape 1 — FAITE** — Init React + Vite + Tailwind avec palette Omnès, polices Google Fonts (Inter + Archivo), mode prudent Claude Code activé.
+2. ✓ **Étape 2 — FAITE** (sous-étapes 2A → 2E)
+   - 2A : Compte + projet Supabase "OMNES ORGA"
+   - 2B : Table `profiles` avec contraintes
+   - 2C-1 : Table `profiles_compta` avec contraintes
+   - 2C-2 : RLS + 5 policies sur `profiles`
+   - 2C-3 : RLS + 7 policies sur `profiles_compta`
+   - 2D : Frontend connecté à Supabase via `supabaseClient.js`
+   - 2E : Auth complète (signup / signin / signout) + trigger `on_auth_user_created`
+3. ✓ **Étape 3 — FAITE** — Home avec grille 7 modules colorés, filigrane SVG décoratif, bottom nav 3 onglets (état local), masquage des modules selon le rôle, mini-écran Profil temporaire.
+4. ✓ **Étape 4 — FAITE** (sous-étapes 4A → 4D, sauf création de médecin volontairement reportée)
+   - 4A : Routing react-router-dom v6 (BrowserRouter, Routes, ProtectedRoute, Outlet)
+   - 4B : Données de test (3 médecins fictifs) + 2 nouveaux champs `jours_disponibles` + `notes_internes` (scripts SQL versionnés `docs/sql/4B-1` et `docs/sql/4B-2`)
+   - 4C : Affichage cartes en lecture seule + tri alphabétique + filtre `actif=true`
+   - 4C-bis : Visibilité fine (`canViewNotes`, `canViewSchedule`) avec sécurité par défaut
+   - 4D-1 : Audit + plan
+   - 4D-2 : Hook `useMedecin` + Page `MedecinDetail` (lecture seule)
+   - 4D-3 : `MedecinForm` + mode édition (toggle view/edit sur la même page)
+   - 4D-4 : `ConfirmDialog` + soft delete (désactiver / réactiver)
+   - 4D-5 : Tests fonctionnels + commit
 5. **Étape 5** — Module Annuaire (liste collaborative)
 6. **Étape 6** — Module Cabinet pratique (Drive)
-7. **Étape 7** — Module Événements (Drive)
-8. **Étape 8** — Module SIM (Drive restreint)
-9. **Étape 9** — Composants réutilisables : TrelloBoard + ChatThread
-10. **Étape 10** — Module Discussion (tableaux + invitations + chat)
-11. **Étape 11** — Module Immobilier (mêmes composants que Discussion)
+7. **Étape 7** — Module Discussion (tableaux + invitations + chat)
+8. **Étape 8** — Module Événements (Drive)
+9. **Étape 9** — Module SIM (Drive restreint)
+10. **Étape 10** — Module Immobilier (mêmes composants que Discussion)
+11. **Étape 11** — Page Profil personnelle + gestion `profiles_compta`
 12. **Étape 12** — Configuration PWA (manifest, service worker, icônes, page guide d'installation)
 13. **Étape 13** — Déploiement Vercel + tests installation iOS et Android
 14. **Étape 14** — Notifications push Firebase FCM (à faire après que la PWA fonctionne)
+
+---
+
+## Limitations connues
+
+- **BottomNav non reliée au routing** — la barre de navigation du bas (3 onglets : Accueil, Rechercher, Profil) fonctionne uniquement sur la page Home, où elle est gérée via un `useState` local. Sur les autres pages (`Trombinoscope`, `MedecinDetail`), la BottomNav s'affiche mais les clics sur les onglets ne déclenchent pas de navigation. À corriger lors d'une étape ultérieure en migrant la BottomNav vers `<NavLink>` de react-router-dom (avec ouverture des routes correspondantes).
+- **Création d'un médecin sans UI dédiée** — pas de bouton "+" dans l'application. Workflow actuel : super_admin crée un AuthUser dans le dashboard Supabase, le trigger `on_auth_user_created` insère la ligne `profiles` avec valeurs par défaut, puis super_admin enrichit le profil via le formulaire d'édition. Industrialisation possible plus tard via une Supabase Edge Function (cf. section Trombinoscope > Création d'un médecin).
+- **Filtrage des champs sensibles côté frontend** — la RLS `profiles_select_all_authenticated` autorise la lecture de toute la table `profiles` à tout utilisateur authentifié. Le masquage de `jours_disponibles` et `notes_internes` pour les remplaçants se fait côté React. Si on a besoin d'une sécurité forte (les remplaçants ne doivent jamais voir ces données via une requête manuelle), migrer vers une vue PostgreSQL filtrée par rôle.
+- **Pas d'UI pour `profiles_compta`** — la table existe et est protégée par RLS, mais la gestion des informations bancaires sera traitée à l'étape 11.
 
 ---
 
