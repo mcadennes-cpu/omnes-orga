@@ -4,6 +4,8 @@ import Login from './pages/Login'
 import Home from './pages/Home'
 import Trombinoscope from './pages/Trombinoscope'
 import MedecinDetail from './pages/MedecinDetail'
+import Recherche from './pages/Recherche'
+import Profil from './pages/Profil'
 
 export default function App() {
   return (
@@ -13,6 +15,8 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/trombinoscope" element={<Trombinoscope />} />
         <Route path="/trombinoscope/:id" element={<MedecinDetail />} />
+        <Route path="/recherche" element={<Recherche />} />
+        <Route path="/profil" element={<Profil />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

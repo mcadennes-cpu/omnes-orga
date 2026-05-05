@@ -104,7 +104,7 @@ export default function MedecinDetail() {
   }
 
   return (
-    <AppLayout activeTab={null}>
+    <AppLayout>
       <header className="flex items-center gap-3 px-5 pt-6 pb-4">
         <button
           type="button"

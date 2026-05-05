@@ -356,6 +356,8 @@ La navigation utilise **react-router-dom v6**. `main.jsx` enveloppe l'applicatio
 | `/` | protégée | `Home` |
 | `/trombinoscope` | protégée | `Trombinoscope` |
 | `/trombinoscope/:id` | protégée | `MedecinDetail` (lecture + édition) |
+| `/recherche` | protégée | `Recherche` (filtre Trombinoscope, vouée à s'étendre aux autres modules) |
+| `/profil` | protégée | `Profil` (infos compte + déconnexion ; sera enrichi à l'étape 11) |
 | `*` | — | redirect vers `/` |
 
 Mécanique :
@@ -365,6 +367,8 @@ Mécanique :
 ### Composants réutilisables transverses
 
 - **`src/components/common/ConfirmDialog.jsx`** — modal de confirmation Tailwind générique. Props : `{ open, title, message, onConfirm, onCancel, confirmLabel, cancelLabel, confirmVariant, submitting }`. Variants : `'primary'` (bg-marine) et `'danger'` (bg-brique). A11y : `role="dialog"`, `aria-modal`, `aria-labelledby`. Bloque le scroll du body et capte la touche Escape pendant l'ouverture. Utilisé actuellement pour la désactivation/réactivation Trombinoscope, à réutiliser pour les futures suppressions (événements, entrées d'annuaire, etc.).
+
+- **`src/components/layout/BottomNav.jsx`** — barre de navigation basse fixe (3 onglets : Accueil, Rechercher, Profil). Utilise `<NavLink>` de react-router-dom : navigue par URL et calcule l'état actif via la prop render `({ isActive })`. Aucune prop n'est passée par les pages — la nav est entièrement autonome. L'onglet Accueil utilise `end={true}` pour matching exact (sinon il resterait actif sur toutes les routes).
 
 ### Helpers de permissions
 
@@ -413,7 +417,9 @@ omnes-orga/
 │       ├── Login.jsx
 │       ├── Home.jsx
 │       ├── Trombinoscope.jsx
-│       └── MedecinDetail.jsx
+│       ├── MedecinDetail.jsx
+│       ├── Recherche.jsx           ← etape 4-bis
+│       └── Profil.jsx              ← etape 4-bis
 ├── vite.config.js
 ├── tailwind.config.js
 ├── .env
@@ -421,7 +427,7 @@ omnes-orga/
 └── README.md
 ```
 
-**Fichiers à venir (étapes ultérieures)** : pages `Annuaire`, `CabinetPratique`, `Discussion`, `Evenements`, `SIM`, `Immobilier`, `InstallGuide`, `ProfilPersonnel` ; composants `TrelloBoard`, `DriveFolder`, `ChatThread`, `InstallPrompt`, `ModuleIcon` ; hooks `useNotifications`, `useInstallPrompt` ; lib `firebase.js`.
+**Fichiers à venir (étapes ultérieures)** : pages `Annuaire`, `CabinetPratique`, `Discussion`, `Evenements`, `SIM`, `Immobilier`, `InstallGuide` ; composants `TrelloBoard`, `DriveFolder`, `ChatThread`, `InstallPrompt`, `ModuleIcon` ; hooks `useNotifications`, `useInstallPrompt` ; lib `firebase.js`.
 
 ---
 
@@ -461,6 +467,12 @@ VITE_FIREBASE_VAPID_KEY=...
    - 4D-3 : `MedecinForm` + mode édition (toggle view/edit sur la même page)
    - 4D-4 : `ConfirmDialog` + soft delete (désactiver / réactiver)
    - 4D-5 : Tests fonctionnels + commit
+   4-bis. ✓ **Étape 4-bis — FAITE** — Refacto BottomNav + pages /recherche et /profil
+  - Migration de la BottomNav vers `<NavLink>` de react-router-dom (fin de la simulation par `useState` local).
+  - Création de la page `/profil` (infos compte + déconnexion, déplacés depuis `Home.jsx`).
+  - Création de la page `/recherche` (input + filtre du Trombinoscope par nom/prénom/spécialité ; couvrira les autres modules au fil du projet).
+  - Allègement de `Home.jsx` (~96 → ~36 lignes).
+  - Refacto `AppLayout.jsx` (suppression des props `activeTab` et `onTabChange`, devenues inutiles).
 5. **Étape 5** — Module Annuaire (liste collaborative)
 6. **Étape 6** — Module Cabinet pratique (Drive)
 7. **Étape 7** — Module Discussion (tableaux + invitations + chat)
@@ -476,7 +488,6 @@ VITE_FIREBASE_VAPID_KEY=...
 
 ## Limitations connues
 
-- **BottomNav non reliée au routing** — la barre de navigation du bas (3 onglets : Accueil, Rechercher, Profil) fonctionne uniquement sur la page Home, où elle est gérée via un `useState` local. Sur les autres pages (`Trombinoscope`, `MedecinDetail`), la BottomNav s'affiche mais les clics sur les onglets ne déclenchent pas de navigation. À corriger lors d'une étape ultérieure en migrant la BottomNav vers `<NavLink>` de react-router-dom (avec ouverture des routes correspondantes).
 - **Création d'un médecin sans UI dédiée** — pas de bouton "+" dans l'application. Workflow actuel : super_admin crée un AuthUser dans le dashboard Supabase, le trigger `on_auth_user_created` insère la ligne `profiles` avec valeurs par défaut, puis super_admin enrichit le profil via le formulaire d'édition. Industrialisation possible plus tard via une Supabase Edge Function (cf. section Trombinoscope > Création d'un médecin).
 - **Filtrage des champs sensibles côté frontend** — la RLS `profiles_select_all_authenticated` autorise la lecture de toute la table `profiles` à tout utilisateur authentifié. Le masquage de `jours_disponibles` et `notes_internes` pour les remplaçants se fait côté React. Si on a besoin d'une sécurité forte (les remplaçants ne doivent jamais voir ces données via une requête manuelle), migrer vers une vue PostgreSQL filtrée par rôle.
 - **Pas d'UI pour `profiles_compta`** — la table existe et est protégée par RLS, mais la gestion des informations bancaires sera traitée à l'étape 11.
