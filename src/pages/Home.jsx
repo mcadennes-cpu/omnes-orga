@@ -23,6 +23,10 @@ export default function Home() {
       navigate('/trombinoscope')
       return
     }
+    if (moduleKey === 'annuaire') {
+      navigate('/annuaire')
+      return
+    }
     alert(`Module "${moduleKey}" à venir`)
   }
 

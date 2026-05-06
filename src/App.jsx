@@ -4,6 +4,7 @@ import Login from './pages/Login'
 import Home from './pages/Home'
 import Trombinoscope from './pages/Trombinoscope'
 import MedecinDetail from './pages/MedecinDetail'
+import Annuaire from './pages/Annuaire'
 import Recherche from './pages/Recherche'
 import Profil from './pages/Profil'
 
@@ -15,6 +16,7 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/trombinoscope" element={<Trombinoscope />} />
         <Route path="/trombinoscope/:id" element={<MedecinDetail />} />
+        <Route path="/annuaire" element={<Annuaire />} />
         <Route path="/recherche" element={<Recherche />} />
         <Route path="/profil" element={<Profil />} />
       </Route>
