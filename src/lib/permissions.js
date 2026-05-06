@@ -18,3 +18,17 @@ export function canToggleActif(role) {
 export function canViewSensitiveFields(role) {
   return Boolean(role) && role !== ROLES.REMPLACANT
 }
+
+export function canEditEntreeAnnuaire({ role, currentUserId, auteurId }) {
+  if (!role) return false
+  if (role === ROLES.SUPER_ADMIN) return true
+  if (role === ROLES.ASSOCIE_GERANT) return true
+  return Boolean(currentUserId) && currentUserId === auteurId
+}
+
+export function canDeleteEntreeAnnuaire({ role, currentUserId, auteurId }) {
+  if (!role) return false
+  if (role === ROLES.SUPER_ADMIN) return true
+  if (role === ROLES.ASSOCIE_GERANT) return true
+  return Boolean(currentUserId) && currentUserId === auteurId
+}
