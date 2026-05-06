@@ -1,4 +1,5 @@
 import { Phone, Calendar } from 'lucide-react'
+import { getAvatarPalette } from '../../lib/avatarColor'
 
 function getInitials(prenom, nom) {
   const p = (prenom ?? '').trim().charAt(0).toUpperCase()
@@ -8,6 +9,7 @@ function getInitials(prenom, nom) {
 
 export default function MedecinCard({ medecin, canViewNotes = false, canViewSchedule = false }) {
   const {
+    id,
     prenom,
     nom,
     specialite,
@@ -20,6 +22,7 @@ export default function MedecinCard({ medecin, canViewNotes = false, canViewSche
   const fullName = [prenom, nom].filter(Boolean).join(' ').trim()
   const initials = getInitials(prenom, nom)
   const showNotes = canViewNotes && notes_internes && notes_internes.trim() !== ''
+  const avatar = getAvatarPalette(`${prenom} ${nom}`)
 
   return (
     <article className="bg-carte border border-border rounded-card p-4 flex flex-col gap-3">
@@ -33,7 +36,7 @@ export default function MedecinCard({ medecin, canViewNotes = false, canViewSche
         ) : (
           <div
             aria-hidden="true"
-            className="h-[60px] w-[60px] rounded-full bg-canard text-white font-bold text-lg flex items-center justify-center flex-shrink-0"
+            className={`h-[60px] w-[60px] rounded-full ${avatar.bg} ${avatar.text} font-bold text-lg flex items-center justify-center flex-shrink-0`}
           >
             {initials}
           </div>

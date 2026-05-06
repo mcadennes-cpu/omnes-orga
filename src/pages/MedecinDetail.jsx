@@ -15,6 +15,7 @@ import {
   canToggleActif,
   canViewSensitiveFields,
 } from '../lib/permissions'
+import { getAvatarPalette } from '../lib/avatarColor'
 
 function getInitials(prenom, nom) {
   const p = (prenom ?? '').trim().charAt(0).toUpperCase()
@@ -39,6 +40,7 @@ export default function MedecinDetail() {
     ? [medecin.prenom, medecin.nom].filter(Boolean).join(' ').trim()
     : ''
   const initials = medecin ? getInitials(medecin.prenom, medecin.nom) : '?'
+  const avatar = getAvatarPalette(medecin ? `${medecin.prenom} ${medecin.nom}` : null)
 
   const canEdit = canEditMedecin({
     role,
@@ -169,7 +171,7 @@ export default function MedecinDetail() {
               ) : (
                 <div
                   aria-hidden="true"
-                  className="h-20 w-20 rounded-full bg-canard text-white font-bold text-2xl flex items-center justify-center flex-shrink-0"
+                  className={`h-20 w-20 rounded-full ${avatar.bg} ${avatar.text} font-bold text-2xl flex items-center justify-center flex-shrink-0`}
                 >
                   {initials}
                 </div>
