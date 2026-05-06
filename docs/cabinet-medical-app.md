@@ -218,6 +218,25 @@ Cette approche (option D du plan 4D) évite de manipuler `auth.admin.createUser`
 
 Pas de chat dans ce module.
 
+#### Routing du module
+
+- `/annuaire` — liste avec recherche locale, filtre par catégorie et bouton "+ Ajouter".
+- `/annuaire/nouveau` — formulaire de création (utilise EntreeAnnuaireForm).
+- `/annuaire/:id` — fiche détail/édition (toggle view/edit sur la même page) + bouton Supprimer.
+
+#### Permissions fines
+
+La logique d'autorisation est dans [src/lib/permissions.js](../src/lib/permissions.js) :
+
+- `canEditEntreeAnnuaire({ role, currentUserId, auteurId })` — true si super_admin OU associe_gerant OU auteur de l'entrée.
+- `canDeleteEntreeAnnuaire(...)` — même règle que canEditEntreeAnnuaire.
+
+Défense en profondeur : la RLS Postgres applique strictement les mêmes règles côté serveur (cf docs/sql/5A-2-rls-annuaire.sql), indépendamment de ce qui passe côté frontend.
+
+#### Hard delete
+
+Contrairement au Trombinoscope qui utilise un soft delete via `actif`, l'Annuaire fait un hard DELETE en base. Justification : les entrées d'annuaire n'ont pas de lien fort avec auth.users (juste auteur_id en ON DELETE SET NULL), et il n'y a pas de nécessité de garder un historique. Le ConfirmDialog (variant danger) protège contre les suppressions accidentelles.
+
 ---
 
 ### 3. Cabinet pratique
@@ -384,13 +403,15 @@ omnes-orga/
 │   └── (icônes PWA, manifest — à venir étape 12)
 ├── docs/
 │   ├── cabinet-medical-app.md      ← ce fichier
-│   └── sql/                        ← scripts SQL versionnés (4B-1, 4B-2, ...)
+│   └── sql/                        ← scripts SQL versionnés (4B-1, 4B-2, 5A-1, 5A-2, ...)
 ├── src/
 │   ├── App.jsx                     ← routing react-router-dom
 │   ├── main.jsx                    ← BrowserRouter wrapper
 │   ├── index.css                   ← Tailwind directives
 │   ├── components/
 │   │   ├── ProtectedRoute.jsx
+│   │   ├── annuaire/
+│   │   │   └── EntreeAnnuaireForm.jsx
 │   │   ├── common/
 │   │   │   └── ConfirmDialog.jsx
 │   │   ├── home/
@@ -408,7 +429,9 @@ omnes-orga/
 │   │   ├── useAuth.js
 │   │   ├── useRole.js
 │   │   ├── useMedecins.js          ← liste filtrée actif=true
-│   │   └── useMedecin.js           ← fiche unique, ne filtre pas actif
+│   │   ├── useMedecin.js           ← fiche unique, ne filtre pas actif
+│   │   ├── useEntreesAnnuaire.js   ← liste annuaire avec auteur joint
+│   │   └── useEntreeAnnuaire.js    ← fiche annuaire unique
 │   ├── lib/
 │   │   ├── supabaseClient.js
 │   │   ├── modules.js              ← ROLES, ROLE_LABELS, MODULES, getVisibleModules
@@ -419,7 +442,10 @@ omnes-orga/
 │       ├── Trombinoscope.jsx
 │       ├── MedecinDetail.jsx
 │       ├── Recherche.jsx           ← etape 4-bis
-│       └── Profil.jsx              ← etape 4-bis
+│       ├── Profil.jsx              ← etape 4-bis
+│       ├── Annuaire.jsx            ← etape 5
+│       ├── EntreeAnnuaireDetail.jsx ← etape 5
+│       └── EntreeAnnuaireNouvelle.jsx ← etape 5
 ├── vite.config.js
 ├── tailwind.config.js
 ├── .env
@@ -473,7 +499,17 @@ VITE_FIREBASE_VAPID_KEY=...
   - Création de la page `/recherche` (input + filtre du Trombinoscope par nom/prénom/spécialité ; couvrira les autres modules au fil du projet).
   - Allègement de `Home.jsx` (~96 → ~36 lignes).
   - Refacto `AppLayout.jsx` (suppression des props `activeTab` et `onTabChange`, devenues inutiles).
-5. **Étape 5** — Module Annuaire (liste collaborative)
+5. ✓ **Étape 5 — FAITE** (sous-étapes 5A → 5H)
+   - 5A : Table public.annuaire + RLS (4 policies) + index + trigger updated_at
+   - 5B : Hooks useEntreesAnnuaire (liste avec auteur joint) + useEntreeAnnuaire (singulier)
+   - 5C : Helpers canEditEntreeAnnuaire + canDeleteEntreeAnnuaire dans permissions.js
+   - 5D-1 : Page /annuaire (liste basique) + tuile Home câblée
+   - 5D-2 : Recherche texte (nom/catégorie/note) + filtre par catégorie + compteur
+   - 5D-3 : Bouton + Ajouter + route /annuaire/nouveau
+   - 5E : Composant EntreeAnnuaireForm (création + édition, auto-complete catégorie via datalist)
+   - 5F : Page /annuaire/:id (détail + édition + suppression hard) + lignes cliquables
+   - 5G : Page /annuaire/nouveau fonctionnelle (INSERT avec auteur_id, redirige vers la fiche créée)
+   - 5H : Tests multi-rôles + mise à jour doc
 6. **Étape 6** — Module Cabinet pratique (Drive)
 7. **Étape 7** — Module Discussion (tableaux + invitations + chat)
 8. **Étape 8** — Module Événements (Drive)
