@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useEntreesAnnuaire } from '../hooks/useEntreesAnnuaire'
 import AppLayout from '../components/layout/AppLayout'
 
@@ -9,8 +9,6 @@ export default function Annuaire() {
   const [search, setSearch] = useState('')
   const [categorie, setCategorie] = useState('')
 
-  // Liste des categories distinctes existantes, triees pour le dropdown.
-  // Recalcul uniquement si la liste des entrees change (pas a chaque render).
   const categories = useMemo(() => {
     const set = new Set(
       entrees
@@ -20,7 +18,6 @@ export default function Annuaire() {
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'fr'))
   }, [entrees])
 
-  // Filtrage combine : recherche texte (nom + categorie + note) ET filtre categorie.
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return entrees.filter((e) => {
@@ -100,28 +97,27 @@ export default function Annuaire() {
             ) : (
               <ul className="space-y-2">
                 {filtered.map((e) => (
-                  <li
-                    key={e.id}
-                    className="rounded-lg border border-gray-200 bg-white p-3"
-                  >
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="font-semibold text-marine">
-                        {e.nom}
-                      </span>
-                      {e.categorie && (
-                        <span className="shrink-0 text-xs text-muted">
-                          {e.categorie}
+                  <li key={e.id}>
+                    <Link
+                      to={`/annuaire/${e.id}`}
+                      className="block rounded-lg border border-gray-200 bg-white p-3 transition hover:bg-gray-50 active:bg-gray-100"
+                    >
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="font-semibold text-marine">
+                          {e.nom}
+                        </span>
+                        {e.categorie && (
+                          <span className="shrink-0 text-xs text-muted">
+                            {e.categorie}
+                          </span>
+                        )}
+                      </div>
+                      {e.telephone && (
+                        <span className="mt-1 inline-block text-sm text-canard">
+                          {e.telephone}
                         </span>
                       )}
-                    </div>
-                    {e.telephone && (
-                      <a
-                        href={`tel:${e.telephone}`}
-                        className="mt-1 inline-block text-sm text-canard"
-                      >
-                        {e.telephone}
-                      </a>
-                    )}
+                    </Link>
                   </li>
                 ))}
               </ul>
