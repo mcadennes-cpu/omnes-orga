@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useEntreesAnnuaire } from '../hooks/useEntreesAnnuaire'
 import AppLayout from '../components/layout/AppLayout'
 
 export default function Annuaire() {
+  const navigate = useNavigate()
   const { entrees, loading, error } = useEntreesAnnuaire()
   const [search, setSearch] = useState('')
   const [categorie, setCategorie] = useState('')
@@ -22,9 +24,7 @@ export default function Annuaire() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return entrees.filter((e) => {
-      // Filtre categorie
       if (categorie && e.categorie !== categorie) return false
-      // Filtre recherche texte
       if (q) {
         const haystack = [e.nom ?? '', e.categorie ?? '', e.note ?? '']
           .join(' ')
@@ -39,11 +39,20 @@ export default function Annuaire() {
 
   return (
     <AppLayout>
-      <div className="px-5 pt-6">
-        <h1 className="text-2xl font-bold text-marine">Annuaire</h1>
-        <p className="mt-1 text-sm text-muted">
-          Carnet d'adresses partagé du cabinet
-        </p>
+      <div className="flex items-start justify-between gap-3 px-5 pt-6">
+        <div>
+          <h1 className="text-2xl font-bold text-marine">Annuaire</h1>
+          <p className="mt-1 text-sm text-muted">
+            Carnet d'adresses partagé du cabinet
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate('/annuaire/nouveau')}
+          className="shrink-0 rounded-lg bg-canard px-3 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 active:opacity-80"
+        >
+          + Ajouter
+        </button>
       </div>
 
       <div className="mt-4 space-y-2 px-5">
