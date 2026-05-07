@@ -2,6 +2,46 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  /* Display - Archivo */
+  .text-wordmark {
+    @apply font-display text-[22px] font-black tracking-[-0.005em];
+  }
+  .text-h1 {
+    @apply font-display text-[24px] font-extrabold tracking-[-0.01em];
+  }
+  .text-h2 {
+    @apply font-display text-[18px] font-extrabold;
+  }
+
+  /* Body - Inter */
+  .text-body-l {
+    @apply font-sans text-[15px] leading-[1.5];
+  }
+  .text-body-m {
+    @apply font-sans text-[14px];
+  }
+  .text-caption {
+    @apply font-sans text-[13px] text-muted;
+  }
+
+  /* Labels - Inter uppercase */
+  .text-eyebrow {
+    @apply font-sans text-[11px] font-semibold uppercase tracking-[0.16em] text-faint;
+  }
+  .text-tagline {
+    @apply font-sans text-[11px] font-medium uppercase tracking-[0.22em] text-faint;
+  }
+  .text-field-label {
+    @apply font-sans text-[11px] font-semibold uppercase tracking-[0.14em] text-faint;
+  }
+
+  /* Action */
+  .text-button {
+    @apply font-sans text-[15px] font-semibold tracking-[0.01em];
+  }
+}
+
 body {
   @apply bg-fond text-ink font-sans;
 }
