@@ -389,6 +389,18 @@ Mécanique :
 
 - **`src/components/layout/BottomNav.jsx`** — barre de navigation basse fixe (3 onglets : Accueil, Rechercher, Profil). Utilise `<NavLink>` de react-router-dom : navigue par URL et calcule l'état actif via la prop render `({ isActive })`. Aucune prop n'est passée par les pages — la nav est entièrement autonome. L'onglet Accueil utilise `end={true}` pour matching exact (sinon il resterait actif sur toutes les routes).
 
+### Design system
+
+Les tokens couleurs, typographies, radii et shadows sont centralisés dans `tailwind.config.js`. Une couche de classes typo composées est définie dans `src/index.css` via `@layer components`.
+
+**Couleurs de marque** : `marine` (primary/CTA/Cabinet pratique), `canard` (Trombinoscope, Immobilier, liens), `ocre` (Annuaire), `olive` (SIM), `brique` (Discussion, danger), `fuchsia` (Événements). **Surfaces** : `fond` (#F5F7F9), `carte` (#FFFFFF). **Opacités du marine** : `ink` (100%), `muted` (55%), `faint` (35%), `border` (8%), `overlay` (40%, pour les fonds de modale).
+
+**Typographies** : préférer les classes composées `.text-h1`, `.text-h2`, `.text-wordmark` (Archivo) et `.text-body-l`, `.text-body-m`, `.text-caption`, `.text-eyebrow`, `.text-tagline`, `.text-field-label`, `.text-button` (Inter) plutôt que de combiner les classes Tailwind à la main. Cela garantit la cohérence des tailles, weights et letter-spacings d'un écran à l'autre.
+
+**Radii** : `rounded-tile` (18px, tuiles modules), `rounded-card` (16px, cartes/dialogs), `rounded-input` (14px, inputs et CTA primary), `rounded-pill` (10px, chips et boutons icônes).
+
+**Shadows** : `shadow-card` (cartes/list items, très subtile), `shadow-button` (CTA primary, plus marquée), `shadow-tile` (tuiles modules colorées). Toutes utilisent une teinte marine plutôt que du noir pur.
+
 ### Helpers de permissions
 
 `src/lib/permissions.js` centralise les règles d'accès du Trombinoscope (cf. section "Permissions fines" du module 1). Les pages et composants importent ces helpers plutôt que de tester `role` directement, ce qui rend les règles modifiables d'un seul endroit.
@@ -511,6 +523,7 @@ VITE_FIREBASE_VAPID_KEY=...
    - 5G : Page /annuaire/nouveau fonctionnelle (INSERT avec auteur_id, redirige vers la fiche créée)
    - 5H : Tests multi-rôles + mise à jour doc
 6. **Étape 6** — Module Cabinet pratique (Drive)
+   - 6.0. ✓ **FAITE** — Mise à jour design system : ajout des tokens `overlay` (couleur), `pill` (radius), `card`/`button`/`tile` (shadows) dans `tailwind.config.js` ; ajout de 10 classes typo composées dans `src/index.css` via `@layer components` (`.text-wordmark`, `.text-h1`, `.text-h2`, `.text-body-l`, `.text-body-m`, `.text-caption`, `.text-eyebrow`, `.text-tagline`, `.text-field-label`, `.text-button`).
 7. **Étape 7** — Module Discussion (tableaux + invitations + chat)
 8. **Étape 8** — Module Événements (Drive)
 9. **Étape 9** — Module SIM (Drive restreint)
