@@ -523,7 +523,20 @@ VITE_FIREBASE_VAPID_KEY=...
    - 5G : Page /annuaire/nouveau fonctionnelle (INSERT avec auteur_id, redirige vers la fiche créée)
    - 5H : Tests multi-rôles + mise à jour doc
 6. **Étape 6** — Module Cabinet pratique (Drive)
+   -6. **Étape 6** — Module Cabinet pratique (Drive)
    - 6.0. ✓ **FAITE** — Mise à jour design system : ajout des tokens `overlay` (couleur), `pill` (radius), `card`/`button`/`tile` (shadows) dans `tailwind.config.js` ; ajout de 10 classes typo composées dans `src/index.css` via `@layer components` (`.text-wordmark`, `.text-h1`, `.text-h2`, `.text-body-l`, `.text-body-m`, `.text-caption`, `.text-eyebrow`, `.text-tagline`, `.text-field-label`, `.text-button`).
+   - 6A : Setup Supabase Storage — bucket `cabinet-pratique` (privé) + 4 Storage policies (SELECT/INSERT/UPDATE/DELETE) calées sur le rôle utilisateur + test manuel d'upload via dashboard.
+   - 6B : Tables `cabinet_dossiers` (hiérarchie via `parent_id`) + `cabinet_fichiers` + RLS (4 policies par table) + index + triggers `updated_at`.
+   - 6C : Hooks `useDossiersEnfants(parent_id)` (liste les sous-dossiers d'un dossier) + `useFichiersDossier(dossier_id)` (liste les fichiers d'un dossier, avec auteur joint).
+   - 6D : Helpers `canEditCabinet` + `canDeleteCabinet` dans `permissions.js` (autorisés : `super_admin`, `associe_gerant`).
+   - 6E-1 : Page `/cabinet` racine + tuile Home câblée (affichage des dossiers et fichiers de la racine, sans navigation arborescente pour l'instant).
+   - 6E-2 : Navigation arborescente — route `/cabinet/:dossier_id` + breadcrumb (fil d'Ariane), clic sur un dossier descend dedans.
+   - 6E-3 : Recherche texte dans le dossier courant uniquement (nom de dossier ou de fichier) + compteur d'éléments.
+   - 6E-4 : Boutons « + Nouveau dossier » et « + Uploader fichier » (visibles si `super_admin` ou `associe_gerant`) + route `/cabinet/:dossier_id/nouveau-dossier`.
+   - 6F : Modale upload fichier — sélection → validation taille (≤ 25 Mo applicatif) → upload vers Storage avec UUID comme nom physique → INSERT dans `cabinet_fichiers`. Feedback progression + succès.
+   - 6G : Menu fichier (kebab `⋮`) — Renommer + Supprimer hard avec `ConfirmDialog` (DELETE dans `cabinet_fichiers` ET dans Storage).
+   - 6H : Menu dossier (kebab `⋮`) — Renommer + Supprimer hard avec `ConfirmDialog`. Garde-fou : suppression interdite si le dossier contient encore des éléments (message explicite).
+   - 6I : Tests multi-rôles (gérant/admin = lecture+écriture, associé/remplaçant = lecture seule) + tests cas limites (fichier > 25 Mo, dossier vide, suppression dossier non vide) + mise à jour doc.
 7. **Étape 7** — Module Discussion (tableaux + invitations + chat)
 8. **Étape 8** — Module Événements (Drive)
 9. **Étape 9** — Module SIM (Drive restreint)
