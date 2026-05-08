@@ -16,6 +16,16 @@ export function couleurToHex(couleur) {
   return COULEUR_TO_HEX[couleur] || COULEUR_TO_HEX.gris
 }
 
+// Liste ordonnee des couleurs pour les pickers UI (label + hex resolue depuis la palette).
+export const COULEURS = [
+  { key: 'bleu',   label: 'Bleu',   hex: '#2A8FA8' },
+  { key: 'gris',   label: 'Gris',   hex: '#1C3D52' },
+  { key: 'jaune',  label: 'Jaune',  hex: '#E8A135' },
+  { key: 'orange', label: 'Orange', hex: '#D94F7E' },
+  { key: 'rouge',  label: 'Rouge',  hex: '#D4503A' },
+  { key: 'vert',   label: 'Vert',   hex: '#6B7A3A' },
+]
+
 // ─── Format relatif francais court ─────────────────────────────────────────
 // "aujourd'hui", "hier", "il y a 3 j", "il y a 2 sem.", "il y a 5 mois", "il y a 2 ans"
 export function formatRelative(isoDate) {

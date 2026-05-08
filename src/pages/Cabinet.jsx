@@ -1,6 +1,8 @@
 import { useNavigate } from 'react-router-dom'
 import AppLayout from '../components/layout/AppLayout'
 import DrivePage from '../features/cabinet/DrivePage'
+import { useState } from 'react'
+import NewFolderModal from '../features/cabinet/NewFolderModal'
 import { useCabinetRoot } from '../features/cabinet/useCabinet'
 import { useRole } from '../hooks/useRole'
 import { canEditCabinet } from '../lib/permissions'
@@ -8,7 +10,8 @@ import { canEditCabinet } from '../lib/permissions'
 export default function Cabinet() {
   const navigate = useNavigate()
   const { role, loading: roleLoading } = useRole()
-  const { folders, files, loading: dataLoading, error } = useCabinetRoot()
+  const { folders, files, loading: dataLoading, error, refetch } = useCabinetRoot()
+  const [isNewFolderOpen, setNewFolderOpen] = useState(false)
 
   const loading = roleLoading || dataLoading
 
@@ -44,8 +47,15 @@ export default function Cabinet() {
         onBack={() => navigate('/')}
         onOpenFolder={(id) => navigate(`/cabinet/${id}`)}
         onUpload={() => alert('Upload : à venir')}
-        onNewFolder={() => alert('Nouveau dossier : à venir')}
+        onNewFolder={() => setNewFolderOpen(true)}
       />
+      {isNewFolderOpen && (
+        <NewFolderModal
+          parentId={null}
+          onClose={() => setNewFolderOpen(false)}
+          onCreated={() => { setNewFolderOpen(false); refetch() }}
+        />
+      )}
     </AppLayout>
   )
 }
