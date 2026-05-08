@@ -27,6 +27,10 @@ export default function Home() {
       navigate('/annuaire')
       return
     }
+    if (moduleKey === 'cabinet_pratique') {
+      navigate('/cabinet')
+      return
+    }
     alert(`Module "${moduleKey}" à venir`)
   }
 

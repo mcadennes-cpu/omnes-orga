@@ -9,6 +9,7 @@ import EntreeAnnuaireNouvelle from './pages/EntreeAnnuaireNouvelle'
 import EntreeAnnuaireDetail from './pages/EntreeAnnuaireDetail'
 import Recherche from './pages/Recherche'
 import Profil from './pages/Profil'
+import Cabinet from './pages/Cabinet'
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="/annuaire/:id" element={<EntreeAnnuaireDetail />} />
         <Route path="/recherche" element={<Recherche />} />
         <Route path="/profil" element={<Profil />} />
+        <Route path="/cabinet" element={<Cabinet />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
