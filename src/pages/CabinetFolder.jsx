@@ -1,14 +1,18 @@
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import AppLayout from '../components/layout/AppLayout'
 import DrivePage from '../features/cabinet/DrivePage'
-import { getSubfolder } from '../features/cabinet/data'
+import { useCabinetFolder } from '../features/cabinet/useCabinet'
 import { useRole } from '../hooks/useRole'
 import { canEditCabinet } from '../lib/permissions'
 
 export default function CabinetFolder() {
   const navigate = useNavigate()
-  const { slug } = useParams()
-  const { role, loading } = useRole()
+  const { id } = useParams()
+  const { role, loading: roleLoading } = useRole()
+  const { folder, folders, files, loading: dataLoading, error, notFound } =
+    useCabinetFolder(id)
+
+  const loading = roleLoading || dataLoading
 
   if (loading) {
     return (
@@ -18,9 +22,18 @@ export default function CabinetFolder() {
     )
   }
 
-  const data = getSubfolder(slug)
-  if (!data) {
+  if (notFound) {
     return <Navigate to="/cabinet" replace />
+  }
+
+  if (error || !folder) {
+    return (
+      <AppLayout>
+        <p className="text-center text-brique py-12 px-5">
+          Impossible de charger ce dossier.
+        </p>
+      </AppLayout>
+    )
   }
 
   const canWrite = canEditCabinet(role)
@@ -28,13 +41,17 @@ export default function CabinetFolder() {
   return (
     <AppLayout>
       <DrivePage
-        {...data}
+        trail={['Cabinet pratique', folder.name]}
+        accent={folder.accent}
+        folders={folders}
+        files={files}
         canWrite={canWrite}
         compact={false}
         onBack={() => navigate('/cabinet')}
         onCrumb={(i) => { if (i === 0) navigate('/cabinet') }}
-        onUpload={() => alert('Upload — à venir en 6E-3')}
-        onNewFolder={() => alert('Nouveau dossier — à venir en 6E-3')}
+        onOpenFolder={(childId) => navigate(`/cabinet/${childId}`)}
+        onUpload={() => alert('Upload : à venir')}
+        onNewFolder={() => alert('Nouveau dossier : à venir')}
       />
     </AppLayout>
   )

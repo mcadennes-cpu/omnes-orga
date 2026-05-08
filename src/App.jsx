@@ -26,7 +26,7 @@ export default function App() {
         <Route path="/recherche" element={<Recherche />} />
         <Route path="/profil" element={<Profil />} />
         <Route path="/cabinet" element={<Cabinet />} />
-        <Route path="/cabinet/:slug" element={<CabinetFolder />} />
+        <Route path="/cabinet/:id" element={<CabinetFolder />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

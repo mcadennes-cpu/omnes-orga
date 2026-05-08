@@ -271,11 +271,11 @@ export default function DrivePage({
               <div className="border-b border-border">
                 {folders.map((f) => (
                   <FolderRow
-                    key={f.slug || f.name}
+                    key={f.id || f.slug || f.name}
                     {...f}
                     canWrite={canWrite}
                     showMeta={!compact}
-                    onOpen={() => onOpenFolder && onOpenFolder(f.slug || f.name)}
+                    onOpen={() => onOpenFolder && onOpenFolder(f.id || f.slug || f.name)}
                   />
                 ))}
               </div>
