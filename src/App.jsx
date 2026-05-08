@@ -10,6 +10,7 @@ import EntreeAnnuaireDetail from './pages/EntreeAnnuaireDetail'
 import Recherche from './pages/Recherche'
 import Profil from './pages/Profil'
 import Cabinet from './pages/Cabinet'
+import CabinetFolder from './pages/CabinetFolder'
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="/recherche" element={<Recherche />} />
         <Route path="/profil" element={<Profil />} />
         <Route path="/cabinet" element={<Cabinet />} />
+        <Route path="/cabinet/:slug" element={<CabinetFolder />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

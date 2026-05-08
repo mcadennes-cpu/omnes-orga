@@ -1,12 +1,13 @@
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import AppLayout from '../components/layout/AppLayout'
 import DrivePage from '../features/cabinet/DrivePage'
-import { ROOT } from '../features/cabinet/data'
+import { getSubfolder } from '../features/cabinet/data'
 import { useRole } from '../hooks/useRole'
 import { canEditCabinet } from '../lib/permissions'
 
-export default function Cabinet() {
+export default function CabinetFolder() {
   const navigate = useNavigate()
+  const { slug } = useParams()
   const { role, loading } = useRole()
 
   if (loading) {
@@ -17,16 +18,21 @@ export default function Cabinet() {
     )
   }
 
+  const data = getSubfolder(slug)
+  if (!data) {
+    return <Navigate to="/cabinet" replace />
+  }
+
   const canWrite = canEditCabinet(role)
 
   return (
     <AppLayout>
       <DrivePage
-        {...ROOT}
+        {...data}
         canWrite={canWrite}
-        compact
-        onBack={() => navigate('/')}
-        onOpenFolder={(slug) => navigate(`/cabinet/${slug}`)}
+        compact={false}
+        onBack={() => navigate('/cabinet')}
+        onCrumb={(i) => { if (i === 0) navigate('/cabinet') }}
         onUpload={() => alert('Upload — à venir en 6E-3')}
         onNewFolder={() => alert('Nouveau dossier — à venir en 6E-3')}
       />
