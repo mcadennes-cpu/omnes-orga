@@ -292,7 +292,7 @@ export default function DrivePage({
                     {...f}
                     canWrite={canWrite}
                     showMeta={!compact}
-                    onOpen={() => onOpenFile && onOpenFile(f.id, f.name)}
+                    onOpen={() => onOpenFile && onOpenFile(f.id, f.name, f.mimeType)}
                     onDownload={() => onDownloadFile && onDownloadFile(f.id, f.name)}
                   />
                 ))}

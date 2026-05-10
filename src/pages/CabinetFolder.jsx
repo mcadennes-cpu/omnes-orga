@@ -4,7 +4,7 @@ import AppLayout from '../components/layout/AppLayout'
 import DrivePage from '../features/cabinet/DrivePage'
 import NewFolderModal from '../features/cabinet/NewFolderModal'
 import UploadModal from '../features/cabinet/UploadModal'
-import { downloadCabinetFile } from '../features/cabinet/cabinetStorage'
+import { downloadCabinetFile, openCabinetFile } from '../features/cabinet/cabinetStorage'
 import { useCabinetFolder } from '../features/cabinet/useCabinet'
 import { useRole } from '../hooks/useRole'
 import { canEditCabinet } from '../lib/permissions'
@@ -53,6 +53,15 @@ export default function CabinetFolder() {
     }
   }
 
+  const handleFileOpen = async (id, nom, mimeType) => {
+    try {
+      await openCabinetFile(id, nom, mimeType)
+    } catch (e) {
+      console.error('Ouverture echouee', e)
+      alert("Erreur lors de l'ouverture du fichier.")
+    }
+  }
+
   return (
     <AppLayout>
       <DrivePage
@@ -65,7 +74,7 @@ export default function CabinetFolder() {
         onBack={() => navigate('/cabinet')}
         onCrumb={(i) => { if (i === 0) navigate('/cabinet') }}
         onOpenFolder={(childId) => navigate(`/cabinet/${childId}`)}
-        onOpenFile={handleFileDownload}
+        onOpenFile={handleFileOpen}
         onDownloadFile={handleFileDownload}
         onUpload={() => setUploadOpen(true)}
         onNewFolder={() => setNewFolderOpen(true)}

@@ -4,7 +4,7 @@ import DrivePage from '../features/cabinet/DrivePage'
 import { useState } from 'react'
 import NewFolderModal from '../features/cabinet/NewFolderModal'
 import UploadModal from '../features/cabinet/UploadModal'
-import { downloadCabinetFile } from '../features/cabinet/cabinetStorage'
+import { downloadCabinetFile, openCabinetFile } from '../features/cabinet/cabinetStorage'
 import { useCabinetRoot } from '../features/cabinet/useCabinet'
 import { useRole } from '../hooks/useRole'
 import { canEditCabinet } from '../lib/permissions'
@@ -47,6 +47,15 @@ export default function Cabinet() {
     }
   }
 
+  const handleFileOpen = async (id, nom, mimeType) => {
+    try {
+      await openCabinetFile(id, nom, mimeType)
+    } catch (e) {
+      console.error('Ouverture echouee', e)
+      alert("Erreur lors de l'ouverture du fichier.")
+    }
+  }
+
   return (
     <AppLayout>
       <DrivePage
@@ -58,7 +67,7 @@ export default function Cabinet() {
         compact
         onBack={() => navigate('/')}
         onOpenFolder={(id) => navigate(`/cabinet/${id}`)}
-        onOpenFile={handleFileDownload}
+        onOpenFile={handleFileOpen}
         onDownloadFile={handleFileDownload}
         onUpload={() => setUploadOpen(true)}
         onNewFolder={() => setNewFolderOpen(true)}

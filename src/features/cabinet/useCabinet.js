@@ -70,6 +70,7 @@ function toFileRow(f) {
     name: f.nom,
     author: authorName(f.auteur),
     when: formatRelative(f.created_at),
+    mimeType: f.mime_type,
   }
 }
 
