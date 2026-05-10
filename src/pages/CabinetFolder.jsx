@@ -1,8 +1,10 @@
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { useState } from 'react'
 import AppLayout from '../components/layout/AppLayout'
 import DrivePage from '../features/cabinet/DrivePage'
-import { useState } from 'react'
 import NewFolderModal from '../features/cabinet/NewFolderModal'
+import UploadModal from '../features/cabinet/UploadModal'
+import { downloadCabinetFile } from '../features/cabinet/cabinetStorage'
 import { useCabinetFolder } from '../features/cabinet/useCabinet'
 import { useRole } from '../hooks/useRole'
 import { canEditCabinet } from '../lib/permissions'
@@ -14,6 +16,7 @@ export default function CabinetFolder() {
   const { folder, folders, files, loading: dataLoading, error, notFound, refetch } =
     useCabinetFolder(id)
   const [isNewFolderOpen, setNewFolderOpen] = useState(false)
+  const [isUploadOpen, setUploadOpen] = useState(false)
 
   const loading = roleLoading || dataLoading
 
@@ -41,6 +44,15 @@ export default function CabinetFolder() {
 
   const canWrite = canEditCabinet(role)
 
+  const handleFileDownload = async (id, nom) => {
+    try {
+      await downloadCabinetFile(id, nom)
+    } catch (e) {
+      console.error('Telechargement echoue', e)
+      alert('Erreur lors du téléchargement.')
+    }
+  }
+
   return (
     <AppLayout>
       <DrivePage
@@ -53,7 +65,9 @@ export default function CabinetFolder() {
         onBack={() => navigate('/cabinet')}
         onCrumb={(i) => { if (i === 0) navigate('/cabinet') }}
         onOpenFolder={(childId) => navigate(`/cabinet/${childId}`)}
-        onUpload={() => alert('Upload : à venir')}
+        onOpenFile={handleFileDownload}
+        onDownloadFile={handleFileDownload}
+        onUpload={() => setUploadOpen(true)}
         onNewFolder={() => setNewFolderOpen(true)}
       />
       {isNewFolderOpen && (
@@ -61,6 +75,14 @@ export default function CabinetFolder() {
           parentId={folder.id}
           onClose={() => setNewFolderOpen(false)}
           onCreated={() => { setNewFolderOpen(false); refetch() }}
+        />
+      )}
+      {isUploadOpen && (
+        <UploadModal
+          dossierId={folder.id}
+          dossierName={folder.name}
+          onClose={() => setUploadOpen(false)}
+          onUploaded={() => { setUploadOpen(false); refetch() }}
         />
       )}
     </AppLayout>

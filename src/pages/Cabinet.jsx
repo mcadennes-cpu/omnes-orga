@@ -3,6 +3,8 @@ import AppLayout from '../components/layout/AppLayout'
 import DrivePage from '../features/cabinet/DrivePage'
 import { useState } from 'react'
 import NewFolderModal from '../features/cabinet/NewFolderModal'
+import UploadModal from '../features/cabinet/UploadModal'
+import { downloadCabinetFile } from '../features/cabinet/cabinetStorage'
 import { useCabinetRoot } from '../features/cabinet/useCabinet'
 import { useRole } from '../hooks/useRole'
 import { canEditCabinet } from '../lib/permissions'
@@ -12,6 +14,7 @@ export default function Cabinet() {
   const { role, loading: roleLoading } = useRole()
   const { folders, files, loading: dataLoading, error, refetch } = useCabinetRoot()
   const [isNewFolderOpen, setNewFolderOpen] = useState(false)
+  const [isUploadOpen, setUploadOpen] = useState(false)
 
   const loading = roleLoading || dataLoading
 
@@ -35,6 +38,15 @@ export default function Cabinet() {
 
   const canWrite = canEditCabinet(role)
 
+  const handleFileDownload = async (id, nom) => {
+    try {
+      await downloadCabinetFile(id, nom)
+    } catch (e) {
+      console.error('Telechargement echoue', e)
+      alert('Erreur lors du téléchargement.')
+    }
+  }
+
   return (
     <AppLayout>
       <DrivePage
@@ -46,7 +58,9 @@ export default function Cabinet() {
         compact
         onBack={() => navigate('/')}
         onOpenFolder={(id) => navigate(`/cabinet/${id}`)}
-        onUpload={() => alert('Upload : à venir')}
+        onOpenFile={handleFileDownload}
+        onDownloadFile={handleFileDownload}
+        onUpload={() => setUploadOpen(true)}
         onNewFolder={() => setNewFolderOpen(true)}
       />
       {isNewFolderOpen && (
@@ -54,6 +68,14 @@ export default function Cabinet() {
           parentId={null}
           onClose={() => setNewFolderOpen(false)}
           onCreated={() => { setNewFolderOpen(false); refetch() }}
+        />
+      )}
+      {isUploadOpen && (
+        <UploadModal
+          dossierId={null}
+          dossierName={null}
+          onClose={() => setUploadOpen(false)}
+          onUploaded={() => { setUploadOpen(false); refetch() }}
         />
       )}
     </AppLayout>

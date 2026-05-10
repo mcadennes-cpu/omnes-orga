@@ -98,7 +98,7 @@ function DriveActions({ canWrite, onNewFolder, onUpload }) {
         className="flex-1 h-10 px-3.5 rounded-xl bg-marine text-white text-sm font-semibold inline-flex items-center justify-center gap-1.5"
       >
         <Upload size={15} strokeWidth={2} />
-        Uploader
+        Importer
       </button>
     </div>
   )
@@ -233,7 +233,7 @@ function DriveEmpty({ canWrite, onUpload }) {
           className="mt-4 h-10 px-3.5 rounded-xl bg-marine text-white text-sm font-semibold inline-flex items-center justify-center gap-1.5"
         >
           <Upload size={15} strokeWidth={2} />
-          Uploader un fichier
+          Importer un fichier
         </button>
       )}
     </div>
@@ -251,6 +251,7 @@ export default function DrivePage({
   onCrumb,
   onOpenFolder,
   onOpenFile,
+  onDownloadFile,
   onUpload,
   onNewFolder,
 }) {
@@ -287,11 +288,12 @@ export default function DrivePage({
               <div className="border-b border-border">
                 {files.map((f) => (
                   <FileRow
-                    key={f.name}
+                    key={f.id}
                     {...f}
                     canWrite={canWrite}
                     showMeta={!compact}
-                    onOpen={() => onOpenFile && onOpenFile(f.name)}
+                    onOpen={() => onOpenFile && onOpenFile(f.id, f.name)}
+                    onDownload={() => onDownloadFile && onDownloadFile(f.id, f.name)}
                   />
                 ))}
               </div>
