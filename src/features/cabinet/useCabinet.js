@@ -2,6 +2,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../hooks/useAuth'
 
+// ─── Normalisation pour recherche : minuscules + sans accents ──────────────
+export function normalize(s) {
+  return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
 // ─── Mapping couleur DB -> hex de la palette Omnes ─────────────────────────
 const COULEUR_TO_HEX = {
   bleu:   '#2A8FA8', // canard
@@ -205,4 +210,90 @@ export function useCabinetFolder(id) {
   }, [user, authLoading, id, reloadKey])
 
   return { folder, folders, files, loading, error, notFound, refetch }
+}
+
+// ─── Hook recherche globale dans tout le cabinet ───────────────────────────
+// N'effectue les SELECT que quand le terme est non vide ; expose un champ meta
+// par resultat ("dans <dossier parent>" ou "a la racine") pour orienter
+// l'utilisateur sur l'emplacement de chaque match.
+export function useCabinetSearch(term) {
+  const { user, loading: authLoading } = useAuth()
+  const [allFolders, setAllFolders] = useState([])
+  const [allFiles, setAllFiles] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [reloadKey, setReloadKey] = useState(0)
+
+  const isActive = (term || '').trim().length > 0
+
+  const refetch = useCallback(() => setReloadKey((k) => k + 1), [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    if (authLoading) return
+    if (!user || !isActive) {
+      setAllFolders([])
+      setAllFiles([])
+      setLoading(false)
+      setError(null)
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    Promise.all([
+      supabase
+        .from('cabinet_dossiers')
+        .select('id, nom, couleur, parent_id'),
+      supabase
+        .from('cabinet_fichiers')
+        .select('id, nom, mime_type, taille_octets, created_at, dossier_id, auteur:auteur_id(prenom, nom)'),
+    ]).then(([fRes, fiRes]) => {
+      if (cancelled) return
+      if (fRes.error)  { setError(fRes.error);  setLoading(false); return }
+      if (fiRes.error) { setError(fiRes.error); setLoading(false); return }
+      setAllFolders(fRes.data ?? [])
+      setAllFiles(fiRes.data ?? [])
+      setLoading(false)
+    })
+
+    return () => { cancelled = true }
+  }, [user, authLoading, isActive, reloadKey])
+
+  // Lookup table pour resoudre le nom du dossier parent
+  const folderById = new Map(allFolders.map((d) => [d.id, d]))
+
+  function locationOf(parentId) {
+    if (!parentId) return 'à la racine'
+    const parent = folderById.get(parentId)
+    return parent ? `dans ${parent.nom}` : 'dans un dossier inconnu'
+  }
+
+  const norm = normalize(term.trim())
+
+  const folders = isActive
+    ? allFolders
+        .filter((d) => normalize(d.nom).includes(norm))
+        .map((d) => ({
+          id: d.id,
+          name: d.nom,
+          accent: couleurToHex(d.couleur),
+          meta: locationOf(d.parent_id),
+        }))
+    : []
+
+  const files = isActive
+    ? allFiles
+        .filter((f) => normalize(f.nom).includes(norm))
+        .map((f) => ({
+          id: f.id,
+          name: f.nom,
+          mimeType: f.mime_type,
+          meta: locationOf(f.dossier_id),
+        }))
+    : []
+
+  return { folders, files, loading, error, isActive, refetch }
 }

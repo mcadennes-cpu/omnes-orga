@@ -1,6 +1,7 @@
 import {
   ChevronLeft, ChevronRight, FolderPlus, Upload, Download,
   Folder, FileText, FileImage, FileSpreadsheet, File, MoreVertical, Inbox,
+  Search, X,
 } from 'lucide-react'
 
 // Mapping extension -> icone + couleur de la palette Omnes.
@@ -13,7 +14,7 @@ function fileTypeMeta(filename) {
   return { Icon: File, color: 'rgba(28,61,82,0.55)', label: ext.toUpperCase() || 'FICHIER' }
 }
 
-// ─── Breadcrumb sticky (verre + backdrop-blur) ─────────────────────────────
+// ─── Breadcrumb sticky ─────────────────────────────────────────────────────
 function Breadcrumb({ trail, onBack, onCrumb }) {
   return (
     <header
@@ -71,7 +72,7 @@ function Breadcrumb({ trail, onBack, onCrumb }) {
   )
 }
 
-// ─── Toolbar (Nouveau dossier / Uploader, ou label lecture seule) ──────────
+// ─── Toolbar ───────────────────────────────────────────────────────────────
 function DriveActions({ canWrite, onNewFolder, onUpload }) {
   if (!canWrite) {
     return (
@@ -119,7 +120,12 @@ function SectionHeader({ children, count }) {
 }
 
 // ─── Ligne dossier ──────────────────────────────────────────────────────────
-function FolderRow({ name, count, accent = '#1C3D52', canWrite, showMeta = true, onOpen, onMenu }) {
+function FolderRow({ name, count, meta, accent = '#1C3D52', canWrite, showMeta = true, onOpen, onMenu }) {
+  // Si meta est fourni (mode recherche globale), il prend le pas sur le compteur d'elements
+  const metaText = meta !== undefined
+    ? meta
+    : (count != null ? `${count} ${count > 1 ? 'éléments' : 'élément'}` : '')
+
   return (
     <div
       role="button"
@@ -135,9 +141,9 @@ function FolderRow({ name, count, accent = '#1C3D52', canWrite, showMeta = true,
       </div>
       <div className="min-w-0 flex-1">
         <div className="font-sans font-semibold text-[14.5px] text-marine truncate">{name}</div>
-        {showMeta && (
+        {showMeta && metaText && (
           <div className="font-sans text-xs text-muted truncate mt-0.5">
-            {count} {count > 1 ? 'éléments' : 'élément'}
+            {metaText}
           </div>
         )}
       </div>
@@ -158,8 +164,11 @@ function FolderRow({ name, count, accent = '#1C3D52', canWrite, showMeta = true,
 }
 
 // ─── Ligne fichier ──────────────────────────────────────────────────────────
-function FileRow({ name, author, when, canWrite, showMeta = true, onOpen, onMenu, onDownload }) {
+function FileRow({ name, author, when, meta, canWrite, showMeta = true, onOpen, onMenu, onDownload }) {
   const { Icon, color, label } = fileTypeMeta(name)
+  // Si meta est fourni (mode recherche globale), il prend le pas sur "auteur · date"
+  const metaText = meta !== undefined ? meta : `${author} · ${when}`
+
   return (
     <div
       role="button"
@@ -181,9 +190,9 @@ function FileRow({ name, author, when, canWrite, showMeta = true, onOpen, onMenu
       </div>
       <div className="min-w-0 flex-1">
         <div className="font-sans font-semibold text-[14.5px] text-marine truncate">{name}</div>
-        {showMeta && (
+        {showMeta && metaText && (
           <div className="font-sans text-xs text-muted truncate mt-0.5">
-            {author} · {when}
+            {metaText}
           </div>
         )}
       </div>
@@ -240,6 +249,52 @@ function DriveEmpty({ canWrite, onUpload }) {
   )
 }
 
+// ─── Champ de recherche ────────────────────────────────────────────────────
+function SearchInput({ value, onChange }) {
+  return (
+    <div className="px-4 mt-3">
+      <div className="relative">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Rechercher dans tout le cabinet…"
+          className="w-full h-10 pl-10 pr-10 rounded-input border border-border bg-carte font-sans text-[14px] text-marine placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-canard"
+        />
+        {value && (
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            aria-label="Effacer la recherche"
+            className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 flex items-center justify-center rounded-full"
+          >
+            <X size={14} className="text-muted" />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Etat aucun resultat de recherche ──────────────────────────────────────
+function NoSearchResults({ search, onClear }) {
+  return (
+    <div className="mx-4 mt-6 px-5 py-9 bg-carte border-[1.5px] border-dashed border-border rounded-card text-center">
+      <p className="font-sans text-[13.5px] text-muted leading-snug">
+        Aucun résultat pour <span className="font-semibold text-marine">« {search} »</span>.
+      </p>
+      <button
+        type="button"
+        onClick={onClear}
+        className="mt-3 text-canard text-sm font-semibold underline"
+      >
+        Effacer la recherche
+      </button>
+    </div>
+  )
+}
+
 // ─── Composite : la page Drive complete ─────────────────────────────────────
 export default function DrivePage({
   trail,
@@ -247,15 +302,23 @@ export default function DrivePage({
   files = [],
   canWrite = false,
   compact = false,
+  search = '',
+  onSearchChange,
+  isSearching = false,
   onBack,
   onCrumb,
   onOpenFolder,
   onOpenFile,
   onDownloadFile,
+  onMenuFolder,
+  onMenuFile,
   onUpload,
   onNewFolder,
 }) {
-  const isEmpty = folders.length === 0 && files.length === 0
+  // Empty state du dossier courant : seulement quand on n'est pas en recherche
+  const isEmpty = !isSearching && folders.length === 0 && files.length === 0
+  // Aucun match : quand on cherche et que rien ne remonte
+  const noResults = isSearching && folders.length === 0 && files.length === 0
 
   return (
     <>
@@ -266,37 +329,51 @@ export default function DrivePage({
         <DriveEmpty canWrite={canWrite} onUpload={onUpload} />
       ) : (
         <>
-          {folders.length > 0 && (
+          <SearchInput value={search} onChange={onSearchChange} />
+
+          {noResults ? (
+            <NoSearchResults search={search} onClear={() => onSearchChange('')} />
+          ) : (
             <>
-              <SectionHeader count={folders.length}>Dossiers</SectionHeader>
-              <div className="border-b border-border">
-                {folders.map((f) => (
-                  <FolderRow
-                    key={f.id || f.slug || f.name}
-                    {...f}
-                    canWrite={canWrite}
-                    showMeta={!compact}
-                    onOpen={() => onOpenFolder && onOpenFolder(f.id || f.slug || f.name)}
-                  />
-                ))}
-              </div>
-            </>
-          )}
-          {files.length > 0 && (
-            <>
-              <SectionHeader count={files.length}>Fichiers</SectionHeader>
-              <div className="border-b border-border">
-                {files.map((f) => (
-                  <FileRow
-                    key={f.id}
-                    {...f}
-                    canWrite={canWrite}
-                    showMeta={!compact}
-                    onOpen={() => onOpenFile && onOpenFile(f.id, f.name, f.mimeType)}
-                    onDownload={() => onDownloadFile && onDownloadFile(f.id, f.name)}
-                  />
-                ))}
-              </div>
+              {folders.length > 0 && (
+                <>
+                  <SectionHeader count={folders.length}>
+                    {isSearching ? 'Dossiers trouvés' : 'Dossiers'}
+                  </SectionHeader>
+                  <div className="border-b border-border">
+                    {folders.map((f) => (
+                      <FolderRow
+                        key={f.id || f.slug || f.name}
+                        {...f}
+                        canWrite={canWrite}
+                        showMeta={!compact || isSearching}
+                        onOpen={() => onOpenFolder && onOpenFolder(f.id || f.slug || f.name)}
+                        onMenu={() => onMenuFolder && onMenuFolder(f.id, f.name)}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+              {files.length > 0 && (
+                <>
+                  <SectionHeader count={files.length}>
+                    {isSearching ? 'Fichiers trouvés' : 'Fichiers'}
+                  </SectionHeader>
+                  <div className="border-b border-border">
+                    {files.map((f) => (
+                      <FileRow
+                        key={f.id}
+                        {...f}
+                        canWrite={canWrite}
+                        showMeta={!compact || isSearching}
+                        onOpen={() => onOpenFile && onOpenFile(f.id, f.name, f.mimeType)}
+                        onDownload={() => onDownloadFile && onDownloadFile(f.id, f.name)}
+                        onMenu={() => onMenuFile && onMenuFile(f.id, f.name, f.mimeType)}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
             </>
           )}
         </>
