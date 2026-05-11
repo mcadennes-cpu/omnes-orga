@@ -143,22 +143,13 @@ as $$
   );
 $$;
 
-create or replace function public.current_user_role()
-returns text
-language sql
-stable
-security definer
-as $$
-  select role from public.profiles where id = auth.uid();
-$$;
-
 create or replace function public.can_create_discussion_board()
 returns boolean
 language sql
 stable
 security definer
 as $$
-  select public.current_user_role() in ('associe', 'associe_gerant', 'super_admin');
+  select public.current_user_role()::text in ('associe', 'associe_gerant', 'super_admin');
 $$;
 
 -- ----------------------------------------------------------------------------
@@ -185,11 +176,11 @@ create policy discussion_boards_insert on public.discussion_boards
 create policy discussion_boards_update on public.discussion_boards
   for update using (
     public.is_board_owner(id)
-    or public.current_user_role() = 'super_admin'
+    or public.current_user_role()::text = 'super_admin'
   );
 
 create policy discussion_boards_delete on public.discussion_boards
-  for delete using (public.current_user_role() = 'super_admin');
+  for delete using (public.current_user_role()::text = 'super_admin');
 
 -- discussion_board_members
 create policy discussion_board_members_select on public.discussion_board_members
@@ -198,7 +189,7 @@ create policy discussion_board_members_select on public.discussion_board_members
 create policy discussion_board_members_insert on public.discussion_board_members
   for insert with check (
     public.is_board_owner(board_id)
-    or public.current_user_role() = 'super_admin'
+    or public.current_user_role()::text = 'super_admin'
     or (
       -- à la création du tableau, l'auteur s'ajoute comme owner
       user_id = auth.uid()
@@ -213,7 +204,7 @@ create policy discussion_board_members_insert on public.discussion_board_members
 create policy discussion_board_members_delete on public.discussion_board_members
   for delete using (
     public.is_board_owner(board_id)
-    or public.current_user_role() = 'super_admin'
+    or public.current_user_role()::text = 'super_admin'
     or user_id = auth.uid()  -- quitter le tableau
   );
 
@@ -224,7 +215,7 @@ create policy discussion_cards_select on public.discussion_cards
 create policy discussion_cards_insert on public.discussion_cards
   for insert with check (
     public.is_board_member(board_id)
-    and public.current_user_role() in ('associe', 'associe_gerant', 'super_admin')
+    and public.current_user_role()::text in ('associe', 'associe_gerant', 'super_admin')
     and created_by = auth.uid()
   );
 
@@ -234,7 +225,7 @@ create policy discussion_cards_update on public.discussion_cards
     and (
       created_by = auth.uid()
       or public.is_board_owner(board_id)
-      or public.current_user_role() = 'super_admin'
+      or public.current_user_role()::text = 'super_admin'
     )
   );
 
@@ -242,7 +233,7 @@ create policy discussion_cards_delete on public.discussion_cards
   for delete using (
     created_by = auth.uid()
     or public.is_board_owner(board_id)
-    or public.current_user_role() = 'super_admin'
+    or public.current_user_role()::text = 'super_admin'
   );
 
 -- discussion_messages
