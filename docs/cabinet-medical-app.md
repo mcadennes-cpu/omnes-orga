@@ -258,26 +258,50 @@ Pas de chat dans ce module.
 
 ### 4. Discussion
 
-**Type :** Cartes / tableaux (style Trello) + chat par carte
+**Type :** Tableaux thématiques + cartes (liste plate) + chat temps réel par carte
 
-**Concept :** Espace de décisions collectives. Les admins/gérants créent des tableaux thématiques et invitent des participants. Chaque tableau contient des cartes avec un fil de discussion intégré.
+**Concept :** Espace de décisions collectives. Les utilisateurs autorisés créent des tableaux thématiques (ex. « Achat échographe », « Planning été ») et y invitent des participants. Chaque tableau contient une liste plate de cartes ; une carte représente un sujet ou une question. Chaque carte porte un fil de chat temps réel où les participants discutent jusqu'à décision, et possède un statut binaire **ouvert / clos**.
+
+> Le format Kanban à colonnes a été écarté au profit d'une liste plate de cartes, plus adaptée au mobile et au cas d'usage d'un cabinet médical.
+
+**Anatomie d'une carte :** titre + description + chat + pièces jointes + statut (ouvert/clos).
+
+**Couleur d'un tableau :** chaque tableau peut choisir une couleur d'identité parmi 6 swatches du DS (`brique`, `canard`, `ocre`, `olive`, `fuchsia`, `marine`). Cette couleur teinte la tile dans la liste, le CTA « + Nouvelle carte » et les bulles de mes messages dans le chat. Fallback `brique` (couleur du module) si non choisie.
 
 **Droits :**
-| Action | super_admin | associe_gerant | associe | remplacant |
+
+| Action | super_admin | associé_gérant | associé | remplaçant |
 |---|:---:|:---:|:---:|:---:|
 | Voir ses tableaux invités | ✓ | ✓ | si invité | si invité |
-| Créer un tableau | ✓ | ✓ | — | — |
-| Inviter des participants | ✓ | ✓ | — | — |
-| Créer / modifier une carte | ✓ | ✓ | — | — |
+| Créer un tableau | ✓ | ✓ | ✓ | — |
+| Inviter / désinviter dans son tableau | ✓ (tout tableau) | ✓ (tout tableau) | ✓ (créateur) | — |
+| Créer une carte (dans un tableau où invité) | ✓ | ✓ | ✓ | — |
+| Modifier / archiver une carte | créateur de la carte, créateur du tableau, super_admin |
 | Commenter (chat) dans une carte | ✓ | ✓ | si invité | si invité |
+| Éditer / supprimer ses propres messages | ✓ | ✓ | ✓ | ✓ |
+| Archiver un tableau | créateur du tableau + super_admin |
+| Supprimer dur un tableau | super_admin uniquement |
+
+**Précisions :**
+- Le remplaçant participe au chat mais ne crée pas de cartes.
+- Désinviter un participant conserve son historique de messages visible pour les autres.
+- L'archivage masque le tableau de la liste principale (accessible via filtre Actifs / Archivés).
+- Les messages ne peuvent plus être postés dans une carte close ; le chat passe en lecture seule (composer remplacé par une bande grisée « Cette carte est close — les messages sont en lecture seule. »).
 
 **Navigation :** Les utilisateurs accèdent à leurs tableaux via le module Discussion. Ils ne voient que les tableaux auxquels ils sont invités.
 
-**Notifications push (Firebase FCM) :**
-- Création d'un nouveau tableau → notification à tous les invités
-- Nouveau message dans une carte → notification à tous les participants
-- Format : nom du tableau en titre + aperçu du message (style WhatsApp)
-- ⚠️ iOS : nécessite que l'utilisateur ait installé la PWA sur l'écran d'accueil
+**Stockage des pièces jointes :** bucket Supabase dédié `discussion-attachments`, helpers calqués sur le pattern `cabinetStorage.js` (path UUID flat, download via Blob pour préserver les noms UTF-8). Une pièce jointe est rattachée soit à une carte (contexte de décision, affichée en chips scrollables sous la description), soit à un message du chat.
+
+**Temps réel :** Supabase Realtime activé sur `discussion_messages` (chat ouvert) et sur `discussion_cards` (rafraîchissement de la liste de cartes quand un autre user en crée une).
+
+**Tracking lu / non-lu :** deux niveaux pour éviter de tout recalculer côté client :
+- `discussion_board_members.last_read_at` : utilisé pour le **point coloré** sur la tile du tableau dans la liste Discussion (niveau « ce tableau a du nouveau ou non »).
+- `discussion_card_reads.last_read_at` : utilisé pour le **compteur numérique** non-lu par carte dans la vue tableau (priorisation fine des cartes actives).
+- Marquage automatique à l'ouverture d'une carte.
+
+**Notifications push (Firebase FCM) :** reportées à l'étape 14 (module dédié notifications). Le module Discussion est livré sans push ; les utilisateurs voient les nouveaux messages au prochain chargement ou via Realtime s'ils ont la carte ouverte.
+
+**Cohérence visuelle :** mêmes patterns que les modules existants (header sticky, recherche en haut de liste, modales bottom-sheet via React Portal, menu trois-points pour actions). Avatars = initiales sur fond coloré, rotation déterministe parmi 6 couleurs (même hash que dans Annuaire). Densité de liste hardcodée à 68 px (comfortable) en V1.
 
 ---
 
@@ -537,7 +561,11 @@ VITE_FIREBASE_VAPID_KEY=...
    - 6G. ✓ **FAITE** — Menu fichier (« ⋮ ») via `ActionsMenu` bottom-sheet. Actions : Renommer (`RenameModal`), Télécharger (force le download via `downloadCabinetFile`), Supprimer (`DeleteConfirmModal` avec DELETE en DB + cleanup best-effort du bucket Storage).
    - 6H. ✓ **FAITE** — Menu dossier (« ⋮ ») via le même `ActionsMenu`. Actions : Renommer, Supprimer. Garde-fou non vide géré côté SQL via `ON DELETE RESTRICT` sur les FK ; le code Postgres 23503 (foreign_key_violation) est intercepté et traduit en message utilisateur clair.
    - 6I. ❌ **PARTIEL** — Tests multi-rôles à faire en rôle remplaçant (lecture seule). Cas limites testés : fichier > 25 Mo (rejet client), dossier non vide (refus de suppression avec message clair). Mise à jour doc faite ici.
-7. **Étape 7** — Module Discussion (tableaux + invitations + chat)
+7. **Étape 7** — Module Discussion (tableaux + invitations + chat temps réel)
+   - 7A — Fondations : migration SQL (6 tables : `discussion_boards`, `discussion_board_members`, `discussion_cards`, `discussion_messages`, `discussion_attachments`, `discussion_card_reads`), policies RLS via helpers SQL (`is_board_member`, `is_board_owner`, `can_create_discussion_board`), trigger `last_activity_at` sur insert message, bucket Storage `discussion-attachments`, helpers JS de permissions dans `src/lib/permissions.js` (`canCreateBoard`, `canInviteToBoard`, `canCreateCard`, `canEditCard`, `canArchiveBoard`, `canDeleteBoard`), hook `useDiscussion.js` dans `src/features/discussion/`, page `Discussion.jsx` (liste plate des tableaux où je suis membre, recherche, filtre Actifs / Archivés, état vide), création d'un tableau via modale bottom-sheet (titre + description + couleur parmi 6 swatches + invitation de participants multi-sélection depuis l'Annuaire), Realtime sur `discussion_boards` pour rafraîchir la liste.
+   - 7B — Vue tableau + cartes : page `DiscussionBoard.jsx` (route `/discussion/:boardId`), sous-header avec `MemberStack` (4 avatars chevauchés + pastille `+N`) et CTA `+ Nouvelle carte`, filtre segmenté `Ouvertes / Closes / Toutes`, liste plate de cartes avec aperçu (titre, badge statut, dernier message, compteur de non lus), CRUD carte (créer, modifier, archiver, basculer statut), gestion des membres du tableau (modale inviter / désinviter / quitter), archivage du tableau côté créateur + super_admin, Realtime sur `discussion_cards` pour rafraîchir la liste.
+   - 7C — Chat dans la carte : ouverture d'une carte en bottom-sheet plein écran (Portal, pattern Cabinet), header avec poignée de drag (swipe-down pour fermer), description collapsible, pièces jointes de carte en chips horizontales scrollables, fil de messages style WhatsApp (bulles asymétriques, mes messages alignés droite en couleur du tableau, autres alignés gauche en `carte` + bordure), séparateurs de date flottants (HIER / AUJOURD'HUI / LUN. 14 AVR.), statut d'envoi (`sending` icône `Clock` / `sent` icône `CheckCheck`), composer sticky avec textarea autosizing + bouton trombone + bouton send, **optimistic UI** sur envoi (insertion locale `sending` → remplacement par version Supabase), Supabase Realtime sur `discussion_messages`, édition / suppression de mes propres messages (menu contextuel), pièces jointes dans message (upload via helper dédié type `discussionStorage.js`, preview / download via Blob), marquage automatique « lu » à l'ouverture (upsert sur `discussion_card_reads`), gestion clavier mobile via `visualViewport.resize` (variable CSS `--keyboard-offset` sur le composer), auto-scroll bas si user en bas (sinon bouton flottant « ↓ N nouveaux messages »).
+   - 7D — Polish : recherche globale étendue à Discussion (titres tableaux + cartes), compteurs de non lus persistants (point coloré niveau tableau via `discussion_board_members.last_read_at`, compteur numérique niveau carte via `discussion_card_reads`), états vides illustrés (liste tableaux vide, tableau sans cartes, filtre Closes vide, chat vide), tests multi-utilisateurs (permissions par rôle, Realtime cross-session, edge cases invitation / désinvitation / carte close).
 8. **Étape 8** — Module Événements (Drive)
 9. **Étape 9** — Module SIM (Drive restreint)
 10. **Étape 10** — Module Immobilier (mêmes composants que Discussion)
