@@ -11,6 +11,7 @@ import Recherche from './pages/Recherche'
 import Profil from './pages/Profil'
 import Cabinet from './pages/Cabinet'
 import CabinetFolder from './pages/CabinetFolder'
+import Discussion from './pages/Discussion'
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
         <Route path="/profil" element={<Profil />} />
         <Route path="/cabinet" element={<Cabinet />} />
         <Route path="/cabinet/:id" element={<CabinetFolder />} />
+        <Route path="/discussion" element={<Discussion />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

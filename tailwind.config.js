@@ -41,6 +41,15 @@ export default {
         button: '0 4px 12px -2px rgba(28,61,82,0.20), 0 2px 4px -2px rgba(28,61,82,0.12)',
         tile:   '0 8px 20px -4px rgba(28,61,82,0.25), 0 4px 8px -4px rgba(28,61,82,0.15)',
       },
+      keyframes: {
+        'slide-up': {
+          '0%':   { transform: 'translateY(100%)' },
+          '100%': { transform: 'translateY(0)' },
+        },
+      },
+      animation: {
+        'slide-up': 'slide-up 220ms cubic-bezier(0.16, 1, 0.3, 1)',
+      },
     },
   },
   plugins: [],
