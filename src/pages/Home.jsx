@@ -31,6 +31,10 @@ export default function Home() {
       navigate('/cabinet')
       return
     }
+    if (moduleKey === 'discussion') {
+      navigate('/discussion')
+      return
+    }
     alert(`Module "${moduleKey}" à venir`)
   }
 
