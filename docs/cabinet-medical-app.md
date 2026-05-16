@@ -563,6 +563,34 @@ VITE_FIREBASE_VAPID_KEY=...
    - 6I. ❌ **PARTIEL** — Tests multi-rôles à faire en rôle remplaçant (lecture seule). Cas limites testés : fichier > 25 Mo (rejet client), dossier non vide (refus de suppression avec message clair). Mise à jour doc faite ici.
 7. **Étape 7** — Module Discussion (tableaux + invitations + chat temps réel)
    - 7A — Fondations : migration SQL (6 tables : `discussion_boards`, `discussion_board_members`, `discussion_cards`, `discussion_messages`, `discussion_attachments`, `discussion_card_reads`), policies RLS via helpers SQL (`is_board_member`, `is_board_owner`, `can_create_discussion_board`), trigger `last_activity_at` sur insert message, bucket Storage `discussion-attachments`, helpers JS de permissions dans `src/lib/permissions.js` (`canCreateBoard`, `canInviteToBoard`, `canCreateCard`, `canEditCard`, `canArchiveBoard`, `canDeleteBoard`), hook `useDiscussion.js` dans `src/features/discussion/`, page `Discussion.jsx` (liste plate des tableaux où je suis membre, recherche, filtre Actifs / Archivés, état vide), création d'un tableau via modale bottom-sheet (titre + description + couleur parmi 6 swatches + invitation de participants multi-sélection depuis l'Annuaire), Realtime sur `discussion_boards` pour rafraîchir la liste.
+
+#### Étape 7B — Vue d'un tableau + cartes (livrée)
+
+**Livré :**
+- Route `/discussion/:boardId` : vue d'un tableau, accessible au clic depuis la liste.
+- Liste plate des cartes triées par dernière activité, avec onglets de filtre Ouvertes / Closes / Toutes.
+- Header de tableau : retour, titre, avatars des membres, bouton « + Nouvelle carte » teinté de la couleur du tableau, menu trois-points (Renommer, Archiver / Désarchiver, Supprimer).
+- Cartes : création, modification (titre + description), clôture / réouverture, suppression — via une modale détail légère en bottom-sheet.
+- Realtime sur `discussion_cards` : la liste se rafraîchit quand un autre utilisateur ajoute ou modifie une carte.
+- États gérés : chargement (skeleton), tableau vide, tableau introuvable / accès refusé, tableau archivé (bandeau).
+
+**Écarts au plan initial :**
+- La modale détail de carte est une **version légère sans chat** : elle sera remplacée en 7C par une vue plein écran intégrant le fil de discussion temps réel et les pièces jointes.
+- Le menu d'actions d'une carte propose **Modifier / Clore-Rouvrir / Supprimer**, mais **pas Archiver** : la maquette ne prévoit pas de vue « cartes archivées », donc une carte archivée disparaîtrait sans recours. La capacité `archiveCard` existe dans le hook mais n'est pas exposée. « Clore » joue le rôle d'archivage doux (la carte reste consultable dans l'onglet Closes).
+
+**Fichiers ajoutés :**
+- Module Discussion : `useBoard.js`, `BoardPage.jsx`, `CardListItem.jsx`, `StatusBadge.jsx`, `CreateCardModal.jsx`, `CardDetailModal.jsx`, `BoardActionsMenu.jsx`, `RenameBoardModal.jsx`, `MemberAvatars.jsx`, `boardColors.js`.
+- Transverses : `src/lib/profileFormat.js` (formatName, initials, normalizeForSearch), `src/lib/dateFormat.js` (formatRelativeDate), `src/components/ConfirmModal.jsx` (modale de confirmation générique).
+- Permission ajoutée : `canEditBoard` (renommer un tableau).
+
+**Correctifs réalisés au passage :**
+- Recherche du Trombinoscope rendue insensible aux accents (réutilise `normalizeForSearch`).
+- `Discussion.jsx` : helpers locaux dédupliqués au profit des modules transverses.
+
+**À traiter en 7C :**
+- Correctif SQL : ajouter une policy RLS `discussion_board_members_update` (absente du SQL 7A) pour autoriser un utilisateur à mettre à jour son `last_read_at` — prérequis du tracking lu / non-lu.
+- Vue carte plein écran, chat temps réel, pièces jointes, passage en lecture seule des cartes closes, tracking lu / non-lu.
+
    - 7B — Vue tableau + cartes : page `DiscussionBoard.jsx` (route `/discussion/:boardId`), sous-header avec `MemberStack` (4 avatars chevauchés + pastille `+N`) et CTA `+ Nouvelle carte`, filtre segmenté `Ouvertes / Closes / Toutes`, liste plate de cartes avec aperçu (titre, badge statut, dernier message, compteur de non lus), CRUD carte (créer, modifier, archiver, basculer statut), gestion des membres du tableau (modale inviter / désinviter / quitter), archivage du tableau côté créateur + super_admin, Realtime sur `discussion_cards` pour rafraîchir la liste.
    - 7C — Chat dans la carte : ouverture d'une carte en bottom-sheet plein écran (Portal, pattern Cabinet), header avec poignée de drag (swipe-down pour fermer), description collapsible, pièces jointes de carte en chips horizontales scrollables, fil de messages style WhatsApp (bulles asymétriques, mes messages alignés droite en couleur du tableau, autres alignés gauche en `carte` + bordure), séparateurs de date flottants (HIER / AUJOURD'HUI / LUN. 14 AVR.), statut d'envoi (`sending` icône `Clock` / `sent` icône `CheckCheck`), composer sticky avec textarea autosizing + bouton trombone + bouton send, **optimistic UI** sur envoi (insertion locale `sending` → remplacement par version Supabase), Supabase Realtime sur `discussion_messages`, édition / suppression de mes propres messages (menu contextuel), pièces jointes dans message (upload via helper dédié type `discussionStorage.js`, preview / download via Blob), marquage automatique « lu » à l'ouverture (upsert sur `discussion_card_reads`), gestion clavier mobile via `visualViewport.resize` (variable CSS `--keyboard-offset` sur le composer), auto-scroll bas si user en bas (sinon bouton flottant « ↓ N nouveaux messages »).
    - 7D — Polish : recherche globale étendue à Discussion (titres tableaux + cartes), compteurs de non lus persistants (point coloré niveau tableau via `discussion_board_members.last_read_at`, compteur numérique niveau carte via `discussion_card_reads`), états vides illustrés (liste tableaux vide, tableau sans cartes, filtre Closes vide, chat vide), tests multi-utilisateurs (permissions par rôle, Realtime cross-session, edge cases invitation / désinvitation / carte close).

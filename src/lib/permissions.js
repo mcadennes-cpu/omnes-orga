@@ -100,6 +100,20 @@ export function canArchiveBoard({ userId, role, board }) {
 }
 
 /**
+ * Peut renommer ou modifier les metadonnees d'un tableau de discussion
+ * (titre, description, couleur). Createur du tableau ou super_admin.
+ * Meme regle que canArchiveBoard, exposee separement pour la clarte
+ * des intentions cote UI.
+ *
+ * @param {{ userId: string, role: string, board: { created_by: string } }} ctx
+ */
+export function canEditBoard({ userId, role, board }) {
+  if (role === ROLES.SUPER_ADMIN) return true
+  if (!userId) return false
+  return board?.created_by === userId
+}
+
+/**
  * Peut supprimer dur un tableau de discussion.
  * Reserve au super_admin (suppression definitive, hors archivage).
  */

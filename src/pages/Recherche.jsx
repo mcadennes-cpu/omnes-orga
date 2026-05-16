@@ -5,6 +5,7 @@ import AppLayout from '../components/layout/AppLayout'
 import MedecinCard from '../components/trombinoscope/MedecinCard'
 import { useMedecins } from '../hooks/useMedecins'
 import { useRole } from '../hooks/useRole'
+import { normalizeForSearch } from '../lib/profileFormat'
 
 export default function Recherche() {
   const navigate = useNavigate()
@@ -15,12 +16,17 @@ export default function Recherche() {
   const canViewNotes = role && role !== 'remplacant'
   const canViewSchedule = role && role !== 'remplacant'
 
-  const trimmed = query.trim().toLowerCase()
+  // Recherche insensible aux accents et a la casse : on normalise
+  // le terme saisi ET les champs compares. normalizeForSearch applique
+  // deja toLowerCase + suppression des accents (cf. src/lib/profileFormat.js).
+  const trimmed = normalizeForSearch(query).trim()
   const filtered =
     trimmed === ''
       ? []
       : medecins.filter((m) => {
-          const text = `${m.prenom ?? ''} ${m.nom ?? ''} ${m.specialite ?? ''}`.toLowerCase()
+          const text = normalizeForSearch(
+            `${m.prenom ?? ''} ${m.nom ?? ''} ${m.specialite ?? ''}`
+          )
           return text.includes(trimmed)
         })
 

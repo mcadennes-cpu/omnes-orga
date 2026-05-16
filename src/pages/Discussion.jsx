@@ -13,69 +13,16 @@ import { useDiscussion } from '../features/discussion/useDiscussion';
 import CreateBoardModal from '../features/discussion/CreateBoardModal';
 import { canCreateBoard } from '../lib/permissions';
 import { useRole } from '../hooks/useRole';
-
-// ----------------------------------------------------------------------------
-// Helpers
-// ----------------------------------------------------------------------------
-
-/** Mapping des classes Tailwind par couleur de tableau (whitelist pour Tailwind). */
-const COLOR_CLASSES = {
-  brique:  { bg: 'bg-brique/12',  text: 'text-brique',  dot: 'bg-brique' },
-  canard:  { bg: 'bg-canard/12',  text: 'text-canard',  dot: 'bg-canard' },
-  ocre:    { bg: 'bg-ocre/12',    text: 'text-ocre',    dot: 'bg-ocre' },
-  olive:   { bg: 'bg-olive/12',   text: 'text-olive',   dot: 'bg-olive' },
-  fuchsia: { bg: 'bg-fuchsia/12', text: 'text-fuchsia', dot: 'bg-fuchsia' },
-  marine:  { bg: 'bg-marine/12',  text: 'text-marine',  dot: 'bg-marine' },
-};
-
-function getColorClasses(color) {
-  return COLOR_CLASSES[color] || COLOR_CLASSES.brique;
-}
-
-/** Normalise une chaine pour la recherche (insensible casse + accents). */
-function normalizeForSearch(s) {
-  return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-}
-
-/** Date relative style messagerie : 14:22, hier, lun., 24 avr., 2024. */
-function formatRelativeDate(iso) {
-  if (!iso) return '';
-  const date = new Date(iso);
-  const now = new Date();
-
-  const isSameDay = (a, b) => a.toDateString() === b.toDateString();
-
-  if (isSameDay(date, now)) {
-    return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-  }
-
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (isSameDay(date, yesterday)) return 'hier';
-
-  const diffDays = Math.floor((now - date) / 86400000);
-  if (diffDays < 7) {
-    const day = date.toLocaleDateString('fr-FR', { weekday: 'short' });
-    return day.endsWith('.') ? day : day + '.';
-  }
-
-  if (date.getFullYear() === now.getFullYear()) {
-    return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
-  }
-
-  return date.toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-}
+import { getBoardColorClasses } from '../features/discussion/boardColors';
+import { formatRelativeDate } from '../lib/dateFormat';
+import { normalizeForSearch } from '../lib/profileFormat';
 
 // ----------------------------------------------------------------------------
 // Sous-composants
 // ----------------------------------------------------------------------------
 
 function BoardTile({ board, onClick }) {
-  const colors = getColorClasses(board.color);
+  const colors = getBoardColorClasses(board.color);
 
   return (
     <button
@@ -86,9 +33,9 @@ function BoardTile({ board, onClick }) {
       {/* Tile à gauche */}
       <div className="relative shrink-0">
         <div
-          className={`w-11 h-11 rounded-tile flex items-center justify-center ${colors.bg}`}
+          className={`w-11 h-11 rounded-tile flex items-center justify-center ${colors.tileBg}`}
         >
-          <MessageSquare className={`w-5 h-5 ${colors.text}`} strokeWidth={1.8} />
+          <MessageSquare className={`w-5 h-5 ${colors.tileText}`} strokeWidth={1.8} />
         </div>
         {board.hasUnread && (
           <span

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Check, Search, Loader2 } from 'lucide-react';
 import { useMedecins } from '../../hooks/useMedecins';
+import { formatName, initials, normalizeForSearch } from '../../lib/profileFormat';
 
 // ----------------------------------------------------------------------------
 // Constantes
@@ -18,27 +19,6 @@ const COLORS = [
 
 const TITLE_MAX = 80;
 const DESCRIPTION_MAX = 280;
-
-// ----------------------------------------------------------------------------
-// Helpers
-// ----------------------------------------------------------------------------
-
-function formatName(profile) {
-  const prenom = (profile.prenom || '').trim();
-  const nom = (profile.nom || '').trim();
-  if (!prenom && !nom) return 'Sans nom';
-  return [prenom, nom].filter(Boolean).join(' ');
-}
-
-function initials(profile) {
-  const prenom = (profile.prenom || '').trim();
-  const nom = (profile.nom || '').trim();
-  return ((prenom[0] || '') + (nom[0] || '')).toUpperCase() || '?';
-}
-
-function normalizeForSearch(s) {
-  return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-}
 
 // ----------------------------------------------------------------------------
 // Composant principal
