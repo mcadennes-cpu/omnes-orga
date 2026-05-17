@@ -1,19 +1,26 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
+import {
+  uploadAttachmentFile,
+  removeAttachmentFile,
+  validateAttachmentFile,
+} from './discussionStorage'
 
 /**
- * Hook de la vue d'une carte de discussion (etape 7C).
+ * Hook de la vue d'une carte de discussion (etapes 7C + 7D).
  *
  * Charge une carte precise, son tableau parent (pour la couleur et les
- * permissions) et son fil de messages. Expose les mutations sur les
- * messages et sur la carte, s'abonne au Realtime, et marque la carte
- * comme lue (discussion_card_reads) tant que l'utilisateur la consulte.
+ * permissions), son fil de messages et ses pieces jointes. Expose les
+ * mutations sur les messages, sur la carte et sur les pieces jointes,
+ * s'abonne au Realtime, et marque la carte comme lue (discussion_card_reads)
+ * tant que l'utilisateur la consulte.
  *
  * La RLS Supabase filtre cote serveur : si l'utilisateur n'est pas membre
  * du tableau de la carte, la requete renvoie 0 ligne -> notFound = true.
  *
- * Le hook ne charge PAS les profils des auteurs de messages : le composant
- * conteneur croisera les author_id avec useMedecins().
+ * Le hook ne charge PAS les profils (auteurs de messages, uploadeurs de
+ * pieces jointes) : le composant conteneur croise les identifiants avec
+ * useMedecins().
  *
  * @param {string} cardId - identifiant de la carte a charger
  */
@@ -21,6 +28,7 @@ export function useCard(cardId) {
   const [card, setCard] = useState(null)
   const [board, setBoard] = useState(null)
   const [messages, setMessages] = useState([])
+  const [attachments, setAttachments] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [error, setError] = useState(null)
@@ -133,13 +141,48 @@ export function useCard(cardId) {
     }
   }, [cardId])
 
+  // -------------------------------------------------------------------------
+  // 4. Fetch des pieces jointes de la carte
+  // -------------------------------------------------------------------------
+  const fetchAttachments = useCallback(async () => {
+    if (!cardId) return
+
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('discussion_attachments')
+        .select(
+          'id, card_id, storage_path, filename, size_bytes, mime_type, uploaded_by, uploaded_at'
+        )
+        .eq('card_id', cardId)
+        .order('uploaded_at', { ascending: true })
+
+      if (fetchError) throw fetchError
+
+      setAttachments(
+        (data || []).map((a) => ({
+          id: a.id,
+          cardId: a.card_id,
+          storagePath: a.storage_path,
+          filename: a.filename,
+          sizeBytes: a.size_bytes,
+          mimeType: a.mime_type,
+          uploadedBy: a.uploaded_by,
+          uploadedAt: a.uploaded_at,
+        }))
+      )
+    } catch (err) {
+      console.error('[useCard] fetchAttachments error:', err)
+      setError(err)
+    }
+  }, [cardId])
+
   const refetch = useCallback(
-    () => Promise.all([fetchCard(), fetchMessages()]),
-    [fetchCard, fetchMessages]
+    () => Promise.all([fetchCard(), fetchMessages(), fetchAttachments()]),
+    [fetchCard, fetchMessages, fetchAttachments]
   )
 
   // -------------------------------------------------------------------------
-  // 4. Reset + fetch initial quand cardId change
+  // 5. Reset + fetch initial quand cardId change
   // -------------------------------------------------------------------------
   useEffect(() => {
     setIsLoading(true)
@@ -148,20 +191,21 @@ export function useCard(cardId) {
     setCard(null)
     setBoard(null)
     setMessages([])
+    setAttachments([])
   }, [cardId])
 
   useEffect(() => {
     if (!cardId) return undefined
     let cancelled = false
     ;(async () => {
-      await Promise.all([fetchCard(), fetchMessages()])
+      await Promise.all([fetchCard(), fetchMessages(), fetchAttachments()])
       if (!cancelled) setIsLoading(false)
     })()
     return () => { cancelled = true }
-  }, [cardId, fetchCard, fetchMessages])
+  }, [cardId, fetchCard, fetchMessages, fetchAttachments])
 
   // -------------------------------------------------------------------------
-  // 5. Realtime : messages (chat) et carte (statut, titre...)
+  // 6. Realtime : messages, carte, pieces jointes
   // -------------------------------------------------------------------------
   useEffect(() => {
     if (!cardId) return undefined
@@ -188,15 +232,25 @@ export function useCard(cardId) {
         },
         () => fetchCard()
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'discussion_attachments',
+          filter: `card_id=eq.${cardId}`,
+        },
+        () => fetchAttachments()
+      )
       .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [cardId, fetchMessages, fetchCard])
+  }, [cardId, fetchMessages, fetchCard, fetchAttachments])
 
   // -------------------------------------------------------------------------
-  // 6. Marquage lu : last_read_at suit le dernier message visible
+  // 7. Marquage lu : last_read_at suit le dernier message visible
   // -------------------------------------------------------------------------
   const markCardRead = useCallback(async () => {
     if (!cardId || !userId) return
@@ -224,7 +278,7 @@ export function useCard(cardId) {
   }, [cardId, userId, messages, markCardRead])
 
   // -------------------------------------------------------------------------
-  // 7. Mutations sur les messages
+  // 8. Mutations sur les messages
   // -------------------------------------------------------------------------
 
   /**
@@ -275,7 +329,7 @@ export function useCard(cardId) {
   }, [fetchMessages])
 
   // -------------------------------------------------------------------------
-  // 8. Mutations sur la carte
+  // 9. Mutations sur la carte
   // -------------------------------------------------------------------------
 
   /**
@@ -341,9 +395,14 @@ export function useCard(cardId) {
   }, [cardId, fetchCard])
 
   /**
-   * Supprime durablement la carte (et, en cascade SQL, ses messages).
-   * Ne refetch PAS : la carte n'existe plus, c'est au conteneur de
-   * rediriger vers la vue du tableau.
+   * Supprime durablement la carte (et, en cascade SQL, ses messages et
+   * les lignes de ses pieces jointes). Ne refetch PAS : la carte n'existe
+   * plus, c'est au conteneur de rediriger vers la vue du tableau.
+   *
+   * Note : les fichiers Storage des pieces jointes ne sont pas supprimes
+   * par la cascade SQL (Supabase ne cascade pas le Storage). Ils deviennent
+   * orphelins, mais inaccessibles (la policy de lecture exige une ligne en
+   * base). Limitation connue, acceptable pour le volume d'un cabinet.
    */
   const deleteCard = useCallback(async () => {
     if (!cardId) throw new Error('Carte introuvable')
@@ -356,11 +415,88 @@ export function useCard(cardId) {
     if (deleteError) throw deleteError
   }, [cardId])
 
+  // -------------------------------------------------------------------------
+  // 10. Mutations sur les pieces jointes
+  // -------------------------------------------------------------------------
+
+  /**
+   * Ajoute une piece jointe a la carte.
+   *
+   * Sequence : validation (extension + taille) -> upload du fichier dans
+   * le bucket Storage -> insertion de la ligne en base. Si l'insertion
+   * echoue, le fichier qui vient d'etre uploade est retire pour ne pas
+   * laisser d'orphelin.
+   *
+   * @param {File} file
+   */
+  const addAttachment = useCallback(async (file) => {
+    if (!userId) throw new Error('Utilisateur non connecte')
+    if (!cardId) throw new Error('Carte introuvable')
+
+    // Validation cote application (leve une Error lisible si refuse).
+    validateAttachmentFile(file)
+
+    // 1. Upload du fichier dans le bucket.
+    const { storagePath } = await uploadAttachmentFile(cardId, file)
+
+    // 2. Insertion de la ligne ; rollback du fichier si elle echoue.
+    try {
+      const { error: insertError } = await supabase
+        .from('discussion_attachments')
+        .insert({
+          card_id: cardId,
+          storage_path: storagePath,
+          filename: file.name,
+          size_bytes: file.size,
+          mime_type: file.type || null,
+          uploaded_by: userId,
+        })
+      if (insertError) throw insertError
+    } catch (err) {
+      try {
+        await removeAttachmentFile(storagePath)
+      } catch (cleanupErr) {
+        console.error('[useCard] addAttachment cleanup error:', cleanupErr)
+      }
+      throw err
+    }
+
+    await fetchAttachments()
+  }, [userId, cardId, fetchAttachments])
+
+  /**
+   * Supprime une piece jointe. La RLS n'autorise que celui qui l'a uploadee.
+   *
+   * Sequence : suppression du fichier Storage PUIS de la ligne en base.
+   * La policy Storage de suppression exige que la ligne existe encore,
+   * d'ou cet ordre.
+   *
+   * @param {{ id: string, storagePath: string }} attachment
+   */
+  const deleteAttachment = useCallback(async (attachment) => {
+    if (!attachment?.id || !attachment?.storagePath) {
+      throw new Error('Piece jointe invalide')
+    }
+
+    // 1. Fichier Storage (la ligne en base doit encore exister).
+    await removeAttachmentFile(attachment.storagePath)
+
+    // 2. Ligne en base.
+    const { error: deleteError } = await supabase
+      .from('discussion_attachments')
+      .delete()
+      .eq('id', attachment.id)
+
+    if (deleteError) throw deleteError
+    await fetchAttachments()
+  }, [fetchAttachments])
+
   return {
     // Etat
     card,
     board,
     messages,
+    attachments,
     isLoading,
     notFound,
     error,
@@ -376,5 +512,8 @@ export function useCard(cardId) {
     closeCard,
     reopenCard,
     deleteCard,
+    // Mutations pieces jointes
+    addAttachment,
+    deleteAttachment,
   }
 }

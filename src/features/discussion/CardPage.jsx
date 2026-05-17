@@ -4,6 +4,7 @@ import StatusBadge from './StatusBadge'
 import CardActionsMenu from './CardActionsMenu'
 import CardMessage from './CardMessage'
 import CardComposer from './CardComposer'
+import CardAttachments from './CardAttachments'
 import { formatDayLabel } from '../../lib/dateFormat'
 
 /** Deux dates tombent-elles le meme jour calendaire ? */
@@ -29,14 +30,16 @@ function DaySeparator({ label }) {
 }
 
 /**
- * Vue presentationnelle d'une carte de discussion (etape 7C).
- * Structure en colonne : header fige, fil de messages scrollable,
- * composer fige en bas. Toute la donnee arrive en props de DiscussionCard.
+ * Vue presentationnelle d'une carte de discussion (etapes 7C + 7D).
+ * Structure en colonne : header fige, zone scrollable (description repliable,
+ * pieces jointes, fil de messages), composer fige en bas. Toute la donnee
+ * arrive en props de DiscussionCard.
  */
 export default function CardPage({
   card,
   board,
   messages,
+  attachments,
   userId,
   profilesById = {},
   canEditCard,
@@ -47,6 +50,9 @@ export default function CardPage({
   onSendMessage,
   onEditMessage,
   onDeleteMessage,
+  onOpenAttachment,
+  onAddAttachment,
+  onDeleteAttachment,
 }) {
   const [descExpanded, setDescExpanded] = useState(true)
   const messagesEndRef = useRef(null)
@@ -89,7 +95,7 @@ export default function CardPage({
         </div>
       </header>
 
-      {/* Zone scrollable : description repliable + fil de messages */}
+      {/* Zone scrollable : description repliable + pieces jointes + fil */}
       <div className="flex-1 overflow-y-auto min-h-0 bg-carte">
         <div className="px-4 pt-3 pb-3 border-b border-border">
           {card.description ? (
@@ -120,6 +126,15 @@ export default function CardPage({
             <p className="text-faint text-sm italic">Aucune description.</p>
           )}
         </div>
+
+        <CardAttachments
+          attachments={attachments}
+          userId={userId}
+          canManage={!isClosed}
+          onOpen={onOpenAttachment}
+          onAdd={onAddAttachment}
+          onDelete={onDeleteAttachment}
+        />
 
         <div className="px-4 py-3 space-y-2">
           {messages.length === 0 ? (

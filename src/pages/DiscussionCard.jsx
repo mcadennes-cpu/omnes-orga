@@ -5,6 +5,7 @@ import ConfirmModal from '../components/ConfirmModal'
 import CardPage from '../features/discussion/CardPage'
 import EditCardModal from '../features/discussion/EditCardModal'
 import { useCard } from '../features/discussion/useCard'
+import { openAttachment } from '../features/discussion/discussionStorage'
 import { useMedecins } from '../hooks/useMedecins'
 import { useRole } from '../hooks/useRole'
 import { canEditCard } from '../lib/permissions'
@@ -25,6 +26,7 @@ export default function DiscussionCard() {
     card,
     board,
     messages,
+    attachments,
     isLoading,
     notFound,
     error,
@@ -36,6 +38,8 @@ export default function DiscussionCard() {
     closeCard,
     reopenCard,
     deleteCard,
+    addAttachment,
+    deleteAttachment,
   } = useCard(cardId)
 
   const [editOpen, setEditOpen] = useState(false)
@@ -124,12 +128,25 @@ export default function DiscussionCard() {
     navigate(`/discussion/${boardId}`)
   }
 
+  const handleOpenAttachment = async (attachment) => {
+    try {
+      await openAttachment(
+        attachment.storagePath,
+        attachment.filename,
+        attachment.mimeType
+      )
+    } catch (err) {
+      console.error('[DiscussionCard] open attachment error:', err)
+    }
+  }
+
   return (
     <div className="h-screen flex flex-col bg-fond">
       <CardPage
         card={card}
         board={board}
         messages={messages}
+        attachments={attachments}
         userId={userId}
         profilesById={profilesById}
         canEditCard={userCanEditCard}
@@ -140,6 +157,9 @@ export default function DiscussionCard() {
         onSendMessage={sendMessage}
         onEditMessage={editMessage}
         onDeleteMessage={deleteMessage}
+        onOpenAttachment={handleOpenAttachment}
+        onAddAttachment={addAttachment}
+        onDeleteAttachment={deleteAttachment}
       />
 
       <EditCardModal
