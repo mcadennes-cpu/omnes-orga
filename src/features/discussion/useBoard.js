@@ -2,24 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 
 /**
- * Hook de la vue d'un tableau de discussion (etape 7B).
+ * Hook de la vue d'un tableau de discussion.
  *
- * Charge un tableau precis, ses cartes (non archivees) et la liste de ses
- * membres, puis expose les mutations sur les cartes et sur le tableau.
- * S'abonne au Realtime des cartes pour refleter en direct les ajouts /
- * modifications faits par d'autres utilisateurs.
+ * Charge un tableau, ses cartes (avec compteurs de messages et de
+ * non-lus), ses membres, expose les mutations, s'abonne au Realtime,
+ * et marque le tableau comme lu (mark_board_read) tant qu'il est ouvert.
  *
- * La RLS Supabase filtre cote serveur : si l'utilisateur n'est pas membre
- * du tableau, la requete renvoie 0 ligne -> on expose notFound = true.
- *
- * Note : le hook ne charge PAS les profils des membres (prenom / nom).
- * Il renvoie seulement les identifiants ; le composant conteneur croise
- * ces identifiants avec useMedecins() pour obtenir les profils complets.
- *
- * Note : le marquage lu / non-lu (discussion_board_members.last_read_at et
- * discussion_card_reads) n'est PAS gere ici. Il fera l'objet de l'etape 7C.
- *
- * @param {string} boardId - identifiant du tableau a charger
+ * @param {string} boardId
  */
 export function useBoard(boardId) {
   const [board, setBoard] = useState(null)
@@ -31,7 +20,7 @@ export function useBoard(boardId) {
   const [userId, setUserId] = useState(null)
 
   // -------------------------------------------------------------------------
-  // 1. Utilisateur courant (necessaire pour les mutations)
+  // 1. Utilisateur courant
   // -------------------------------------------------------------------------
   useEffect(() => {
     let mounted = true
@@ -42,7 +31,7 @@ export function useBoard(boardId) {
   }, [])
 
   // -------------------------------------------------------------------------
-  // 2. Fetch du tableau + cartes + membres en une requete
+  // 2. Fetch du tableau + cartes (avec compteurs) + membres
   // -------------------------------------------------------------------------
   const fetchBoard = useCallback(async () => {
     if (!boardId) return
@@ -57,7 +46,9 @@ export function useBoard(boardId) {
           members:discussion_board_members(user_id, role, last_read_at),
           cards:discussion_cards(
             id, board_id, title, description, status, archived,
-            created_by, closed_by, closed_at, created_at, last_activity_at
+            created_by, closed_by, closed_at, created_at, last_activity_at,
+            messages:discussion_messages(id, author_id, body, created_at),
+            reads:discussion_card_reads(last_read_at)
           )
         `)
         .eq('id', boardId)
@@ -65,8 +56,6 @@ export function useBoard(boardId) {
 
       if (fetchError) throw fetchError
 
-      // maybeSingle renvoie null si 0 ligne : tableau inexistant ou
-      // acces refuse par la RLS (utilisateur non membre).
       if (!data) {
         setBoard(null)
         setCards([])
@@ -97,19 +86,53 @@ export function useBoard(boardId) {
 
       const enrichedCards = (data.cards || [])
         .filter((c) => !c.archived)
-        .map((c) => ({
-          id: c.id,
-          boardId: c.board_id,
-          title: c.title,
-          description: c.description,
-          status: c.status,
-          archived: c.archived,
-          createdBy: c.created_by,
-          closedBy: c.closed_by,
-          closedAt: c.closed_at,
-          createdAt: c.created_at,
-          lastActivityAt: c.last_activity_at,
-        }))
+        .map((c) => {
+          const msgs = c.messages || []
+
+          // discussion_card_reads est filtre par la RLS sur auth.uid() :
+          // l'embed ne renvoie donc que la ligne de lecture de l'utilisateur.
+          const myReadAt = c.reads?.[0]?.last_read_at
+          const myReadMs = myReadAt ? new Date(myReadAt).getTime() : 0
+
+          // Non-lus : messages des autres, posterieurs a ma derniere lecture.
+          const unreadCount = msgs.filter(
+            (m) =>
+              m.author_id !== userId &&
+              new Date(m.created_at).getTime() > myReadMs
+          ).length
+
+          // Dernier message, pour l'apercu sur la tile.
+          let lastMessage = null
+          if (msgs.length > 0) {
+            const last = msgs.reduce((a, b) =>
+              new Date(a.created_at).getTime() >= new Date(b.created_at).getTime()
+                ? a
+                : b
+            )
+            lastMessage = {
+              authorId: last.author_id,
+              body: last.body,
+              createdAt: last.created_at,
+            }
+          }
+
+          return {
+            id: c.id,
+            boardId: c.board_id,
+            title: c.title,
+            description: c.description,
+            status: c.status,
+            archived: c.archived,
+            createdBy: c.created_by,
+            closedBy: c.closed_by,
+            closedAt: c.closed_at,
+            createdAt: c.created_at,
+            lastActivityAt: c.last_activity_at,
+            messagesCount: msgs.length,
+            unreadCount,
+            lastMessage,
+          }
+        })
         .sort(
           (a, b) =>
             new Date(b.lastActivityAt).getTime() -
@@ -123,7 +146,7 @@ export function useBoard(boardId) {
     } finally {
       setIsLoading(false)
     }
-  }, [boardId])
+  }, [boardId, userId])
 
   // -------------------------------------------------------------------------
   // 3. Reset + fetch initial quand boardId change
@@ -167,13 +190,28 @@ export function useBoard(boardId) {
   }, [boardId, fetchBoard])
 
   // -------------------------------------------------------------------------
-  // 5. Mutations sur les cartes
+  // 5. Marquage lu du tableau : eteint le point colore de la tile
+  // -------------------------------------------------------------------------
+  const markBoardRead = useCallback(async () => {
+    if (!boardId || !userId) return
+    try {
+      await supabase.rpc('mark_board_read', { p_board_id: boardId })
+    } catch (err) {
+      // Non bloquant : un echec de marquage n'empeche pas de consulter.
+      console.error('[useBoard] markBoardRead error:', err)
+    }
+  }, [boardId, userId])
+
+  useEffect(() => {
+    // A l'ouverture du tableau et a chaque rafraichissement, on marque
+    // le tableau lu (board_members.last_read_at).
+    if (boardId && userId && board) markBoardRead()
+  }, [boardId, userId, board, markBoardRead])
+
+  // -------------------------------------------------------------------------
+  // 6. Mutations sur les cartes
   // -------------------------------------------------------------------------
 
-  /**
-   * Cree une carte dans le tableau courant.
-   * @param {{ title: string, description?: string }} payload
-   */
   const createCard = useCallback(async ({ title, description }) => {
     if (!userId) throw new Error('Utilisateur non connecte')
     if (!boardId) throw new Error('Tableau introuvable')
@@ -196,12 +234,6 @@ export function useBoard(boardId) {
     return data
   }, [userId, boardId, fetchBoard])
 
-  /**
-   * Met a jour le titre et/ou la description d'une carte.
-   * Passer une cle a undefined pour ne pas la modifier.
-   * @param {string} cardId
-   * @param {{ title?: string, description?: string }} patch
-   */
   const updateCard = useCallback(async (cardId, { title, description } = {}) => {
     const patch = {}
     if (title !== undefined) {
@@ -223,10 +255,6 @@ export function useBoard(boardId) {
     await fetchBoard()
   }, [fetchBoard])
 
-  /**
-   * Cloture une carte : statut closed + tracabilite (closed_by / closed_at).
-   * Le chat d'une carte close passe en lecture seule (gere en 7C).
-   */
   const closeCard = useCallback(async (cardId) => {
     if (!userId) throw new Error('Utilisateur non connecte')
     const { error: closeError } = await supabase
@@ -242,27 +270,16 @@ export function useBoard(boardId) {
     await fetchBoard()
   }, [userId, fetchBoard])
 
-  /**
-   * Reouvre une carte close : statut open, on efface closed_by / closed_at.
-   */
   const reopenCard = useCallback(async (cardId) => {
     const { error: reopenError } = await supabase
       .from('discussion_cards')
-      .update({
-        status: 'open',
-        closed_by: null,
-        closed_at: null,
-      })
+      .update({ status: 'open', closed_by: null, closed_at: null })
       .eq('id', cardId)
 
     if (reopenError) throw reopenError
     await fetchBoard()
   }, [fetchBoard])
 
-  /**
-   * Archive une carte : elle disparait de la liste du tableau.
-   * Non destructif, contrairement a deleteCard.
-   */
   const archiveCard = useCallback(async (cardId) => {
     const { error: archiveError } = await supabase
       .from('discussion_cards')
@@ -273,10 +290,6 @@ export function useBoard(boardId) {
     await fetchBoard()
   }, [fetchBoard])
 
-  /**
-   * Supprime durablement une carte (et, en cascade SQL, ses messages
-   * et pieces jointes). Action definitive.
-   */
   const deleteCard = useCallback(async (cardId) => {
     const { error: deleteError } = await supabase
       .from('discussion_cards')
@@ -288,14 +301,9 @@ export function useBoard(boardId) {
   }, [fetchBoard])
 
   // -------------------------------------------------------------------------
-  // 6. Mutations sur le tableau
+  // 7. Mutations sur le tableau
   // -------------------------------------------------------------------------
 
-  /**
-   * Met a jour les metadonnees du tableau (titre, description, couleur).
-   * Passer une cle a undefined pour ne pas la modifier.
-   * @param {{ title?: string, description?: string, color?: string }} patch
-   */
   const updateBoard = useCallback(async ({ title, description, color } = {}) => {
     if (!boardId) throw new Error('Tableau introuvable')
     const patch = {}
@@ -321,11 +329,6 @@ export function useBoard(boardId) {
     await fetchBoard()
   }, [boardId, fetchBoard])
 
-  /**
-   * Archive le tableau (le masque de la liste principale).
-   * On refetch pour que board.archived passe a true : le conteneur
-   * peut alors afficher un bandeau "tableau archive".
-   */
   const archiveBoard = useCallback(async () => {
     if (!boardId) throw new Error('Tableau introuvable')
     const { error: archiveError } = await supabase
@@ -337,9 +340,6 @@ export function useBoard(boardId) {
     await fetchBoard()
   }, [boardId, fetchBoard])
 
-  /**
-   * Desarchive le tableau (le restaure dans la liste principale).
-   */
   const unarchiveBoard = useCallback(async () => {
     if (!boardId) throw new Error('Tableau introuvable')
     const { error: unarchiveError } = await supabase
@@ -351,11 +351,6 @@ export function useBoard(boardId) {
     await fetchBoard()
   }, [boardId, fetchBoard])
 
-  /**
-   * Supprime durablement le tableau (super_admin uniquement, applique
-   * par la RLS). Ne refetch PAS : le tableau n'existe plus, c'est au
-   * conteneur de rediriger vers /discussion apres succes.
-   */
   const deleteBoard = useCallback(async () => {
     if (!boardId) throw new Error('Tableau introuvable')
     const { error: deleteError } = await supabase
@@ -367,7 +362,6 @@ export function useBoard(boardId) {
   }, [boardId])
 
   return {
-    // Etat
     board,
     cards,
     members,
@@ -375,16 +369,13 @@ export function useBoard(boardId) {
     notFound,
     error,
     userId,
-    // Rechargement manuel
     refetch: fetchBoard,
-    // Mutations cartes
     createCard,
     updateCard,
     closeCard,
     reopenCard,
     archiveCard,
     deleteCard,
-    // Mutations tableau
     updateBoard,
     archiveBoard,
     unarchiveBoard,

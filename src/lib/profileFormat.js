@@ -35,3 +35,17 @@ export function initials(profile) {
 export function normalizeForSearch(s) {
   return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 }
+
+/**
+ * Retourne un nom court "Prenom N." (prenom + initiale du nom).
+ * Pratique pour les apercus compacts (ex. dernier message d'une carte).
+ */
+export function formatShortName(profile) {
+  if (!profile) return "Quelqu'un"
+  const prenom = (profile.prenom || '').trim()
+  const nom = (profile.nom || '').trim()
+  if (!prenom && !nom) return "Quelqu'un"
+  if (!nom) return prenom
+  if (!prenom) return nom
+  return `${prenom} ${nom[0].toUpperCase()}.`
+}

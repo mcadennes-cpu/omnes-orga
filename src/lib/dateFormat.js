@@ -39,3 +39,42 @@ export function formatRelativeDate(input) {
     ...(sameYear ? {} : { year: 'numeric' }),
   })
 }
+
+/**
+ * Formate une date en heure courte "HH:mm" (ex. "14:22").
+ * Utilise pour l'horodatage des messages du chat.
+ */
+export function formatTime(input) {
+  if (!input) return ''
+  const date = new Date(input)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+}
+
+/**
+ * Formate une date en libelle de jour pour les separateurs du chat :
+ *   - aujourd'hui -> "Aujourd'hui"
+ *   - hier        -> "Hier"
+ *   - cette annee -> "12 mai"
+ *   - sinon       -> "12 mai 2025"
+ */
+export function formatDayLabel(input) {
+  if (!input) return ''
+  const date = new Date(input)
+  if (Number.isNaN(date.getTime())) return ''
+
+  const now = new Date()
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const dayDiff = Math.round((startOfToday - startOfDate) / 86400000)
+
+  if (dayDiff <= 0) return "Aujourd'hui"
+  if (dayDiff === 1) return 'Hier'
+
+  const sameYear = date.getFullYear() === now.getFullYear()
+  return date.toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'long',
+    ...(sameYear ? {} : { year: 'numeric' }),
+  })
+}

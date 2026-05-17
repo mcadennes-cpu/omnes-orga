@@ -3,12 +3,20 @@ import { ArrowLeft, Plus, MessageSquarePlus } from 'lucide-react'
 import CardListItem from './CardListItem'
 import MemberAvatars from './MemberAvatars'
 import { getBoardColorClasses } from './boardColors'
+import { formatShortName } from '../../lib/profileFormat'
 
 const STATUS_TABS = [
   { id: 'open', label: 'Ouvertes' },
   { id: 'closed', label: 'Closes' },
   { id: 'all', label: 'Toutes' },
 ]
+
+/** Construit l'apercu "Prenom N. : texte" du dernier message d'une carte. */
+function buildLastMessagePreview(card, profilesById) {
+  if (!card.lastMessage) return null
+  const author = profilesById[card.lastMessage.authorId]
+  return `${formatShortName(author)} : ${card.lastMessage.body || ''}`
+}
 
 /**
  * Composant presentationnel de la vue d'un tableau de discussion (7B).
@@ -145,13 +153,25 @@ export default function BoardPage({
             </p>
           </div>
         ) : (
-          <ul className="divide-y divide-border">
-            {visibleCards.map((card) => (
-              <li key={card.id}>
-                <CardListItem card={card} onClick={() => onCardClick(card)} />
-              </li>
-            ))}
-          </ul>
+          (() => {
+            const profilesById = {}
+            memberProfiles.forEach((p) => { profilesById[p.id] = p })
+            return (
+              <ul className="divide-y divide-border">
+                {visibleCards.map((card) => (
+                  <li key={card.id}>
+                    <CardListItem
+                      card={card}
+                      onClick={() => onCardClick(card)}
+                      unreadCount={card.unreadCount}
+                      messagesCount={card.messagesCount}
+                      lastMessagePreview={buildLastMessagePreview(card, profilesById)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )
+          })()
         )}
       </div>
     </div>

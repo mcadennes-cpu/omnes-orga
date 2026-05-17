@@ -5,23 +5,20 @@ import ConfirmModal from '../components/ConfirmModal'
 import BoardPage from '../features/discussion/BoardPage'
 import BoardActionsMenu from '../features/discussion/BoardActionsMenu'
 import CreateCardModal from '../features/discussion/CreateCardModal'
-import CardDetailModal from '../features/discussion/CardDetailModal'
 import RenameBoardModal from '../features/discussion/RenameBoardModal'
 import { useBoard } from '../features/discussion/useBoard'
 import { useMedecins } from '../hooks/useMedecins'
 import { useRole } from '../hooks/useRole'
 import {
   canCreateCard,
-  canEditCard,
   canEditBoard,
   canArchiveBoard,
   canDeleteBoard,
 } from '../lib/permissions'
 
 /**
- * Page conteneur de la vue d'un tableau de discussion (etape 7B).
- * Orchestre le hook useBoard, l'annuaire (useMedecins) pour les profils
- * des membres, les permissions et les modales.
+ * Page conteneur de la vue d'un tableau de discussion.
+ * Le clic sur une carte navigue vers la page carte /discussion/:boardId/:cardId.
  */
 export default function DiscussionBoard() {
   const { boardId } = useParams()
@@ -38,10 +35,6 @@ export default function DiscussionBoard() {
     error,
     userId,
     createCard,
-    updateCard,
-    closeCard,
-    reopenCard,
-    deleteCard,
     updateBoard,
     archiveBoard,
     unarchiveBoard,
@@ -50,18 +43,9 @@ export default function DiscussionBoard() {
 
   const [statusFilter, setStatusFilter] = useState('open')
   const [createCardOpen, setCreateCardOpen] = useState(false)
-  const [detailCardId, setDetailCardId] = useState(null)
   const [renameOpen, setRenameOpen] = useState(false)
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
 
-  // Carte affichee dans la modale detail : derivee de `cards` (et non
-  // stockee en state) pour rester synchro apres une modification.
-  const detailCard = detailCardId
-    ? cards.find((c) => c.id === detailCardId) || null
-    : null
-
-  // Profils des membres : on croise les identifiants renvoyes par useBoard
-  // avec l'annuaire charge par useMedecins.
   const memberProfiles = members
     .map((m) => medecins.find((med) => med.id === m.userId))
     .filter(Boolean)
@@ -113,8 +97,7 @@ export default function DiscussionBoard() {
   }
 
   // --- Permissions ---------------------------------------------------------
-  // permissions.js attend les champs en snake_case (created_by) ; useBoard
-  // expose en camelCase. On adapte localement le board pour les helpers.
+  // permissions.js attend created_by en snake_case ; useBoard expose camelCase.
   const boardForPerms = board ? { created_by: board.createdBy } : null
 
   const userCanEditBoard = boardForPerms
@@ -125,19 +108,8 @@ export default function DiscussionBoard() {
     : false
   const userCanDeleteBoard = canDeleteBoard(role)
 
-  // Creer une carte : droit lie au role ET tableau non archive.
   const userCanCreateCard =
     canCreateCard(role) && Boolean(board) && !board.archived
-
-  const userCanEditDetailCard =
-    detailCard && boardForPerms
-      ? canEditCard({
-          userId,
-          role,
-          card: { created_by: detailCard.createdBy },
-          board: boardForPerms,
-        })
-      : false
 
   // --- Handlers ------------------------------------------------------------
   const handleToggleArchive = async () => {
@@ -156,9 +128,6 @@ export default function DiscussionBoard() {
     await deleteBoard()
     navigate('/discussion')
   }
-
-  const handleToggleCardStatus = (card) =>
-    card.status === 'open' ? closeCard(card.id) : reopenCard(card.id)
 
   // --- Menu d'actions du header -------------------------------------------
   const headerActions = board ? (
@@ -184,7 +153,7 @@ export default function DiscussionBoard() {
         onStatusFilterChange={setStatusFilter}
         canCreateCard={userCanCreateCard}
         onCreateCard={() => setCreateCardOpen(true)}
-        onCardClick={(card) => setDetailCardId(card.id)}
+        onCardClick={(card) => navigate(`/discussion/${boardId}/${card.id}`)}
         onBack={() => navigate('/discussion')}
         onUnarchive={userCanArchiveBoard ? handleToggleArchive : undefined}
         headerActions={headerActions}
@@ -195,17 +164,6 @@ export default function DiscussionBoard() {
         onClose={() => setCreateCardOpen(false)}
         onCreate={createCard}
         accentColor={board?.color}
-      />
-
-      <CardDetailModal
-        open={Boolean(detailCard)}
-        onClose={() => setDetailCardId(null)}
-        card={detailCard}
-        accentColor={board?.color}
-        canEdit={userCanEditDetailCard}
-        onSave={updateCard}
-        onToggleStatus={handleToggleCardStatus}
-        onDelete={deleteCard}
       />
 
       <RenameBoardModal

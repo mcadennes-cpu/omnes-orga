@@ -44,7 +44,7 @@ export default function MemberAvatars({
       className={`inline-flex items-center ${onClick ? 'active:opacity-80 transition-opacity' : ''}`}
     >
       {visible.map((p, idx) => {
-        const palette = getAvatarPalette(p.id)
+        const palette = getAvatarPalette(`${p.prenom} ${p.nom}`)
         return (
           <span
             key={p.id}

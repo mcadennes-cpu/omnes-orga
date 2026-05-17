@@ -592,6 +592,51 @@ VITE_FIREBASE_VAPID_KEY=...
 - Vue carte plein écran, chat temps réel, pièces jointes, passage en lecture seule des cartes closes, tracking lu / non-lu.
 
    - 7B — Vue tableau + cartes : page `DiscussionBoard.jsx` (route `/discussion/:boardId`), sous-header avec `MemberStack` (4 avatars chevauchés + pastille `+N`) et CTA `+ Nouvelle carte`, filtre segmenté `Ouvertes / Closes / Toutes`, liste plate de cartes avec aperçu (titre, badge statut, dernier message, compteur de non lus), CRUD carte (créer, modifier, archiver, basculer statut), gestion des membres du tableau (modale inviter / désinviter / quitter), archivage du tableau côté créateur + super_admin, Realtime sur `discussion_cards` pour rafraîchir la liste.
+
+#### Étape 7C — Vue carte + chat temps réel (livrée)
+
+**Livré :**
+- Route `/discussion/:boardId/:cardId` : vue d'une carte en page plein écran, ouverte au clic depuis la liste des cartes du tableau.
+- La vue carte est une page autonome, sans `AppLayout` ni barre de navigation : comportement type écran de conversation de messagerie.
+- Fil de discussion temps réel : envoi de messages, édition et suppression de ses propres messages, séparateurs de jour dans le fil.
+- Composer : zone de saisie à hauteur automatique, envoi par bouton (la touche Entrée fait un retour à la ligne). Une carte close passe le fil en lecture seule.
+- Description de carte repliable, dépliée par défaut.
+- Menu d'actions de la carte (modifier, clore / rouvrir, supprimer) accessible depuis la vue carte.
+- Suivi lu / non-lu à deux niveaux : compteur de messages non lus par carte sur les tiles du tableau, et point coloré du tableau dans la liste `/discussion` qui s'éteint à l'ouverture du tableau.
+- Tile de carte complétée : aperçu du dernier message (« Prénom N. : … »), compteur total de messages, badge de non-lus.
+
+**Côté base de données :**
+- Fonction RPC `mark_board_read(p_board_id)` en `SECURITY DEFINER`, qui met à jour le seul champ `last_read_at` de la ligne `discussion_board_members` de l'appelant. Fichier `docs/sql/7C-1-mark-board-read.sql`, appliqué via le dashboard Supabase.
+
+**Écarts au plan initial :**
+- La vue carte est une page routée plein écran, et non une vue intégrée à `AppLayout` : choix assumé pour un comportement de type messagerie.
+- Le suivi lu / non-lu côté tableau passe par la fonction RPC `mark_board_read` et non par une policy RLS `UPDATE` sur `discussion_board_members` (envisagée en note de fin de 7B). Une policy `UPDATE` aurait laissé un membre modifier son propre champ `role` et donc s'auto-promouvoir owner ; la fonction `SECURITY DEFINER` ne touche que `last_read_at` et écarte ce risque.
+- La modale détail légère `CardDetailModal.jsx` (livrée en 7B) est supprimée, remplacée par la vue carte plein écran.
+- Pièces jointes : aucune dans les messages. Les pièces jointes de carte sont reportées à une étape 7D dédiée (l'infrastructure SQL et Storage existe déjà depuis 7A).
+
+**Fichiers ajoutés :**
+- Module Discussion : `useCard.js`, `CardPage.jsx`, `CardMessage.jsx`, `CardComposer.jsx`, `CardActionsMenu.jsx`, `EditCardModal.jsx`.
+- Page : `src/pages/DiscussionCard.jsx`.
+- SQL : `docs/sql/7C-1-mark-board-read.sql`.
+
+**Fichiers modifiés :**
+- `useBoard.js` : charge les messages et les lectures de chaque carte, calcule les compteurs (messages, non-lus) et l'aperçu du dernier message ; marque le tableau lu via `mark_board_read`.
+- `BoardPage.jsx` : alimente les tiles de cartes (aperçu, compteur, badge de non-lus).
+- `dateFormat.js` : ajout de `formatTime` et `formatDayLabel`.
+- `profileFormat.js` : ajout de `formatShortName` (« Prénom N. »).
+- `App.jsx` : route `/discussion/:boardId/:cardId`.
+- `DiscussionBoard.jsx` : navigation vers la page carte au lieu de la modale, retrait de `CardDetailModal`.
+
+**Fichier supprimé :**
+- `CardDetailModal.jsx`.
+
+**Correctifs réalisés au passage :**
+- Couleurs des avatars de membres alignées sur le Trombinoscope : `MemberAvatars` calcule sa couleur à partir du nom du profil, comme `MedecinCard`, et non plus à partir de l'identifiant.
+- Titre de carte : ajout de `break-words` pour gérer proprement un titre sans espaces.
+
+**À traiter en 7D :**
+- Pièces jointes de carte : upload vers le bucket `discussion-attachments`, helpers `discussionStorage.js` calqués sur `cabinetStorage.js`, affichage en chips sous la description de la carte. L'infrastructure SQL (table `discussion_attachments`, bucket et policies Storage) existe depuis 7A.
+
    - 7C — Chat dans la carte : ouverture d'une carte en bottom-sheet plein écran (Portal, pattern Cabinet), header avec poignée de drag (swipe-down pour fermer), description collapsible, pièces jointes de carte en chips horizontales scrollables, fil de messages style WhatsApp (bulles asymétriques, mes messages alignés droite en couleur du tableau, autres alignés gauche en `carte` + bordure), séparateurs de date flottants (HIER / AUJOURD'HUI / LUN. 14 AVR.), statut d'envoi (`sending` icône `Clock` / `sent` icône `CheckCheck`), composer sticky avec textarea autosizing + bouton trombone + bouton send, **optimistic UI** sur envoi (insertion locale `sending` → remplacement par version Supabase), Supabase Realtime sur `discussion_messages`, édition / suppression de mes propres messages (menu contextuel), pièces jointes dans message (upload via helper dédié type `discussionStorage.js`, preview / download via Blob), marquage automatique « lu » à l'ouverture (upsert sur `discussion_card_reads`), gestion clavier mobile via `visualViewport.resize` (variable CSS `--keyboard-offset` sur le composer), auto-scroll bas si user en bas (sinon bouton flottant « ↓ N nouveaux messages »).
    - 7D — Polish : recherche globale étendue à Discussion (titres tableaux + cartes), compteurs de non lus persistants (point coloré niveau tableau via `discussion_board_members.last_read_at`, compteur numérique niveau carte via `discussion_card_reads`), états vides illustrés (liste tableaux vide, tableau sans cartes, filtre Closes vide, chat vide), tests multi-utilisateurs (permissions par rôle, Realtime cross-session, edge cases invitation / désinvitation / carte close).
 8. **Étape 8** — Module Événements (Drive)

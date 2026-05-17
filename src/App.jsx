@@ -13,6 +13,7 @@ import Cabinet from './pages/Cabinet'
 import CabinetFolder from './pages/CabinetFolder'
 import Discussion from './pages/Discussion'
 import DiscussionBoard from './pages/DiscussionBoard'
+import DiscussionCard from './pages/DiscussionCard'
 
 export default function App() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
         <Route path="/cabinet/:id" element={<CabinetFolder />} />
         <Route path="/discussion" element={<Discussion />} />
         <Route path="/discussion/:boardId" element={<DiscussionBoard />} />
+        <Route path="/discussion/:boardId/:cardId" element={<DiscussionCard />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
