@@ -638,6 +638,41 @@ VITE_FIREBASE_VAPID_KEY=...
 - Pièces jointes de carte : upload vers le bucket `discussion-attachments`, helpers `discussionStorage.js` calqués sur `cabinetStorage.js`, affichage en chips sous la description de la carte. L'infrastructure SQL (table `discussion_attachments`, bucket et policies Storage) existe depuis 7A.
 
    - 7C — Chat dans la carte : ouverture d'une carte en bottom-sheet plein écran (Portal, pattern Cabinet), header avec poignée de drag (swipe-down pour fermer), description collapsible, pièces jointes de carte en chips horizontales scrollables, fil de messages style WhatsApp (bulles asymétriques, mes messages alignés droite en couleur du tableau, autres alignés gauche en `carte` + bordure), séparateurs de date flottants (HIER / AUJOURD'HUI / LUN. 14 AVR.), statut d'envoi (`sending` icône `Clock` / `sent` icône `CheckCheck`), composer sticky avec textarea autosizing + bouton trombone + bouton send, **optimistic UI** sur envoi (insertion locale `sending` → remplacement par version Supabase), Supabase Realtime sur `discussion_messages`, édition / suppression de mes propres messages (menu contextuel), pièces jointes dans message (upload via helper dédié type `discussionStorage.js`, preview / download via Blob), marquage automatique « lu » à l'ouverture (upsert sur `discussion_card_reads`), gestion clavier mobile via `visualViewport.resize` (variable CSS `--keyboard-offset` sur le composer), auto-scroll bas si user en bas (sinon bouton flottant « ↓ N nouveaux messages »).
+
+#### Étape 7D — Pièces jointes de carte (livrée)
+
+**Livré :**
+- Section « Pièces jointes » sous la description de chaque carte.
+- Ajout de fichiers avec sélection multiple ; suppression de ses propres pièces jointes (avec confirmation inline).
+- Ouverture d'une pièce jointe : prévisualisation dans un nouvel onglet pour les types affichables (images, PDF), téléchargement avec nom de fichier propre pour les autres (Word, Excel, PowerPoint, Pages, Numbers, Keynote).
+- Formats acceptés : images (jpg, png, gif, webp, heic), PDF, bureautique Microsoft et Apple iWork. Taille maximale de 25 Mo par fichier, validée côté application et côté bucket.
+- Realtime : l'ajout ou la suppression d'une pièce jointe se reflète en direct chez les membres consultant la même carte.
+
+**Côté base de données :**
+- `discussion_attachments` ajoutée à la publication Realtime ; limite de taille du bucket `discussion-attachments` fixée à 25 Mo. Fichier `docs/sql/7D-1-attachments-realtime.sql`.
+- L'infrastructure (table `discussion_attachments`, bucket et policies Storage) existait depuis 7A.
+
+**Décisions :**
+- Les pièces jointes sont rattachées aux cartes uniquement, pas aux messages.
+- Carte close = lecture seule totale : les pièces jointes restent consultables et téléchargeables, mais on ne peut ni en ajouter ni en supprimer. Ce blocage est appliqué côté interface (la RLS ne l'impose pas pour les pièces jointes).
+- La suppression d'une pièce jointe est réservée à celui qui l'a déposée (imposé par la RLS).
+- Ouverture des fichiers via une URL signée dans un nouvel onglet plutôt qu'un téléchargement forcé : plus confortable, en particulier sur mobile pour les images et les PDF.
+
+**Fichiers ajoutés :**
+- Module Discussion : `discussionStorage.js`, `AttachmentChip.jsx`, `CardAttachments.jsx`.
+- SQL : `docs/sql/7D-1-attachments-realtime.sql`.
+
+**Fichiers modifiés :**
+- `useCard.js` : chargement des pièces jointes, mutations d'ajout et de suppression, Realtime.
+- `CardPage.jsx` : intégration de la section pièces jointes entre la description et le fil.
+- `DiscussionCard.jsx` : branchement des pièces jointes sur la vue carte.
+
+**Limitations connues :**
+- Ajouter une pièce jointe ne met pas à jour `last_activity_at` de la carte (le trigger SQL ne couvre que les messages) : une pièce jointe ajoutée ne fait pas remonter la carte ni n'allume le point de non-lu.
+- À la suppression d'une carte, la cascade SQL efface les lignes `discussion_attachments` mais pas les fichiers du bucket Storage : ces fichiers deviennent orphelins — inaccessibles (sans fuite de données), simplement de l'espace de stockage perdu.
+
+Le module Discussion est désormais complet (étapes 7A à 7D).
+
    - 7D — Polish : recherche globale étendue à Discussion (titres tableaux + cartes), compteurs de non lus persistants (point coloré niveau tableau via `discussion_board_members.last_read_at`, compteur numérique niveau carte via `discussion_card_reads`), états vides illustrés (liste tableaux vide, tableau sans cartes, filtre Closes vide, chat vide), tests multi-utilisateurs (permissions par rôle, Realtime cross-session, edge cases invitation / désinvitation / carte close).
 8. **Étape 8** — Module Événements (Drive)
 9. **Étape 9** — Module SIM (Drive restreint)
