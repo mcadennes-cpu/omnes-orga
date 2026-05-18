@@ -131,3 +131,58 @@ export function canEditMessage({ userId, message }) {
   if (!userId) return false
   return message?.author_id === userId
 }
+
+// ----------------------------------------------------------------------------
+// Module Evenements
+// ----------------------------------------------------------------------------
+
+const EVENEMENT_CREATOR_ROLES = [
+  ROLES.SUPER_ADMIN,
+  ROLES.ASSOCIE_GERANT,
+  ROLES.ASSOCIE,
+]
+
+/**
+ * Peut creer un evenement.
+ * Reserve aux associes, associes-gerants et super_admins. Le remplacant est
+ * en lecture seule (il peut neanmoins voter au sondage, cf.
+ * canRespondToSondage).
+ */
+export function canCreateEvenement(role) {
+  return EVENEMENT_CREATOR_ROLES.includes(role)
+}
+
+/**
+ * Peut modifier un evenement (titre, dates, lieu, description, couleur,
+ * activation du sondage) et gerer ses documents.
+ * - super_admin et associe_gerant : n'importe quel evenement.
+ * - associe : uniquement ses propres evenements (auteur).
+ * - remplacant : jamais.
+ * Meme regle que canEditEntreeAnnuaire.
+ *
+ * @param {{ role: string, currentUserId: string, auteurId: string }} ctx
+ */
+export function canEditEvenement({ role, currentUserId, auteurId }) {
+  if (!role) return false
+  if (role === ROLES.SUPER_ADMIN) return true
+  if (role === ROLES.ASSOCIE_GERANT) return true
+  return Boolean(currentUserId) && currentUserId === auteurId
+}
+
+/**
+ * Peut supprimer un evenement (hard delete, cascade sur documents et
+ * reponses). Meme regle que canEditEvenement.
+ */
+export function canDeleteEvenement({ role, currentUserId, auteurId }) {
+  return canEditEvenement({ role, currentUserId, auteurId })
+}
+
+/**
+ * Peut repondre au sondage de presence d'un evenement.
+ * Tout utilisateur authentifie ayant un role, remplacant compris : chacun
+ * indique s'il peut venir. (Le sondage doit aussi etre actif ; la RLS le
+ * verifie cote serveur et l'UI le masque cote frontend.)
+ */
+export function canRespondToSondage(role) {
+  return Boolean(role)
+}
