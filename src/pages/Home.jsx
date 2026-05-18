@@ -35,6 +35,10 @@ export default function Home() {
       navigate('/discussion')
       return
     }
+    if (moduleKey === 'evenements') {
+      navigate('/evenements')
+      return
+    }
     alert(`Module "${moduleKey}" à venir`)
   }
 
