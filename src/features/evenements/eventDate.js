@@ -23,6 +23,11 @@ function moisCourt(date) {
     .toUpperCase()
 }
 
+/** Met la premiere lettre en majuscule. */
+function capitalize(s) {
+  return s ? s[0].toUpperCase() + s.slice(1) : s
+}
+
 /**
  * Donnees d'affichage du bloc-date d'une carte evenement.
  * - Mono-jour : { primary: '12', secondary: 'JUIN', multiDay: false }
@@ -53,6 +58,57 @@ export function formatDateBlock(dateDebut, dateFin) {
     secondary: moisCourt(debut),
     multiDay: false,
   }
+}
+
+/**
+ * Date complete d'un evenement, pour l'ecran detail.
+ * - Mono-jour : 'Jeudi 12 juin 2026'
+ * - Multi-jours meme mois : '12 - 14 juin 2026'
+ * - Multi-jours meme annee : '30 mai - 2 juin 2026'
+ * - Multi-jours annees differentes : '30 decembre 2025 - 2 janvier 2026'
+ */
+export function formatDateLong(dateDebut, dateFin) {
+  const debut = parseDateOnly(dateDebut)
+  if (!debut) return ''
+  const fin = parseDateOnly(dateFin)
+
+  // Mono-jour
+  if (!fin || fin.getTime() === debut.getTime()) {
+    return capitalize(
+      new Intl.DateTimeFormat('fr-FR', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      }).format(debut),
+    )
+  }
+
+  // Multi-jours
+  const memeAnnee = debut.getFullYear() === fin.getFullYear()
+  const memeMois = memeAnnee && debut.getMonth() === fin.getMonth()
+  const finLong = new Intl.DateTimeFormat('fr-FR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(fin)
+
+  if (memeMois) {
+    return `${debut.getDate()} – ${finLong}`
+  }
+  if (memeAnnee) {
+    const debutJourMois = new Intl.DateTimeFormat('fr-FR', {
+      day: 'numeric',
+      month: 'long',
+    }).format(debut)
+    return `${debutJourMois} – ${finLong}`
+  }
+  const debutComplet = new Intl.DateTimeFormat('fr-FR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(debut)
+  return `${debutComplet} – ${finLong}`
 }
 
 /**

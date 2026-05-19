@@ -10,9 +10,11 @@ import { useAuth } from '../../hooks/useAuth'
  *   ('oui' | 'non' | 'peut_etre') ou null s'il n'a pas vote
  *
  * Tri par date_debut ascendant. Le decoupage "A venir" / "Passes" se fait
- * cote page (lot 8C) a partir de ce jeu complet.
+ * cote page (Evenements.jsx) a partir de ce jeu complet.
  *
  * Realtime : abonnement aux changements de la table evenements -> refetch.
+ *
+ * Expose createEvenement(values) pour la modale de creation.
  */
 export function useEvenements() {
   const { user, loading: authLoading } = useAuth()
@@ -112,5 +114,33 @@ export function useEvenements() {
     }
   }, [user, refetch])
 
-  return { evenements, loading, error, refetch }
+  // --- Creation d'un evenement ---
+  // auteur_id = utilisateur courant : impose par la RLS evenements_insert_creators.
+  const createEvenement = useCallback(
+    async (values) => {
+      if (!user) throw new Error('Utilisateur non connecte')
+
+      const { data, error: insertError } = await supabase
+        .from('evenements')
+        .insert({
+          titre: values.titre,
+          description: values.description,
+          date_debut: values.date_debut,
+          date_fin: values.date_fin,
+          lieu: values.lieu,
+          couleur: values.couleur,
+          sondage_actif: values.sondage_actif,
+          auteur_id: user.id,
+        })
+        .select('id')
+        .single()
+
+      if (insertError) throw insertError
+      refetch()
+      return data
+    },
+    [user, refetch],
+  )
+
+  return { evenements, loading, error, refetch, createEvenement }
 }

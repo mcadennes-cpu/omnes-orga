@@ -15,6 +15,7 @@ import Discussion from './pages/Discussion'
 import DiscussionBoard from './pages/DiscussionBoard'
 import DiscussionCard from './pages/DiscussionCard'
 import Evenements from './pages/Evenements'
+import EvenementDetail from './pages/EvenementDetail'
 
 export default function App() {
   return (
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="/discussion/:boardId" element={<DiscussionBoard />} />
         <Route path="/discussion/:boardId/:cardId" element={<DiscussionCard />} />
         <Route path="/evenements" element={<Evenements />} />
+        <Route path="/evenements/:id" element={<EvenementDetail />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

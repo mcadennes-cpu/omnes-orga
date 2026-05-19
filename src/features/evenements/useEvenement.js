@@ -4,11 +4,13 @@ import { useAuth } from '../../hooks/useAuth'
 
 /**
  * Charge un evenement unique par son id, avec son auteur (prenom, nom).
- * Les documents et les reponses au sondage seront charges par des hooks
- * dedies dans les lots ulterieurs (8E documents, 8F sondage).
+ * Les documents et les reponses au sondage sont charges par des hooks
+ * dedies (lots 8F documents, 8G sondage).
  *
  * Si l'evenement n'existe pas (ou n'est pas visible), evenement vaut null
- * et error reste null : la page detail affichera un etat "introuvable".
+ * et error reste null : la page detail affiche un etat "introuvable".
+ *
+ * Expose updateEvenement(values) et deleteEvenement() pour la page detail.
  */
 export function useEvenement(id) {
   const { user, loading: authLoading } = useAuth()
@@ -60,5 +62,40 @@ export function useEvenement(id) {
     }
   }, [id, user, authLoading, reloadKey])
 
-  return { evenement, loading, error, refetch }
+  // --- Modification de l'evenement ---
+  const updateEvenement = useCallback(
+    async (values) => {
+      if (!id) throw new Error('Evenement introuvable')
+      const { error: updateError } = await supabase
+        .from('evenements')
+        .update({
+          titre: values.titre,
+          description: values.description,
+          date_debut: values.date_debut,
+          date_fin: values.date_fin,
+          lieu: values.lieu,
+          couleur: values.couleur,
+          sondage_actif: values.sondage_actif,
+        })
+        .eq('id', id)
+      if (updateError) throw updateError
+      refetch()
+    },
+    [id, refetch],
+  )
+
+  // --- Suppression de l'evenement ---
+  // Hard delete : la cascade SQL efface les lignes evenement_fichiers et
+  // evenement_reponses. Le nettoyage des blobs Storage des documents sera
+  // ajoute au lot 8F (quand les documents existeront).
+  const deleteEvenement = useCallback(async () => {
+    if (!id) throw new Error('Evenement introuvable')
+    const { error: deleteError } = await supabase
+      .from('evenements')
+      .delete()
+      .eq('id', id)
+    if (deleteError) throw deleteError
+  }, [id])
+
+  return { evenement, loading, error, refetch, updateEvenement, deleteEvenement }
 }
