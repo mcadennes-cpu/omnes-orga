@@ -5,6 +5,7 @@ import AppLayout from '../components/layout/AppLayout'
 import ConfirmDialog from '../components/common/ConfirmDialog'
 import EvenementFormModal from '../features/evenements/EvenementFormModal'
 import EvenementDocuments from '../features/evenements/EvenementDocuments'
+import PollSection from '../features/evenements/PollSection'
 import { useEvenement } from '../features/evenements/useEvenement'
 import { useAuth } from '../hooks/useAuth'
 import { useRole } from '../hooks/useRole'
@@ -222,7 +223,13 @@ export default function EvenementDetail() {
               </div>
             )}
 
-            {/* Section sondage : lot 8G */}
+            {/* Sondage de presence */}
+            {evenement.sondage_actif && (
+              <PollSection
+                evenementId={evenement.id}
+                couleur={evenement.couleur}
+              />
+            )}
 
             {/* Documents */}
             <EvenementDocuments evenementId={evenement.id} canEdit={canEdit} />
