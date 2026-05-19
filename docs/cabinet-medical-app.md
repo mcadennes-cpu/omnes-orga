@@ -307,18 +307,90 @@ Pas de chat dans ce module.
 
 ### 5. Événements
 
-**Type :** Drive (documents + descriptions)
+**Type :** Agenda commun (liste d'événements) + sondage de présence + documents
 
-**Concept :** Centralise les événements du cabinet (formations, réunions, congrès…). Peut contenir des documents associés (programmes, inscriptions).
+**Concept :** Agenda partagé du cabinet — formations, réunions, congrès. Chaque événement porte un titre, des dates (un ou plusieurs jours), un lieu, une description et une couleur d'identité. En option : un sondage de présence et des documents attachés. Pas de chat, pas de récurrence, pas de notifications.
 
-**Droits :**
+**Couleur par événement :** à la création, l'auteur choisit une couleur parmi les 6 du DS (`brique`, `ocre`, `olive`, `canard`, `fuchsia`, `marine`, défaut `marine`). Elle teinte le bloc-date de la liste, la pastille calendrier du détail, la pill « Sondage », l'indicateur « À répondre » et les boutons du sondage. Le module n'a pas de couleur d'accent propre : les CTA et le filtre actif sont en `marine`.
+
+#### Tables (Supabase)
+
+`evenements`
+```
+id             uuid      PK
+titre          text      not null
+description    text
+date_debut     date      not null
+date_fin       date      optionnel (multi-jours ; CHECK >= date_debut)
+lieu           text      optionnel
+couleur        text      6 valeurs DS, defaut 'marine'
+sondage_actif  boolean   defaut false
+auteur_id      uuid      FK profiles(id) ON DELETE SET NULL
+created_at / updated_at  timestamptz
+```
+
+`evenement_fichiers` — documents attachés (bucket Storage `evenements`, l'`id` sert de nom physique du blob, pattern flat UUID).
+```
+id            uuid      PK = nom du blob dans Storage
+evenement_id  uuid      FK evenements(id) ON DELETE CASCADE
+nom           text
+taille_octets bigint    CHECK <= 25 Mo
+mime_type     text
+auteur_id     uuid      FK profiles(id) ON DELETE SET NULL
+created_at    timestamptz
+```
+
+`evenement_reponses` — réponses au sondage (une par utilisateur et par événement).
+```
+id            uuid      PK
+evenement_id  uuid      FK evenements(id) ON DELETE CASCADE
+user_id       uuid      FK profiles(id) ON DELETE CASCADE
+reponse       text      'oui' | 'non' | 'peut_etre' (CHECK)
+created_at / updated_at  timestamptz
+UNIQUE (evenement_id, user_id)  -- permet l'upsert
+```
+
+**RLS (10 policies, étape 8A-2) :** lecture des 3 tables ouverte à tout authentifié. `evenements` : création par super_admin / associe_gerant / associe (auteur = soi) ; modification et suppression par super_admin / associe_gerant ou l'auteur. `evenement_fichiers` : ajout / suppression réservés à ceux qui peuvent modifier l'événement parent. `evenement_reponses` : chacun gère sa propre réponse (INSERT + UPDATE) tant que le sondage est actif. Storage : bucket `evenements` privé, 25 Mo ; lecture pour tous, écriture pour super_admin / associe_gerant / associe (la granularité fine « son propre événement » est portée par la RLS de `evenement_fichiers`). Realtime activé sur `evenements` uniquement.
+
+#### Droits
+
 | Action | super_admin | associe_gerant | associe | remplacant |
 |---|:---:|:---:|:---:|:---:|
-| Voir | ✓ | ✓ | ✓ | ✓ |
-| Créer / modifier / uploader | ✓ | ✓ | — | — |
-| Supprimer | ✓ | ✓ | — | — |
+| Voir les événements | ✓ | ✓ | ✓ | ✓ |
+| Créer un événement | ✓ | ✓ | ✓ | — |
+| Modifier / supprimer un événement | ✓ tous | ✓ tous | ✓ les siens | — |
+| Ajouter / supprimer un document | ✓ tous | ✓ tous | ✓ ses événements | — |
+| Répondre au sondage | ✓ | ✓ | ✓ | ✓ |
 
-Pas de chat dans ce module.
+#### Écrans & routing
+
+- `/evenements` — liste : recherche (titre + lieu), filtre segmenté « À venir » / « Passés », bloc-date coloré (plage compacte si multi-jours, neutralisé en gris pour les passés), pill « Sondage », indicateur « À répondre ». CTA « Nouvel événement » selon le rôle. Tuile Home câblée.
+- `/evenements/:id` — détail : bloc résumé (date complète, lieu, auteur), description, section sondage (si actif), section documents. Menu trois-points Modifier / Supprimer selon les droits.
+- Création / édition via la bottom-sheet `EvenementFormModal` (titre, description, dates, lieu, `ColorPicker`, interrupteur sondage).
+
+#### Permissions fines
+
+Dans `src/lib/permissions.js` : `canCreateEvenement(role)`, `canEditEvenement({ role, currentUserId, auteurId })`, `canDeleteEvenement(...)` (même règle qu'éditer), `canRespondToSondage(role)`.
+
+#### Sondage de présence
+
+Activable à la création / édition (`sondage_actif`). 3 réponses fixes Oui / Non / Peut-être, une par personne, modifiable (upsert sur `evenement_reponses`), en optimistic UI. Décompte et liste des votants groupée visibles par tous.
+
+#### Architecture
+
+Dossier `src/features/evenements/` : hooks `useEvenements`, `useEvenement`, `useEvenementFichiers`, `useSondage` ; composants `EvenementFormModal`, `ColorPicker`, `EvenementDocuments`, `EvenementUploadModal`, `PollSection`, `EventDateBlock` ; helpers `eventColors.js`, `eventDate.js`, `fileType.js`, `evenementStorage.js`. Pages `src/pages/Evenements.jsx` et `EvenementDetail.jsx`.
+
+#### Écarts au plan initial
+
+- Spécifié « Drive » à l'origine, le module a été conçu en **liste plate d'événements** (pas d'arborescence de dossiers).
+- Droits élargis : l'`associe` peut créer des événements et gérer les siens (le plan le donnait en lecture seule).
+- Ajouts produit non prévus : **couleur d'identité par événement** et **sondage de présence**.
+- Pas de champ heure (l'heure va dans la description) ni de sous-lieu (un seul champ `lieu`).
+
+#### Limitations connues
+
+- Suppression d'un événement : nettoyage best-effort des blobs Storage des documents ; un échec laisse des fichiers orphelins (sans fuite de données).
+- Pas de Realtime sur les documents ni le sondage : rafraîchis au chargement de la page détail.
 
 ---
 
@@ -364,7 +436,7 @@ Pas de chat dans ce module.
 | Annuaire | ✓ | ✓ | ✓ | ✓ |
 | Cabinet pratique | ✓ édition | ✓ édition | ✓ lecture | ✓ lecture |
 | Discussion | ✓ | ✓ | si invité | si invité |
-| Événements | ✓ édition | ✓ édition | ✓ lecture | ✓ lecture |
+| Événements | ✓ édition complète | ✓ édition complète | ✓ création + édition de soi | ✓ lecture + sondage |
 | SIM | ✓ | ✓ | invisible | invisible |
 | Immobilier | ✓ | ✓ | si invité | — |
 
@@ -674,7 +746,15 @@ VITE_FIREBASE_VAPID_KEY=...
 Le module Discussion est désormais complet (étapes 7A à 7D).
 
    - 7D — Polish : recherche globale étendue à Discussion (titres tableaux + cartes), compteurs de non lus persistants (point coloré niveau tableau via `discussion_board_members.last_read_at`, compteur numérique niveau carte via `discussion_card_reads`), états vides illustrés (liste tableaux vide, tableau sans cartes, filtre Closes vide, chat vide), tests multi-utilisateurs (permissions par rôle, Realtime cross-session, edge cases invitation / désinvitation / carte close).
-8. **Étape 8** — Module Événements (Drive)
+8. ✓ **Étape 8 — FAITE** — Module Événements (sous-étapes 8A → 8H)
+   - 8A : Schéma SQL — tables `evenements`, `evenement_fichiers`, `evenement_reponses` + RLS (10 policies) + index + triggers + Realtime sur `evenements` + bucket Storage `evenements` + 3 storage policies. Colonne `couleur` ajoutée en 8A-5. SQL versionné `docs/sql/8A-1` à `8A-5`.
+   - 8B : Helpers de permissions (`canCreateEvenement`, `canEditEvenement`, `canDeleteEvenement`, `canRespondToSondage`) + hooks `useEvenements` / `useEvenement` + helper `evenementStorage.js`.
+   - 8C : Page liste `/evenements` (recherche, filtre À venir / Passés, bloc-date coloré, état vide) + tuile Home câblée.
+   - 8D : Modale `EvenementFormModal` (création) avec `ColorPicker` et interrupteur sondage.
+   - 8E : Page détail `/evenements/:id` (résumé, description, menu trois-points) + édition + suppression (`ConfirmDialog`).
+   - 8F : Section documents (hook `useEvenementFichiers`, `EvenementUploadModal`, liste avec icônes par type, téléchargement, suppression).
+   - 8G : Sondage de présence (hook `useSondage`, `PollSection` Oui / Non / Peut-être, optimistic UI, résultats).
+   - 8H : Tests multi-rôles + mise à jour doc.
 9. **Étape 9** — Module SIM (Drive restreint)
 10. **Étape 10** — Module Immobilier (mêmes composants que Discussion)
 11. **Étape 11** — Page Profil personnelle + gestion `profiles_compta`
