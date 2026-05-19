@@ -186,3 +186,45 @@ export function canDeleteEvenement({ role, currentUserId, auteurId }) {
 export function canRespondToSondage(role) {
   return Boolean(role)
 }
+
+// ─── SIM (Societe d'Intendance Medicale) — Drive restreint ─────────────────
+//
+// Modele a deux niveaux, calque sur l'Annuaire (role + auteur) :
+//   - Voir / uploader : etre membre SIM (super_admin ou associe_gerant).
+//     Cette partie "membre" est surtout portee par la RLS (is_sim_member) ;
+//     cote React, le module est simplement masque de la Home aux non-membres.
+//   - Modifier / supprimer un dossier ou un fichier : super_admin (tout),
+//     ou associe_gerant uniquement sur les elements qu'il a crees.
+
+const SIM_ROLES = ['super_admin', 'associe_gerant']
+
+/**
+ * true si le role a acces au module SIM (voir, telecharger, uploader,
+ * creer un dossier). Sert au masquage de la tuile Home et aux gardes de page.
+ */
+export function canAccessSim(role) {
+  return SIM_ROLES.includes(role)
+}
+
+/**
+ * true si l'utilisateur peut modifier (renommer) un dossier ou un fichier SIM.
+ * super_admin : tout. associe_gerant : uniquement ses propres elements.
+ *
+ * @param {object} p
+ * @param {string} p.role           role de l'utilisateur courant
+ * @param {string} p.currentUserId  id de l'utilisateur courant
+ * @param {string} p.auteurId       auteur_id de l'element (dossier ou fichier)
+ */
+export function canEditSim({ role, currentUserId, auteurId }) {
+  if (role === 'super_admin') return true
+  if (role === 'associe_gerant') return currentUserId === auteurId
+  return false
+}
+
+/**
+ * true si l'utilisateur peut supprimer un dossier ou un fichier SIM.
+ * Meme regle que canEditSim.
+ */
+export function canDeleteSim(params) {
+  return canEditSim(params)
+}
