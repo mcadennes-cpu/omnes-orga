@@ -759,6 +759,7 @@ Le module Discussion est désormais complet (étapes 7A à 7D).
 10. **Étape 10** — Module Immobilier (mêmes composants que Discussion)
 11. **Étape 11** — Page Profil personnelle + gestion `profiles_compta`
 12. **Étape 12** — Configuration PWA (manifest, service worker, icônes, page guide d'installation)
+    - **Étape 12 bis — Alignement du design system** — passe de mise au standard DS des écrans antérieurs à l'étape 6.0, dans l'ordre : shell (Home, Login, navigation), puis Trombinoscope, puis Annuaire. Migration des radii (`rounded-card` / `rounded-input` / `rounded-tile`), des surfaces (`bg-carte` / `bg-fond`), des bordures (`border-border`), des ombres (`shadow-card` / `shadow-button`) et de la typographie (classes `.text-h1` / `.text-h2` / etc. en Archivo). À traiter écran par écran en petits lots testés. Voir « Limitations connues ».
 13. **Étape 13** — Déploiement Vercel + tests installation iOS et Android
 14. **Étape 14** — Notifications push Firebase FCM (à faire après que la PWA fonctionne)
 
@@ -769,6 +770,7 @@ Le module Discussion est désormais complet (étapes 7A à 7D).
 - **Création d'un médecin sans UI dédiée** — pas de bouton "+" dans l'application. Workflow actuel : super_admin crée un AuthUser dans le dashboard Supabase, le trigger `on_auth_user_created` insère la ligne `profiles` avec valeurs par défaut, puis super_admin enrichit le profil via le formulaire d'édition. Industrialisation possible plus tard via une Supabase Edge Function (cf. section Trombinoscope > Création d'un médecin).
 - **Filtrage des champs sensibles côté frontend** — la RLS `profiles_select_all_authenticated` autorise la lecture de toute la table `profiles` à tout utilisateur authentifié. Le masquage de `jours_disponibles` et `notes_internes` pour les remplaçants se fait côté React. Si on a besoin d'une sécurité forte (les remplaçants ne doivent jamais voir ces données via une requête manuelle), migrer vers une vue PostgreSQL filtrée par rôle.
 - **Pas d'UI pour `profiles_compta`** — la table existe et est protégée par RLS, mais la gestion des informations bancaires sera traitée à l'étape 11.
+- **Cohérence du design system** — les modules Trombinoscope et Annuaire ainsi que le shell de l'application (Home, Login, navigation) sont antérieurs à l'étape 6.0 qui a introduit les tokens du DS. Ils utilisent encore en partie du Tailwind brut (radii `rounded-lg`, surfaces `bg-white`, bordures `border-gray-*`, titres en `text-2xl font-bold` plutôt qu'en `.text-h1` Archivo). Les modules Cabinet pratique, Discussion et Événements sont au standard DS. Un alignement des écrans historiques est planifié à l'étape 12 bis, avant le déploiement.
 
 ---
 
