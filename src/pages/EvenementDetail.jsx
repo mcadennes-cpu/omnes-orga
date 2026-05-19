@@ -4,6 +4,7 @@ import { ChevronLeft, MoreVertical, CalendarDays, MapPin } from 'lucide-react'
 import AppLayout from '../components/layout/AppLayout'
 import ConfirmDialog from '../components/common/ConfirmDialog'
 import EvenementFormModal from '../features/evenements/EvenementFormModal'
+import EvenementDocuments from '../features/evenements/EvenementDocuments'
 import { useEvenement } from '../features/evenements/useEvenement'
 import { useAuth } from '../hooks/useAuth'
 import { useRole } from '../hooks/useRole'
@@ -222,7 +223,9 @@ export default function EvenementDetail() {
             )}
 
             {/* Section sondage : lot 8G */}
-            {/* Section documents : lot 8F */}
+
+            {/* Documents */}
+            <EvenementDocuments evenementId={evenement.id} canEdit={canEdit} />
           </div>
         )}
       </div>

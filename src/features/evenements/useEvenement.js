@@ -5,7 +5,7 @@ import { useAuth } from '../../hooks/useAuth'
 /**
  * Charge un evenement unique par son id, avec son auteur (prenom, nom).
  * Les documents et les reponses au sondage sont charges par des hooks
- * dedies (lots 8F documents, 8G sondage).
+ * dedies (useEvenementFichiers, et le hook de sondage au lot 8G).
  *
  * Si l'evenement n'existe pas (ou n'est pas visible), evenement vaut null
  * et error reste null : la page detail affiche un etat "introuvable".
@@ -84,12 +84,27 @@ export function useEvenement(id) {
     [id, refetch],
   )
 
-  // --- Suppression de l'evenement ---
-  // Hard delete : la cascade SQL efface les lignes evenement_fichiers et
-  // evenement_reponses. Le nettoyage des blobs Storage des documents sera
-  // ajoute au lot 8F (quand les documents existeront).
+  // --- Suppression de l'evenement (hard delete) ---
   const deleteEvenement = useCallback(async () => {
     if (!id) throw new Error('Evenement introuvable')
+
+    // Nettoyage best-effort des blobs Storage des documents : on les retire
+    // AVANT la suppression de l'evenement (apres, la cascade SQL aurait deja
+    // efface les lignes evenement_fichiers et on perdrait les ids).
+    const { data: fichiers } = await supabase
+      .from('evenement_fichiers')
+      .select('id')
+      .eq('evenement_id', id)
+    const blobIds = (fichiers ?? []).map((f) => f.id)
+    if (blobIds.length > 0) {
+      try {
+        await supabase.storage.from('evenements').remove(blobIds)
+      } catch {
+        // best-effort : un echec laisse des blobs orphelins, sans gravite
+      }
+    }
+
+    // La cascade SQL efface les lignes evenement_fichiers et evenement_reponses.
     const { error: deleteError } = await supabase
       .from('evenements')
       .delete()
