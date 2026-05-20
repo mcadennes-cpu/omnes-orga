@@ -1,0 +1,79 @@
+// src/features/immobilier/useImmobilier.js
+// Hook racine du module Immobilier.
+// - Liste les tableaux ou je suis membre via INNER JOIN sur board_members.
+// - Filtre actifs / archives via showArchived.
+// - Realtime sur immobilier_boards : si un membre cree ou archive un
+//   tableau ou si une activite remonte un tableau, on refetch.
+// - Cleanup classique avec drapeau "active" + unsubscribe du channel.
+
+import { useEffect, useState } from 'react';
+import { supabase } from '../../lib/supabaseClient';
+
+export function useImmobilier({ showArchived = false } = {}) {
+  const [boards, setBoards] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const refetch = () => setReloadKey((k) => k + 1);
+
+  useEffect(() => {
+    let active = true;
+
+    async function fetchBoards() {
+      setLoading(true);
+      setError(null);
+
+      // Filtrage par appartenance via la RLS SELECT : on charge tous
+      // les boards visibles, qui correspondent par definition aux
+      // tableaux ou je suis membre (cf. immobilier_boards_select).
+      const { data, error: err } = await supabase
+        .from('immobilier_boards')
+        .select(`
+          id,
+          titre,
+          description,
+          couleur,
+          archive,
+          auteur_id,
+          last_activity_at,
+          created_at,
+          updated_at
+        `)
+        .eq('archive', showArchived)
+        .order('last_activity_at', { ascending: false });
+
+      if (!active) return;
+
+      if (err) {
+        setError(err);
+        setBoards([]);
+      } else {
+        setBoards(data || []);
+      }
+      setLoading(false);
+    }
+
+    fetchBoards();
+
+    // Realtime : on rafraichit a chaque changement sur immobilier_boards.
+    // Simple et suffisant pour V1 ; on pourra affiner si besoin.
+    const channel = supabase
+      .channel('immobilier_boards_list')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'immobilier_boards' },
+        () => {
+          if (active) refetch();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
+  }, [showArchived, reloadKey]);
+
+  return { boards, loading, error, refetch };
+}

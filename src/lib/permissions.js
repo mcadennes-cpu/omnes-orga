@@ -228,3 +228,85 @@ export function canEditSim({ role, currentUserId, auteurId }) {
 export function canDeleteSim(params) {
   return canEditSim(params)
 }
+
+// =============================================================
+// Permissions du module Immobilier (etape 10)
+// =============================================================
+// Le module Immobilier reutilise le pattern de Discussion mais avec
+// des droits plus restrictifs :
+// - Les remplacants n'ont aucun acces, meme sur invitation.
+// - Seuls super_admin et associe_gerant creent un tableau.
+// - Les associes invites peuvent creer/modifier des cartes et chatter.
+// - Pour modifier/archiver une carte, il faut etre createur de la
+//   carte, owner du tableau ou super_admin.
+// - Pour archiver/supprimer un tableau, il faut etre createur du
+//   tableau ou super_admin. Hard delete = super_admin uniquement.
+
+export function canAccessImmobilier(role) {
+  return role === 'super_admin'
+      || role === 'associe_gerant'
+      || role === 'associe';
+}
+
+export function canCreateImmobilierBoard(role) {
+  return role === 'super_admin' || role === 'associe_gerant';
+}
+
+// Owner d'un tableau : utilise pour inviter, archiver, renommer,
+// modifier la couleur. La verite de fond reste la RLS Postgres ;
+// ce helper sert a piloter l'affichage des CTA cote UI.
+export function isImmobilierBoardOwner({ role, currentUserId, ownerIds = [] }) {
+  if (role === 'super_admin') return true;
+  return ownerIds.includes(currentUserId);
+}
+
+export function canInviteToImmobilierBoard({ role, currentUserId, ownerIds = [] }) {
+  return isImmobilierBoardOwner({ role, currentUserId, ownerIds });
+}
+
+export function canEditImmobilierBoard({ role, currentUserId, ownerIds = [] }) {
+  return isImmobilierBoardOwner({ role, currentUserId, ownerIds });
+}
+
+export function canArchiveImmobilierBoard({ role, currentUserId, ownerIds = [] }) {
+  return isImmobilierBoardOwner({ role, currentUserId, ownerIds });
+}
+
+// Hard delete reserve a super_admin uniquement (cf. matrice Immobilier).
+export function canDeleteImmobilierBoard(role) {
+  return role === 'super_admin';
+}
+
+// Un associe invite peut creer une carte (matrice 10).
+// On verifie l'acces au module (exclut les remplacants) ; la condition
+// "membre du tableau concerne" est portee par la RLS et par l'UI
+// qui n'affiche le CTA "+ Nouvelle carte" que sur les tableaux ou
+// je suis membre.
+export function canCreateImmobilierCard(role) {
+  return canAccessImmobilier(role);
+}
+
+// Modifier / clore / supprimer une carte :
+// createur de la carte, owner du tableau, ou super_admin.
+export function canEditImmobilierCard({ role, currentUserId, auteurId, ownerIds = [] }) {
+  if (role === 'super_admin') return true;
+  if (auteurId === currentUserId) return true;
+  return ownerIds.includes(currentUserId);
+}
+
+export function canDeleteImmobilierCard(args) {
+  return canEditImmobilierCard(args);
+}
+
+// Commenter dans le chat d'une carte : tout membre du tableau
+// (incluant les associes invites). Le blocage carte close est
+// porte cote UI et cote RLS (cf. policy immobilier_messages_insert).
+export function canCommentImmobilier(role) {
+  return canAccessImmobilier(role);
+}
+
+// Editer / supprimer son propre message : tout membre du tableau,
+// limite a ses propres messages (la RLS l'impose strictement).
+export function canEditOwnImmobilierMessage({ role, currentUserId, auteurId }) {
+  return canAccessImmobilier(role) && auteurId === currentUserId;
+}
