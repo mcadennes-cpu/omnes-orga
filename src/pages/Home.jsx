@@ -43,6 +43,10 @@ export default function Home() {
       navigate('/sim')
       return
     }
+    if (moduleKey === 'immobilier') {
+      navigate('/immobilier')
+      return
+    }
     alert(`Module "${moduleKey}" à venir`)
   }
 

@@ -19,6 +19,7 @@ import EvenementDetail from './pages/EvenementDetail'
 import Sim from './pages/Sim'
 import SimFolder from './pages/SimFolder'
 import Immobilier from './pages/Immobilier'
+import ImmobilierBoard from './pages/ImmobilierBoard'
 
 export default function App() {
   return (
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="/sim" element={<Sim />} />
         <Route path="/sim/:id" element={<SimFolder />} />
         <Route path="/immobilier" element={<Immobilier />} />
+        <Route path="/immobilier/:boardId" element={<ImmobilierBoard />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
