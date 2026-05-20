@@ -39,6 +39,10 @@ export default function Home() {
       navigate('/evenements')
       return
     }
+    if (moduleKey === 'sim') {
+      navigate('/sim')
+      return
+    }
     alert(`Module "${moduleKey}" à venir`)
   }
 
