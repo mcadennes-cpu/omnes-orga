@@ -398,14 +398,76 @@ Dossier `src/features/evenements/` : hooks `useEvenements`, `useEvenement`, `use
 
 **Type :** Drive (documents)
 
-**Concept :** Espace documentaire privé réservé aux associés gérants de la SIM. Collecte tous les documents de la société (statuts, PV d'AG, comptabilité, contrats…). Complètement invisible pour les associés simples et les remplaçants — le module n'apparaît pas dans leur page d'accueil.
+**Concept :** Espace documentaire privé réservé aux associés gérants de la SIM. Collecte tous les documents de la société (statuts, PV d'AG, comptabilité, contrats…). Complètement invisible pour les associés simples et les remplaçants — le module n'apparaît pas dans leur page d'accueil et l'URL directe `/sim` les redirige vers un écran « Accès restreint ».
 
-**Droits :**
+#### Tables (Supabase)
+
+`sim_dossiers` — arborescence libre via `parent_id` (self-référence avec `ON DELETE RESTRICT` : un dossier non vide ne peut pas être supprimé).
+id          uuid      PK
+nom         text      not null
+parent_id   uuid      FK sim_dossiers(id) ON DELETE RESTRICT
+couleur     text      6 valeurs DS (bleu/gris/jaune/orange/rouge/vert), défaut 'gris'
+auteur_id   uuid      FK profiles(id) ON DELETE RESTRICT, NOT NULL
+created_at / updated_at  timestamptz
+
+`sim_fichiers` — fichiers rattachés à un dossier ou à la racine. L'`id` UUID sert aussi de nom physique du blob dans le bucket Storage `sim` (pattern flat UUID).
+id            uuid      PK = nom du blob dans Storage
+nom           text      not null
+dossier_id    uuid      FK sim_dossiers(id) ON DELETE RESTRICT (NULL = racine)
+taille_octets bigint    CHECK <= 25 Mo
+mime_type     text
+auteur_id     uuid      FK profiles(id) ON DELETE RESTRICT, NOT NULL
+created_at / updated_at  timestamptz
+
+**Fonction `is_sim_member()`** (`SECURITY DEFINER`, étape 9A-3) — répond à « l'utilisateur courant est-il super_admin ou associe_gerant ? ». Pattern identique à `is_board_member` (Discussion) : permet de lire `profiles` sans récursion de policy et sans dépendre des droits SELECT de l'appelant.
+
+**RLS (8 policies + 3 storage, étape 9A-4 et 9A-5) :**
+- SELECT / INSERT sur `sim_dossiers` et `sim_fichiers` : conditionnés à `is_sim_member()`. Un non-membre ne voit **aucune ligne**.
+- UPDATE / DELETE : `is_sim_member()` ET (`auteur_id = auth.uid()` OU rôle `super_admin`). Le filtrage fin « auteur » est porté au niveau Postgres, pas seulement côté React.
+- Storage (bucket `sim`, privé, 25 Mo) : SELECT / INSERT / DELETE conditionnés à `is_sim_member()`. La granularité « auteur » sur la suppression de blob est implicite — le code supprime d'abord la ligne DB (où la RLS « auteur » s'applique), puis le blob dans la foulée.
+
+#### Droits
+
 | Action | super_admin | associe_gerant | associe | remplacant |
 |---|:---:|:---:|:---:|:---:|
 | Voir et télécharger | ✓ | ✓ | — | — |
-| Uploader / créer dossier | ✓ | ✓ | — | — |
-| Supprimer | ✓ | — | — | — |
+| Uploader / créer dossier (n'importe où) | ✓ | ✓ | — | — |
+| Modifier / supprimer un dossier | ✓ tous | ✓ les siens | — | — |
+| Modifier / supprimer un fichier | ✓ tous | ✓ les siens | — | — |
+
+Conséquence assumée : un dossier créé par un gérant peut contenir des fichiers déposés par d'autres membres. La règle `ON DELETE RESTRICT` empêche alors le créateur de supprimer son propre dossier tant qu'il contient le fichier d'un autre — il faut soit que l'autre membre retire son fichier, soit que le super_admin intervienne.
+
+#### Écrans & routing
+
+- `/sim` — racine : header « SIM » + sous-titre « Société d'Intendance Médicale », toolbar « Nouveau dossier » + « Importer » (CTA olive), barre de recherche, liste dossiers puis fichiers, état vide dédié. Tuile Home câblée.
+- `/sim/:id` — vue d'un dossier : breadcrumb à 2 segments `SIM > NomDossier` (le segment `SIM` est cliquable, ramène à la racine). Si l'id n'existe pas (ou a été supprimé entre-temps), redirection vers `/sim`.
+- Création de dossier, import, renommage, confirmation de suppression : tous en bottom-sheet via React Portal, animation `animate-slide-up`, calques bottom-sheet sur ceux de Cabinet pratique (boutons de validation en `marine`, danger en `brique`, accent secondaire `canard` dans les états des modales — conformément au DS).
+
+#### Permissions fines (helpers React)
+
+Dans `src/lib/permissions.js` :
+- `canAccessSim(role)` — pilote le masquage de la tuile Home (`getVisibleModules` lit `allowedRoles`) et les gardes de page de `/sim` et `/sim/:id`.
+- `canEditSim({ role, currentUserId, auteurId })` — true si `super_admin`, ou `associe_gerant` ET auteur de l'élément. Pattern identique à `canEditEntreeAnnuaire`.
+- `canDeleteSim(...)` — même règle que `canEditSim`.
+
+Côté UI, chaque dossier/fichier est décoré par `Sim.jsx` et `SimFolder.jsx` avec des champs `canEdit` / `canDelete` / `canMenu` avant d'être passé à `DrivePage`. L'icône « ⋮ » n'apparaît que si au moins une action est possible — un dossier dont on n'est pas l'auteur affiche un simple chevron `>` à la place.
+
+#### Architecture
+
+Dossier `src/features/sim/` : hooks `useSimRoot`, `useSimFolder`, helper de filtrage `filterByTerm` (recherche scopée au dossier courant — différent de Cabinet pratique qui a une recherche globale) ; composants `DrivePage`, `NewFolderModal`, `UploadModal`, `ActionsMenu`, `RenameModal`, `DeleteConfirmModal` ; helper `simStorage.js` (`openSimFile`, `downloadSimFile`, `removeSimBlob`). Pages `src/pages/Sim.jsx` et `src/pages/SimFolder.jsx`.
+
+#### Écarts au plan initial
+
+- Le plan initial donnait la suppression uniquement à `super_admin`. Arbitré en étape 9 : `associe_gerant` peut supprimer (et modifier) **ses propres éléments**, calqué sur l'Annuaire. La matrice des accès du module a été corrigée en conséquence dans la section « Matrice des accès — vue globale ».
+- La recherche du Drive SIM est **scopée au dossier courant**, et non globale comme Cabinet pratique. Décision produit assumée : volume documentaire faible et arborescence prévue peu profonde.
+- `DrivePage` a été dérivé de la version Cabinet plutôt que partagé : ajout des props `subtitle` et `accent`, et bascule du contrat `canWrite` (global) vers `canMenu` par élément pour porter la logique « auteur ». Une factorisation Cabinet / SIM pourra être envisagée plus tard si une troisième page Drive émerge.
+
+#### Limitations connues
+
+- **Breadcrumb à 2 segments uniquement** (`SIM > NomDossier`). Au-delà du 2e niveau d'imbrication, le contexte intermédiaire n'apparaît pas dans le fil — le retour racine se fait en un clic sur le segment `SIM`. Limitation identique à Cabinet pratique ; un breadcrumb complet (remontée des `parent_id`) pourra être ajouté en transverse sur les deux modules en une étape dédiée si le besoin se confirme.
+- **Suppression de fichier** : nettoyage best-effort du blob dans le bucket Storage. Un échec laisse le fichier orphelin (inaccessible, sans fuite de données) — même stratégie qu'en Cabinet pratique et Événements.
+- **Suppression d'un dossier non vide** : refusée par la contrainte SQL `ON DELETE RESTRICT`. Le code Postgres 23503 est intercepté et traduit en message utilisateur clair (« Ce dossier n'est pas vide. Supprimez d'abord les éléments qu'il contient. »).
+- **Pas de Realtime** : les listes sont rafraîchies au chargement de la page et après chaque mutation locale (`refetch`). Un utilisateur qui consulte un dossier ne voit pas en direct un fichier déposé par un autre membre — il faut un rechargement de la page. Cohérent avec Cabinet pratique.
 
 ---
 
@@ -755,7 +817,12 @@ Le module Discussion est désormais complet (étapes 7A à 7D).
    - 8F : Section documents (hook `useEvenementFichiers`, `EvenementUploadModal`, liste avec icônes par type, téléchargement, suppression).
    - 8G : Sondage de présence (hook `useSondage`, `PollSection` Oui / Non / Peut-être, optimistic UI, résultats).
    - 8H : Tests multi-rôles + mise à jour doc.
-9. **Étape 9** — Module SIM (Drive restreint)
+9. ✓ **Étape 9 — FAITE** (sous-étapes 9A → 9G) — Module SIM (Drive restreint)
+   - 9A : Fondations SQL — tables `sim_dossiers` + `sim_fichiers`, fonction `is_sim_member()` `SECURITY DEFINER`, RLS + 8 policies (SELECT/INSERT par rôle, UPDATE/DELETE par rôle + auteur), bucket Storage `sim` (privé, 25 Mo) + 3 storage policies. Scripts archivés dans `docs/sql/9A-1` à `9A-5`.
+   - 9B : Fondations React — helpers `canAccessSim` / `canEditSim` / `canDeleteSim` dans `permissions.js`, hooks `useSimRoot` / `useSimFolder` + helper `filterByTerm` (`useSim.js`), helper `simStorage.js` (open, download, removeBlob).
+   - 9C : Page racine `/sim` — `Sim.jsx` avec garde d'accès et décoration par élément (calcul de `canEdit`/`canDelete`/`canMenu` par dossier et fichier), 6 composants `features/sim/` adaptés de Cabinet pratique (`DrivePage` avec props `subtitle` et `accent`, `NewFolderModal`, `UploadModal`, `ActionsMenu` qui masque les actions interdites, `RenameModal`, `DeleteConfirmModal`). Route `/sim` dans `App.jsx`, navigation de la tuile SIM ajoutée dans `Home.jsx`.
+   - 9D : Navigation arborescente — page `SimFolder.jsx` (route `/sim/:id`) calquée sur `CabinetFolder.jsx`, breadcrumb 2 segments, redirection vers `/sim` si dossier introuvable, décoration par auteur identique à la racine.
+   - 9G : Tests multi-rôles formels + mise à jour de la documentation.
 10. **Étape 10** — Module Immobilier (mêmes composants que Discussion)
 11. **Étape 11** — Page Profil personnelle + gestion `profiles_compta`
 12. **Étape 12** — Configuration PWA (manifest, service worker, icônes, page guide d'installation)
@@ -771,6 +838,7 @@ Le module Discussion est désormais complet (étapes 7A à 7D).
 - **Filtrage des champs sensibles côté frontend** — la RLS `profiles_select_all_authenticated` autorise la lecture de toute la table `profiles` à tout utilisateur authentifié. Le masquage de `jours_disponibles` et `notes_internes` pour les remplaçants se fait côté React. Si on a besoin d'une sécurité forte (les remplaçants ne doivent jamais voir ces données via une requête manuelle), migrer vers une vue PostgreSQL filtrée par rôle.
 - **Pas d'UI pour `profiles_compta`** — la table existe et est protégée par RLS, mais la gestion des informations bancaires sera traitée à l'étape 11.
 - **Cohérence du design system** — les modules Trombinoscope et Annuaire ainsi que le shell de l'application (Home, Login, navigation) sont antérieurs à l'étape 6.0 qui a introduit les tokens du DS. Ils utilisent encore en partie du Tailwind brut (radii `rounded-lg`, surfaces `bg-white`, bordures `border-gray-*`, titres en `text-2xl font-bold` plutôt qu'en `.text-h1` Archivo). Les modules Cabinet pratique, Discussion et Événements sont au standard DS. Un alignement des écrans historiques est planifié à l'étape 12 bis, avant le déploiement.
+- **Breadcrumb des Drives à 2 segments** — les modules Cabinet pratique et SIM affichent un breadcrumb réduit à `Module > NomDossierActuel` quel que soit le niveau d'imbrication. Au-delà du 2e niveau, le contexte intermédiaire n'est pas visible dans le fil ; le retour racine se fait en un clic. Un breadcrumb complet (remontée des `parent_id`) sera ajouté en transverse sur les deux modules si le besoin se confirme avec l'usage.
 
 ---
 
