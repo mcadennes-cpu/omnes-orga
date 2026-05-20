@@ -17,6 +17,7 @@ import DiscussionCard from './pages/DiscussionCard'
 import Evenements from './pages/Evenements'
 import EvenementDetail from './pages/EvenementDetail'
 import Sim from './pages/Sim'
+import SimFolder from './pages/SimFolder'
 
 export default function App() {
   return (
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="/evenements" element={<Evenements />} />
         <Route path="/evenements/:id" element={<EvenementDetail />} />
         <Route path="/sim" element={<Sim />} />
+        <Route path="/sim/:id" element={<SimFolder />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
