@@ -8,24 +8,35 @@
 // - Modales create + edit cartes.
 
 import { useMemo, useState } from 'react';
-import { useParams, Navigate, Link } from 'react-router-dom';
-import { ChevronLeft, Plus } from 'lucide-react';
+import { useParams, Navigate, Link, useNavigate } from 'react-router-dom';
+import { ChevronLeft, Plus, MoreVertical } from 'lucide-react';
 import AppLayout from '../components/layout/AppLayout';
+import { useAuth } from '../hooks/useAuth';
 import { useRole } from '../hooks/useRole';
 import {
   canAccessImmobilier,
   canCreateImmobilierCard,
+  canEditImmobilierBoard,
+  canArchiveImmobilierBoard,
+  canDeleteImmobilierBoard,
+  canInviteToImmobilierBoard,
 } from '../lib/permissions';
+import { supabase } from '../lib/supabaseClient';
+import ConfirmModal from '../components/ConfirmModal';
 import { useBoard } from '../features/immobilier/useBoard';
 import { getBoardColorClasses } from '../features/immobilier/immobilierColors';
 import MemberAvatars from '../features/immobilier/MemberAvatars';
 import CardTile from '../features/immobilier/CardTile';
 import CreateCardModal from '../features/immobilier/CreateCardModal';
 import EditCardModal from '../features/immobilier/EditCardModal';
+import BoardActionsMenu from '../features/immobilier/BoardActionsMenu';
+import EditBoardModal from '../features/immobilier/EditBoardModal';
 
 export default function ImmobilierBoard() {
   const { boardId } = useParams();
   const { role, loading: roleLoading } = useRole();
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   const {
     board,
@@ -35,11 +46,15 @@ export default function ImmobilierBoard() {
     loading,
     error,
     notMember,
+    refetch,
   } = useBoard(boardId);
 
   const [filter, setFilter] = useState('ouvertes'); // 'ouvertes' | 'closes' | 'toutes'
   const [createOpen, setCreateOpen] = useState(false);
   const [editingCard, setEditingCard] = useState(null);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [editBoardOpen, setEditBoardOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const filteredCards = useMemo(() => {
     if (filter === 'ouvertes') return cards.filter((c) => c.statut === 'ouvert');
@@ -64,6 +79,49 @@ export default function ImmobilierBoard() {
 
   const colors = board ? getBoardColorClasses(board.couleur) : null;
   const canCreate = canCreateImmobilierCard(role);
+
+  const canEditBoard = canEditImmobilierBoard({
+    role,
+    currentUserId: user?.id,
+    ownerIds,
+  });
+  const canArchiveBoard = canArchiveImmobilierBoard({
+    role,
+    currentUserId: user?.id,
+    ownerIds,
+  });
+  const canManageMembers = canInviteToImmobilierBoard({
+    role,
+    currentUserId: user?.id,
+    ownerIds,
+  });
+  const canDeleteBoard = canDeleteImmobilierBoard(role);
+  const hasAnyBoardAction =
+    canEditBoard || canArchiveBoard || canManageMembers || canDeleteBoard;
+
+  async function handleToggleArchive() {
+    if (!board || !canArchiveBoard) return;
+    const { error: err } = await supabase
+      .from('immobilier_boards')
+      .update({ archive: !board.archive })
+      .eq('id', board.id);
+    if (err) {
+      // eslint-disable-next-line no-alert
+      alert(`Erreur : ${err.message}`);
+      return;
+    }
+    refetch();
+  }
+
+  async function handleDeleteBoard() {
+    if (!board) return;
+    const { error: err } = await supabase
+      .from('immobilier_boards')
+      .delete()
+      .eq('id', board.id);
+    if (err) throw err; // ConfirmModal affichera l'erreur
+    navigate('/immobilier', { replace: true });
+  }
 
   return (
     <AppLayout>
@@ -99,8 +157,28 @@ export default function ImmobilierBoard() {
                     </p>
                   )}
                 </div>
-                <MemberAvatars members={members} max={4} />
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <MemberAvatars members={members} max={4} />
+                  {hasAnyBoardAction && (
+                    <button
+                      type="button"
+                      onClick={() => setActionsOpen(true)}
+                      className="p-2 text-muted hover:text-ink rounded-pill
+                                 hover:bg-fond transition-colors"
+                      aria-label="Actions du tableau"
+                    >
+                      <MoreVertical size={20} aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
               </div>
+
+              {board.archive && (
+                <div className="mt-3 px-3 py-2 bg-fond border border-border
+                                rounded-input text-caption text-muted">
+                  Ce tableau est archive.
+                </div>
+              )}
 
               <div className="mt-3 flex items-center justify-between gap-2">
                 {/* Filtre segmente */}
@@ -183,6 +261,43 @@ export default function ImmobilierBoard() {
         onClose={() => setEditingCard(null)}
         card={editingCard}
         ownerIds={ownerIds}
+      />
+
+      <BoardActionsMenu
+        open={actionsOpen}
+        onClose={() => setActionsOpen(false)}
+        archive={board?.archive ?? false}
+        canEdit={canEditBoard}
+        canArchive={canArchiveBoard}
+        canManageMembers={canManageMembers}
+        canDelete={canDeleteBoard}
+        onRename={() => setEditBoardOpen(true)}
+        onToggleArchive={handleToggleArchive}
+        onManageMembers={() => {
+          // Cable en 10C-2b : ouvrira la modale de gestion des membres.
+          // eslint-disable-next-line no-console
+          console.log('TODO 10C-2b : ouvrir gestion des membres');
+        }}
+        onDelete={() => setConfirmDeleteOpen(true)}
+      />
+
+      <EditBoardModal
+        open={editBoardOpen}
+        onClose={() => {
+          setEditBoardOpen(false);
+          refetch();
+        }}
+        board={board}
+      />
+
+      <ConfirmModal
+        open={confirmDeleteOpen}
+        onClose={() => setConfirmDeleteOpen(false)}
+        title="Supprimer le tableau"
+        message="Cette action est definitive. Toutes les cartes, messages et pieces jointes du tableau seront supprimes."
+        confirmLabel="Supprimer"
+        danger
+        onConfirm={handleDeleteBoard}
       />
     </AppLayout>
   );
