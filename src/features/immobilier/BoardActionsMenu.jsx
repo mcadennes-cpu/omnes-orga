@@ -5,7 +5,7 @@
 
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Pencil, Archive, ArchiveRestore, Users, Trash2 } from 'lucide-react';
+import { Pencil, Archive, ArchiveRestore, Users, Trash2, LogOut } from 'lucide-react';
 
 export default function BoardActionsMenu({
   open,
@@ -15,10 +15,12 @@ export default function BoardActionsMenu({
   canArchive,        // peut archiver/desarchiver
   canManageMembers,  // peut gerer les participants
   canDelete,         // peut supprimer dur (super_admin)
+  canLeave,
   onRename,
   onToggleArchive,
   onManageMembers,
   onDelete,
+  onLeave,
 }) {
   useEffect(() => {
     if (!open) return undefined;
@@ -59,6 +61,14 @@ export default function BoardActionsMenu({
       label: archive ? 'Desarchiver' : 'Archiver',
       icon: archive ? ArchiveRestore : Archive,
       onClick: onToggleArchive,
+    });
+  }
+  if (canLeave) {
+    items.push({
+      key: 'leave',
+      label: 'Quitter le tableau',
+      icon: LogOut,
+      onClick: onLeave,
     });
   }
   if (canDelete) {

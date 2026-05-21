@@ -31,6 +31,7 @@ import CreateCardModal from '../features/immobilier/CreateCardModal';
 import EditCardModal from '../features/immobilier/EditCardModal';
 import BoardActionsMenu from '../features/immobilier/BoardActionsMenu';
 import EditBoardModal from '../features/immobilier/EditBoardModal';
+import ManageMembersModal from '../features/immobilier/ManageMembersModal';
 
 export default function ImmobilierBoard() {
   const { boardId } = useParams();
@@ -55,6 +56,7 @@ export default function ImmobilierBoard() {
   const [actionsOpen, setActionsOpen] = useState(false);
   const [editBoardOpen, setEditBoardOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [manageMembersOpen, setManageMembersOpen] = useState(false);
 
   const filteredCards = useMemo(() => {
     if (filter === 'ouvertes') return cards.filter((c) => c.statut === 'ouvert');
@@ -96,8 +98,13 @@ export default function ImmobilierBoard() {
     ownerIds,
   });
   const canDeleteBoard = canDeleteImmobilierBoard(role);
+  // Un membre peut quitter s'il est membre, mais pas s'il est le seul owner.
+  const isCurrentUserMember = members.some((m) => m.user_id === user?.id);
+  const isCurrentUserSoleOwner =
+    ownerIds.length === 1 && ownerIds[0] === user?.id;
+  const canLeaveBoard = isCurrentUserMember && !isCurrentUserSoleOwner;
   const hasAnyBoardAction =
-    canEditBoard || canArchiveBoard || canManageMembers || canDeleteBoard;
+    canEditBoard || canArchiveBoard || canManageMembers || canDeleteBoard || canLeaveBoard;
 
   async function handleToggleArchive() {
     if (!board || !canArchiveBoard) return;
@@ -120,6 +127,21 @@ export default function ImmobilierBoard() {
       .delete()
       .eq('id', board.id);
     if (err) throw err; // ConfirmModal affichera l'erreur
+    navigate('/immobilier', { replace: true });
+  }
+
+  async function handleLeaveBoard() {
+    if (!user?.id || !board) return;
+    const { error: err } = await supabase
+      .from('immobilier_board_members')
+      .delete()
+      .eq('board_id', board.id)
+      .eq('user_id', user.id);
+    if (err) {
+      // eslint-disable-next-line no-alert
+      alert(`Erreur : ${err.message}`);
+      return;
+    }
     navigate('/immobilier', { replace: true });
   }
 
@@ -271,14 +293,12 @@ export default function ImmobilierBoard() {
         canArchive={canArchiveBoard}
         canManageMembers={canManageMembers}
         canDelete={canDeleteBoard}
+        canLeave={canLeaveBoard}
         onRename={() => setEditBoardOpen(true)}
         onToggleArchive={handleToggleArchive}
-        onManageMembers={() => {
-          // Cable en 10C-2b : ouvrira la modale de gestion des membres.
-          // eslint-disable-next-line no-console
-          console.log('TODO 10C-2b : ouvrir gestion des membres');
-        }}
+        onManageMembers={() => setManageMembersOpen(true)}
         onDelete={() => setConfirmDeleteOpen(true)}
+        onLeave={handleLeaveBoard}
       />
 
       <EditBoardModal
@@ -298,6 +318,16 @@ export default function ImmobilierBoard() {
         confirmLabel="Supprimer"
         danger
         onConfirm={handleDeleteBoard}
+      />
+
+      <ManageMembersModal
+        open={manageMembersOpen}
+        onClose={() => setManageMembersOpen(false)}
+        board={board}
+        members={members}
+        ownerIds={ownerIds}
+        canManage={canManageMembers}
+        onChanged={refetch}
       />
     </AppLayout>
   );

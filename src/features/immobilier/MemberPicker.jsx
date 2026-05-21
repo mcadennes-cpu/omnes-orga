@@ -11,7 +11,9 @@ import { Search, Check } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { normalizeForSearch, initials, formatName } from '../../lib/profileFormat';
 
-export default function MemberPicker({ currentUserId, selectedIds, onChange }) {
+const EMPTY_ARRAY = [];
+
+export default function MemberPicker({ currentUserId, selectedIds, onChange, excludeIds = EMPTY_ARRAY }) {
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -35,15 +37,18 @@ export default function MemberPicker({ currentUserId, selectedIds, onChange }) {
         setError(err);
         setProfiles([]);
       } else {
-        // Exclure l'utilisateur courant : il sera ajoute en owner a la creation.
-        setProfiles((data || []).filter((p) => p.id !== currentUserId));
+        // Exclure l'utilisateur courant (gere par l'appelant) et tout id
+        // explicite via excludeIds (utile pour ne pas reproposer des
+        // membres deja invites en gestion de membres).
+        const excluded = new Set([currentUserId, ...excludeIds]);
+        setProfiles((data || []).filter((p) => !excluded.has(p.id)));
       }
       setLoading(false);
     }
 
     fetchProfiles();
     return () => { active = false; };
-  }, [currentUserId]);
+  }, [currentUserId, excludeIds]);
 
   const filteredProfiles = useMemo(() => {
     if (!searchTerm.trim()) return profiles;
