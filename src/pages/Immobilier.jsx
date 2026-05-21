@@ -20,11 +20,13 @@ import {
 import { normalizeForSearch } from '../lib/profileFormat';
 import { useImmobilier } from '../features/immobilier/useImmobilier';
 import ImmobilierBoardTile from '../features/immobilier/ImmobilierBoardTile';
+import CreateBoardModal from '../features/immobilier/CreateBoardModal';
 
 export default function Immobilier() {
   const { role, loading: roleLoading } = useRole();
   const [showArchived, setShowArchived] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
 
   const { boards, loading, error } = useImmobilier({ showArchived });
 
@@ -71,11 +73,7 @@ export default function Immobilier() {
                 className="inline-flex items-center gap-1.5 px-3 py-2
                            bg-canard text-white text-button rounded-input
                            shadow-button"
-                onClick={() => {
-                  // Cable en 10B-2 : ouvrira la modale de creation.
-                  // eslint-disable-next-line no-console
-                  console.log('TODO 10B-2 : ouvrir modale creation tableau');
-                }}
+                onClick={() => setCreateOpen(true)}
                 aria-label="Nouveau tableau"
               >
                 <Plus size={18} aria-hidden="true" />
@@ -161,6 +159,11 @@ export default function Immobilier() {
           </div>
         )}
       </div>
+
+      <CreateBoardModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+      />
     </AppLayout>
   );
 }
