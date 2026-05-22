@@ -26,6 +26,7 @@ import CardMessage from './CardMessage';
 import CardComposer from './CardComposer';
 import CardActionsMenu from './CardActionsMenu';
 import EditCardModal from './EditCardModal';
+import CardAttachments from './CardAttachments';
 
 export default function CardPage({ boardId, cardId }) {
   const navigate = useNavigate();
@@ -39,6 +40,7 @@ export default function CardPage({ boardId, cardId }) {
     card,
     board,
     messages,
+    attachments,
     loading,
     error,
     notFound,
@@ -46,6 +48,7 @@ export default function CardPage({ boardId, cardId }) {
     sendMessage,
     editMessage,
     deleteMessage,
+    deleteAttachment,
   } = useCard(cardId);
 
   const [descriptionOpen, setDescriptionOpen] = useState(true);
@@ -234,6 +237,14 @@ export default function CardPage({ boardId, cardId }) {
           )}
         </section>
       )}
+
+      {/* Pieces jointes */}
+      <CardAttachments
+        cardId={card.id}
+        attachments={attachments}
+        cardClosed={isClosed}
+        onDeleteAttachment={deleteAttachment}
+      />
 
       {/* Fil de messages */}
       <main className="flex-1 overflow-y-auto px-3 py-3">

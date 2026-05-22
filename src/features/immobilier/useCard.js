@@ -11,11 +11,13 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import { deleteAttachment } from './immobilierStorage';
 
 export function useCard(cardId) {
   const [card, setCard] = useState(null);
   const [board, setBoard] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [attachments, setAttachments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [notFound, setNotFound] = useState(false);
@@ -54,7 +56,7 @@ export function useCard(cardId) {
       setCard(cardData);
 
       // 2) En parallele : board parent + messages
-      const [resBoard, resMessages] = await Promise.all([
+      const [resBoard, resMessages, resAttachments] = await Promise.all([
         supabase
           .from('immobilier_boards')
           .select('id, titre, couleur, archive')
@@ -73,20 +75,26 @@ export function useCard(cardId) {
           `)
           .eq('card_id', cardId)
           .order('created_at', { ascending: true }),
+        supabase
+          .from('immobilier_attachments')
+          .select('id, card_id, nom, taille_octets, mime_type, auteur_id, created_at')
+          .eq('card_id', cardId)
+          .order('created_at', { ascending: true }),
       ]);
 
       if (!active) return;
 
       if (resBoard.data) setBoard(resBoard.data);
       if (resMessages.data) setMessages(resMessages.data);
+      if (resAttachments.data) setAttachments(resAttachments.data);
       setLoading(false);
     }
 
     fetchAll();
 
     // Realtime sur les messages de cette carte
-    const channel = supabase
-      .channel(`immobilier_card_${cardId}`)
+    const messagesChannel = supabase
+      .channel(`immobilier_card_${cardId}_messages`)
       .on(
         'postgres_changes',
         {
@@ -101,9 +109,27 @@ export function useCard(cardId) {
       )
       .subscribe();
 
+    // Realtime sur les pieces jointes de cette carte
+    const attachmentsChannel = supabase
+      .channel(`immobilier_card_${cardId}_attachments`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'immobilier_attachments',
+          filter: `card_id=eq.${cardId}`,
+        },
+        () => {
+          if (active) refetch();
+        }
+      )
+      .subscribe();
+
     return () => {
       active = false;
-      supabase.removeChannel(channel);
+      supabase.removeChannel(messagesChannel);
+      supabase.removeChannel(attachmentsChannel);
     };
   }, [cardId, reloadKey, refetch]);
 
@@ -154,13 +180,19 @@ export function useCard(cardId) {
 
   const editMessage = useCallback(async (messageId, nouveauContenu) => {
     if (!nouveauContenu?.trim()) return { error: new Error('Contenu vide') };
+    const contenu = nouveauContenu.trim();
     const { error: err } = await supabase
       .from('immobilier_messages')
-      .update({
-        contenu: nouveauContenu.trim(),
-        edited: true,
-      })
+      .update({ contenu, edited: true })
       .eq('id', messageId);
+    if (!err) {
+      // Mise a jour optimiste
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId ? { ...m, contenu, edited: true } : m
+        )
+      );
+    }
     return { error: err };
   }, []);
 
@@ -169,13 +201,27 @@ export function useCard(cardId) {
       .from('immobilier_messages')
       .delete()
       .eq('id', messageId);
+    if (!err) {
+      // Mise a jour optimiste : on retire localement sans attendre Realtime
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    }
     return { error: err };
+  }, []);
+
+  const deleteAttachmentFn = useCallback(async (attachmentId) => {
+    const result = await deleteAttachment(attachmentId);
+    if (!result.error) {
+      // Mise a jour optimiste
+      setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
+    }
+    return result;
   }, []);
 
   return {
     card,
     board,
     messages,
+    attachments,
     loading,
     error,
     notFound,
@@ -184,5 +230,6 @@ export function useCard(cardId) {
     sendMessage,
     editMessage,
     deleteMessage,
+    deleteAttachment: deleteAttachmentFn,
   };
 }

@@ -1,0 +1,124 @@
+// src/features/immobilier/AttachmentChip.jsx
+// Chip horizontale d'une piece jointe.
+// - Icone (selon type) + nom (tronque) + taille
+// - Clic sur la chip : ouvre la piece jointe (preview ou download selon type)
+// - Bouton croix dedie si l'utilisateur en est l'auteur (et carte ouverte)
+//
+// Note : la chip n'est pas un <button> mais un <div role="button"> pour
+// pouvoir contenir un vrai <button> (la croix) sans imbrication HTML invalide.
+
+import { useState } from 'react';
+import {
+  FileText,
+  Image as ImageIcon,
+  FileSpreadsheet,
+  Presentation,
+  Paperclip,
+  X,
+} from 'lucide-react';
+import {
+  openAttachment,
+  formatBytes,
+  fileTypeCategory,
+} from './immobilierStorage';
+
+const ICON_BY_CATEGORY = {
+  image: ImageIcon,
+  pdf: FileText,
+  doc: FileText,
+  sheet: FileSpreadsheet,
+  slide: Presentation,
+  file: Paperclip,
+};
+
+export default function AttachmentChip({
+  attachment,
+  canDelete,
+  onDelete,
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  const Icon = ICON_BY_CATEGORY[fileTypeCategory(attachment.mime_type)] || Paperclip;
+
+  async function handleOpen() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await openAttachment(attachment);
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDelete(e) {
+    e.stopPropagation();
+    if (busy) return;
+    // eslint-disable-next-line no-alert
+    if (!confirm(`Supprimer la piece jointe "${attachment.nom}" ?`)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { error: err } = await onDelete(attachment.id);
+      if (err) throw err;
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function handleKeyDown(e) {
+    // Accessibilite : Espace ou Entree activent la chip
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleOpen();
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1 flex-shrink-0">
+      <div
+        role="button"
+        tabIndex={busy ? -1 : 0}
+        onClick={handleOpen}
+        onKeyDown={handleKeyDown}
+        aria-disabled={busy}
+        className={`flex items-center gap-2 px-3 py-2
+                    bg-fond border border-border rounded-input
+                    hover:bg-border transition-colors
+                    max-w-[240px] cursor-pointer
+                    ${busy ? 'opacity-50 cursor-wait' : ''}
+                    focus:outline-none focus:ring-2 focus:ring-canard`}
+        title={attachment.nom}
+      >
+        <Icon size={18} className="text-canard flex-shrink-0" aria-hidden="true" />
+        <div className="min-w-0 flex-1 text-left">
+          <p className="text-body-m text-ink truncate">{attachment.nom}</p>
+          <p className="text-caption text-faint">{formatBytes(attachment.taille_octets)}</p>
+        </div>
+        {canDelete && (
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={busy}
+            className="p-1 text-muted hover:text-brique
+                       rounded-pill hover:bg-brique/10
+                       disabled:opacity-50 flex-shrink-0"
+            aria-label="Supprimer la piece jointe"
+          >
+            <X size={14} aria-hidden="true" />
+          </button>
+        )}
+      </div>
+      {error && (
+        <p className="text-caption text-brique max-w-[240px] truncate">
+          {error.message}
+        </p>
+      )}
+    </div>
+  );
+}
