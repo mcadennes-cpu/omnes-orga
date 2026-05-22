@@ -475,18 +475,138 @@ Dossier `src/features/sim/` : hooks `useSimRoot`, `useSimFolder`, helper de filt
 
 **Type :** Cartes / tableaux (style Trello) + chat par carte
 
-**Concept :** Suivi des projets immobiliers liés au cabinet (travaux, acquisitions, baux…). Fonctionne comme le module Discussion : tableaux thématiques avec invitation et chat intégré. Non accessible aux remplaçants même sur invitation.
+**Concept :** Suivi des projets immobiliers liés au cabinet (travaux, acquisitions, baux…). Fonctionne comme le module Discussion : tableaux thématiques avec invitation et chat intégré. Module **invisible et inaccessible aux remplaçants** : la tuile est masquée sur la Home, l'URL directe redirige vers `/`, et la RLS exclut leur user_id de l'invitation aux board_members.
 
-**Droits :**
+#### Tables (Supabase)
+
+`immobilier_boards` — tableaux thématiques.
+id               uuid     PK
+titre            text     not null
+description      text     optionnel
+couleur          text     CHECK in (brique, canard, ocre, olive, fuchsia, marine), défaut 'canard'
+archive          boolean  défaut false
+auteur_id        uuid     FK profiles(id) ON DELETE SET NULL
+last_activity_at timestamptz  mis à jour par trigger sur insert message
+created_at / updated_at  timestamptz
+
+`immobilier_board_members` — appartenance à un tableau.
+board_id      uuid    FK immobilier_boards(id) ON DELETE CASCADE
+user_id       uuid    FK profiles(id) ON DELETE CASCADE
+role_in_board text    CHECK in ('owner', 'member'), défaut 'member'
+last_read_at  timestamptz  utilisé pour le point coloré du tableau
+created_at    timestamptz
+PRIMARY KEY (board_id, user_id)
+
+`immobilier_cards` — cartes d'un tableau.
+id               uuid     PK
+board_id         uuid     FK immobilier_boards(id) ON DELETE CASCADE
+titre            text     not null
+description      text
+statut           text     CHECK in ('ouvert', 'clos'), défaut 'ouvert'
+archive          boolean  défaut false
+auteur_id        uuid     FK profiles(id) ON DELETE SET NULL
+last_activity_at timestamptz
+created_at / updated_at  timestamptz
+
+`immobilier_messages` — fil de chat d'une carte.
+id         uuid     PK
+card_id    uuid     FK immobilier_cards(id) ON DELETE CASCADE
+auteur_id  uuid     FK profiles(id) ON DELETE SET NULL
+contenu    text     not null
+edited     boolean  défaut false
+created_at / updated_at  timestamptz
+
+`immobilier_attachments` — pièces jointes attachées à une carte. L'`id` UUID sert aussi de nom physique du blob dans le bucket Storage `immobilier-attachments` (pattern flat UUID identique à Cabinet/SIM/Discussion).
+id            uuid    PK = nom du blob
+card_id       uuid    FK immobilier_cards(id) ON DELETE CASCADE
+nom           text    not null
+taille_octets bigint  CHECK <= 25 Mo
+mime_type     text
+auteur_id     uuid    FK profiles(id) ON DELETE SET NULL
+created_at    timestamptz
+
+`immobilier_card_reads` — dernière lecture d'une carte par un user (pour le compteur numérique non-lu).
+card_id      uuid    FK immobilier_cards(id) ON DELETE CASCADE
+user_id      uuid    FK profiles(id) ON DELETE CASCADE
+last_read_at timestamptz
+PRIMARY KEY (card_id, user_id)
+
+#### Fonctions SECURITY DEFINER
+
+Cinq fonctions dans `public`, toutes en `SECURITY DEFINER` avec `search_path` figé sur `public, pg_temp` :
+- `is_immobilier_member()` — true si l'utilisateur courant est super_admin / associe_gerant / associe (exclut remplaçants).
+- `is_immobilier_board_member(p_board_id)` — true si l'utilisateur est membre du tableau donné. Sert aux RLS SELECT.
+- `is_immobilier_board_owner(p_board_id)` — true si l'utilisateur est `owner` du tableau. Sert aux RLS UPDATE/DELETE/INSERT-members.
+- `can_create_immobilier_board()` — true si l'utilisateur est super_admin ou associe_gerant. Différence vs Discussion : l'associé ne peut PAS créer de tableau.
+- `mark_immobilier_board_read(p_board_id)` — RPC appelée à l'ouverture d'un tableau ; met à jour le seul champ `last_read_at` de la ligne `immobilier_board_members` de l'appelant. Pattern identique à `mark_board_read` (Discussion 7C).
+
+#### Trigger auto-owner
+
+Trigger `AFTER INSERT` sur `immobilier_boards` qui inscrit automatiquement l'`auteur_id` comme `owner` dans `immobilier_board_members`. Permet à l'INSERT côté client de réussir sans devoir gérer manuellement la ligne d'appartenance après création, et résout un piège RLS où l'INSERT...RETURNING échouait parce que le SELECT du RETURNING ne passait pas la policy SELECT (le créateur n'était pas encore membre au moment de l'évaluation).
+
+#### RLS (21 policies)
+
+| Table | SELECT | INSERT | UPDATE | DELETE |
+|---|---|---|---|---|
+| `immobilier_boards` | membre | super_admin + associe_gerant, et `auteur_id = auth.uid()` | owner | super_admin uniquement |
+| `immobilier_board_members` | membre | owner du tableau, et `user_id` non-remplaçant (sous-requête `profiles`) | — (pas de policy, on passe par RPC `mark_immobilier_board_read`) | owner OU soi-même (quitter) |
+| `immobilier_cards` | membre | membre, et `auteur_id = auth.uid()` | créateur carte OU owner OU super_admin | idem UPDATE |
+| `immobilier_messages` | membre du board parent | membre du board parent, `auteur_id = auth.uid()`, et statut carte = 'ouvert' | auteur uniquement | auteur uniquement |
+| `immobilier_attachments` | membre du board parent | membre du board parent, `auteur_id = auth.uid()` (carte close bloquée côté UI uniquement) | — | auteur uniquement |
+| `immobilier_card_reads` | soi-même | soi-même | soi-même | — |
+
+#### Storage
+
+Bucket `immobilier-attachments` (privé, 25 Mo, MIME types non restreints au niveau bucket — la validation des types acceptés est faite côté UI dans `immobilierStorage.js`). 3 policies : SELECT/INSERT/DELETE conditionnées à `is_immobilier_member()`. La granularité fine « auteur uniquement » sur la suppression de blob est portée implicitement : le code supprime d'abord la ligne DB (où la RLS auteur s'applique), puis le blob dans la foulée.
+
+#### Realtime
+
+Activé sur `immobilier_boards`, `immobilier_cards`, `immobilier_messages`, `immobilier_attachments`. Non activé sur `immobilier_board_members` (rechargement de page suffit) ni sur `immobilier_card_reads` (purement local). Les 4 tables relayées ont aussi `REPLICA IDENTITY FULL` pour que les DELETE soient relayés avec leur contenu complet (sans ça, les filtres `card_id=eq.X` côté client n'évaluent pas les DELETE).
+
+#### Droits
+
 | Action | super_admin | associe_gerant | associe | remplacant |
 |---|:---:|:---:|:---:|:---:|
 | Voir ses tableaux invités | ✓ | ✓ | si invité | — |
 | Créer un tableau | ✓ | ✓ | — | — |
-| Inviter des participants | ✓ | ✓ | — | — |
-| Créer / modifier une carte | ✓ | ✓ | — | — |
+| Inviter / désinviter dans son tableau | ✓ tout tableau | ✓ tout tableau | si owner (rare en pratique) | — |
+| Créer / modifier une carte | ✓ | ✓ | ✓ si invité | — |
 | Commenter (chat) dans une carte | ✓ | ✓ | si invité | — |
+| Éditer / supprimer ses propres messages | ✓ | ✓ | ✓ | — |
+| Modifier / clore / supprimer une carte | créateur carte + owner + super_admin |
+| Archiver un tableau | créateur tableau + super_admin |
+| Supprimer dur un tableau | super_admin uniquement |
+| Ajouter / supprimer ses propres pièces jointes | ✓ | ✓ | ✓ si membre | — |
 
-**Notifications push :** Mêmes règles que le module Discussion.
+#### Écrans & routing
+
+- `/immobilier` — page liste : header sticky (titre canard, recherche locale, filtre Actifs/Archivés), CTA `+ Nouveau` (visible super_admin + associe_gerant), liste de tiles avec point coloré non-lu, état vide adapté au rôle.
+- `/immobilier/:boardId` — vue tableau : header (retour, titre, description, avatars membres, menu trois-points), filtre Ouvertes/Closes/Toutes, CTA `+ Carte` teinté couleur tableau, liste de tiles cartes (avec snippet du dernier message + compteur non-lus + badge statut).
+- `/immobilier/:boardId/:cardId` — vue carte plein écran (sans AppLayout, sans BottomNav — comportement type messagerie) : header retour + titre + sous-titre tableau + badge statut + menu trois-points, description repliable, section pièces jointes (chips horizontales scrollables), fil de messages temps réel, composer sticky (textarea autosizing, bouton Send teinté couleur tableau, désactivé si carte close).
+
+#### Architecture
+
+Dossier `src/features/immobilier/` :
+- Hooks : `useImmobilier.js` (liste tableaux + point non-lu), `useBoard.js` (vue tableau + enrichissement cartes avec dernier message et compteur non-lus), `useBoardOwnerIds` (hook léger pour la vue carte), `useCard.js` (vue carte + messages + attachments + Realtime).
+- Composants : `ImmobilierBoardTile`, `CardTile`, `StatusBadge`, `MemberAvatars`, `BoardActionsMenu`, `CardActionsMenu`, `CardMessage`, `CardComposer`, `CardPage`, `CardAttachments`, `AttachmentChip`, `ColorPicker`, `MemberPicker`, modales `CreateBoardModal`, `EditBoardModal`, `CreateCardModal`, `EditCardModal`, `ManageMembersModal`.
+- Helpers : `immobilierColors.js` (accent canard + 6 swatches), `immobilierStorage.js` (upload/download/open, validation taille + types).
+
+Pages : `src/pages/Immobilier.jsx`, `ImmobilierBoard.jsx`, `ImmobilierCard.jsx`.
+
+Permissions dans `src/lib/permissions.js` : `canAccessImmobilier`, `canCreateImmobilierBoard`, `isImmobilierBoardOwner`, `canInviteToImmobilierBoard`, `canEditImmobilierBoard`, `canArchiveImmobilierBoard`, `canDeleteImmobilierBoard`, `canCreateImmobilierCard`, `canEditImmobilierCard`, `canDeleteImmobilierCard`, `canCommentImmobilier`, `canEditOwnImmobilierMessage`.
+
+#### Écarts au plan initial
+
+- Décisions de cadrage validées en début d'étape 10 : architecture **copier-adapter** depuis `features/discussion/` (pas de partage de composants), tables séparées préfixées `immobilier_`, accent module **canard** (différent de Discussion qui est `brique`).
+- L'`associe` invité peut **créer/modifier ses propres cartes** (la matrice initiale lui donnait juste « commenter »). Arbitré pour pertinence métier.
+- **Cohérence visuelle avec Discussion à finaliser en étape 10D-2-bis** : à la fin de 10D-2c, les écrans Immobilier sont fonctionnellement complets mais leur rendu visuel diverge de Discussion (tiles de cartes, header de carte, bulles de chat, avatars). Un alignement de cohérence est planifié avant clôture définitive de l'étape 10. Ne pas y toucher avant.
+
+#### Limitations connues
+
+- **Nouveau tableau créé par un autre utilisateur** : visible uniquement après rechargement de `/immobilier` (la table `immobilier_board_members` n'est pas dans la publication Realtime ; une fix simple — ajouter la table à la publication — pourra être faite ultérieurement si l'usage le justifie).
+- **Suppression de PJ orpheline** : si la suppression DB réussit mais que la suppression du blob Storage échoue, le blob reste dans le bucket (inaccessible, sans fuite de données). Stratégie best-effort identique à Cabinet pratique, SIM, Événements et Discussion.
+- **Pas de breadcrumb riche** sur la vue carte : juste « retour au tableau ». Cohérent avec le pattern Discussion 7C.
+- **Cohérence visuelle Immobilier ↔ Discussion** : voir « Écarts au plan initial » ci-dessus. À traiter en 10D-2-bis.
 
 ---
 
@@ -500,7 +620,7 @@ Dossier `src/features/sim/` : hooks `useSimRoot`, `useSimFolder`, helper de filt
 | Discussion | ✓ | ✓ | si invité | si invité |
 | Événements | ✓ édition complète | ✓ édition complète | ✓ création + édition de soi | ✓ lecture + sondage |
 | SIM | ✓ | ✓ | invisible | invisible |
-| Immobilier | ✓ | ✓ | si invité | — |
+| Immobilier | ✓ création + gestion complète | ✓ création + gestion complète | ✓ si invité (cartes + chat) | — invisible |
 
 ---
 
@@ -823,7 +943,17 @@ Le module Discussion est désormais complet (étapes 7A à 7D).
    - 9C : Page racine `/sim` — `Sim.jsx` avec garde d'accès et décoration par élément (calcul de `canEdit`/`canDelete`/`canMenu` par dossier et fichier), 6 composants `features/sim/` adaptés de Cabinet pratique (`DrivePage` avec props `subtitle` et `accent`, `NewFolderModal`, `UploadModal`, `ActionsMenu` qui masque les actions interdites, `RenameModal`, `DeleteConfirmModal`). Route `/sim` dans `App.jsx`, navigation de la tuile SIM ajoutée dans `Home.jsx`.
    - 9D : Navigation arborescente — page `SimFolder.jsx` (route `/sim/:id`) calquée sur `CabinetFolder.jsx`, breadcrumb 2 segments, redirection vers `/sim` si dossier introuvable, décoration par auteur identique à la racine.
    - 9G : Tests multi-rôles formels + mise à jour de la documentation.
-10. **Étape 10** — Module Immobilier (mêmes composants que Discussion)
+10. ✓ **Étape 10 — FAITE** (sous-étapes 10A → 10D, alignement visuel 10D-2-bis restant) — Module Immobilier
+    - 10A : Fondations SQL — 6 tables `immobilier_*`, 5 fonctions SECURITY DEFINER (`is_immobilier_member`, `is_immobilier_board_member`, `is_immobilier_board_owner`, `can_create_immobilier_board`, `mark_immobilier_board_read`), trigger auto-owner, RLS + 21 policies, bucket Storage `immobilier-attachments` (privé, 25 Mo), Realtime sur 4 tables, REPLICA IDENTITY FULL. Helpers permissions React + hook racine `useImmobilier`. Stub de route + tuile Home conditionnelle.
+    - 10B : Page liste `/immobilier` (recherche, filtre Actifs/Archivés, tile cliquable) + modale création tableau (ColorPicker 6 swatches + MemberPicker filtré non-remplaçants).
+    - 10C-1 : Vue tableau `/immobilier/:boardId` (header avec avatars, filtre Ouvertes/Closes/Toutes, CTA `+ Carte` teinté, CRUD cartes via modale d'édition légère).
+    - 10C-2a : Menu trois-points tableau (Modifier, Archiver/Désarchiver, Supprimer en super_admin uniquement) + bandeau « tableau archivé » + redirection après suppression.
+    - 10C-2b : Modale gestion participants (liste membres avec badge owner, désinvitation, invitation multi-sélect via MemberPicker avec `excludeIds`) + action « Quitter le tableau » + garde-fou dernier owner.
+    - 10D-1 : Vue carte plein écran `/immobilier/:boardId/:cardId` (sans AppLayout), fil de messages temps réel via `useCard`, envoi/édition/suppression de ses messages, séparateurs de jour, carte close = lecture seule, tracking lu/non-lu à deux niveaux (compteur par carte, point coloré par tableau), tile carte enrichie (dernier message + compteur).
+    - 10D-2a : Pièces jointes — helper `immobilierStorage.js` (validation taille + types calqués sur Discussion 7D), `AttachmentChip` (preview ou download selon MIME), `CardAttachments` (chips horizontales scrollables, bouton d'ajout, suppression auteur uniquement, désactivés si carte close). REPLICA IDENTITY FULL ajouté pour propagation des DELETE en Realtime. Suppressions optimistes côté client pour latence perçue.
+    - 10D-2b : Recherche globale `/recherche` étendue à Immobilier (tableaux + cartes) **et à Discussion** (rattrapage d'une dette annoncée en 7D). Affichage par sections (Médecins / Discussion / Immobilier) avec compteur. Normalisation des noms anglais Discussion vers le français côté affichage.
+    - 10D-2c : Tests multi-rôles formels + mise à jour de la doc + clôture commit.
+    - 10D-2-bis : **Alignement visuel ciblé sur Discussion** (à faire) — réharmonisation tiles de carte, header de carte, bulles de chat, avatars de membres. Conservé du côté Immobilier : déroulement horizontal des pièces jointes (préférence utilisateur).
 11. **Étape 11** — Page Profil personnelle + gestion `profiles_compta`
 12. **Étape 12** — Configuration PWA (manifest, service worker, icônes, page guide d'installation)
     - **Étape 12 bis — Alignement du design system** — passe de mise au standard DS des écrans antérieurs à l'étape 6.0, dans l'ordre : shell (Home, Login, navigation), puis Trombinoscope, puis Annuaire. Migration des radii (`rounded-card` / `rounded-input` / `rounded-tile`), des surfaces (`bg-carte` / `bg-fond`), des bordures (`border-border`), des ombres (`shadow-card` / `shadow-button`) et de la typographie (classes `.text-h1` / `.text-h2` / etc. en Archivo). À traiter écran par écran en petits lots testés. Voir « Limitations connues ».
