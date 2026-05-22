@@ -1,0 +1,188 @@
+// src/features/immobilier/useCard.js
+// Hook de la vue carte /immobilier/:boardId/:cardId.
+// - Charge la carte + le board parent (pour la couleur, le titre court,
+//   le statut clos eventuellement)
+// - Charge les messages avec leur auteur (jointure profiles)
+// - Realtime sur immobilier_messages pour le fil en direct
+// - Marque la carte lue a l'ouverture (upsert immobilier_card_reads)
+//   + RPC mark_immobilier_board_read pour le tracking tableau
+//
+// Renvoie aussi sendMessage / editMessage / deleteMessage pour le composer.
+
+import { useEffect, useState, useCallback } from 'react';
+import { supabase } from '../../lib/supabaseClient';
+
+export function useCard(cardId) {
+  const [card, setCard] = useState(null);
+  const [board, setBoard] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [notFound, setNotFound] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const refetch = useCallback(() => setReloadKey((k) => k + 1), []);
+
+  useEffect(() => {
+    if (!cardId) return;
+    let active = true;
+
+    async function fetchAll() {
+      setLoading(true);
+      setError(null);
+      setNotFound(false);
+
+      // 1) Charger la carte
+      const { data: cardData, error: cardErr } = await supabase
+        .from('immobilier_cards')
+        .select('id, board_id, titre, description, statut, archive, auteur_id, last_activity_at, created_at')
+        .eq('id', cardId)
+        .maybeSingle();
+
+      if (!active) return;
+      if (cardErr) {
+        setError(cardErr);
+        setLoading(false);
+        return;
+      }
+      if (!cardData) {
+        // Carte introuvable ou RLS qui bloque (non-membre du tableau)
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
+      setCard(cardData);
+
+      // 2) En parallele : board parent + messages
+      const [resBoard, resMessages] = await Promise.all([
+        supabase
+          .from('immobilier_boards')
+          .select('id, titre, couleur, archive')
+          .eq('id', cardData.board_id)
+          .maybeSingle(),
+        supabase
+          .from('immobilier_messages')
+          .select(`
+            id,
+            card_id,
+            auteur_id,
+            contenu,
+            edited,
+            created_at,
+            auteur:profiles!auteur_id (id, prenom, nom)
+          `)
+          .eq('card_id', cardId)
+          .order('created_at', { ascending: true }),
+      ]);
+
+      if (!active) return;
+
+      if (resBoard.data) setBoard(resBoard.data);
+      if (resMessages.data) setMessages(resMessages.data);
+      setLoading(false);
+    }
+
+    fetchAll();
+
+    // Realtime sur les messages de cette carte
+    const channel = supabase
+      .channel(`immobilier_card_${cardId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'immobilier_messages',
+          filter: `card_id=eq.${cardId}`,
+        },
+        () => {
+          if (active) refetch();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
+  }, [cardId, reloadKey, refetch]);
+
+  // ----- Marquage lu -----
+  // Appelle apres le 1er chargement pour mettre a jour :
+  // - immobilier_card_reads (compteur numerique par carte)
+  // - immobilier_board_members.last_read_at via RPC (point coloré tableau)
+  const markRead = useCallback(async () => {
+    if (!card) return;
+    // Upsert immobilier_card_reads pour cet user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase
+      .from('immobilier_card_reads')
+      .upsert(
+        {
+          card_id: card.id,
+          user_id: user.id,
+          last_read_at: new Date().toISOString(),
+        },
+        { onConflict: 'card_id,user_id' }
+      );
+    // RPC pour le tableau
+    await supabase.rpc('mark_immobilier_board_read', {
+      p_board_id: card.board_id,
+    });
+  }, [card]);
+
+  // ----- Envoi / edition / suppression de message -----
+  const sendMessage = useCallback(
+    async (contenu) => {
+      if (!card || !contenu?.trim()) return { error: new Error('Contenu vide') };
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return { error: new Error('Non connecte') };
+      const id = crypto.randomUUID();
+      const { error: err } = await supabase
+        .from('immobilier_messages')
+        .insert({
+          id,
+          card_id: card.id,
+          auteur_id: user.id,
+          contenu: contenu.trim(),
+        });
+      return { error: err, id };
+    },
+    [card]
+  );
+
+  const editMessage = useCallback(async (messageId, nouveauContenu) => {
+    if (!nouveauContenu?.trim()) return { error: new Error('Contenu vide') };
+    const { error: err } = await supabase
+      .from('immobilier_messages')
+      .update({
+        contenu: nouveauContenu.trim(),
+        edited: true,
+      })
+      .eq('id', messageId);
+    return { error: err };
+  }, []);
+
+  const deleteMessage = useCallback(async (messageId) => {
+    const { error: err } = await supabase
+      .from('immobilier_messages')
+      .delete()
+      .eq('id', messageId);
+    return { error: err };
+  }, []);
+
+  return {
+    card,
+    board,
+    messages,
+    loading,
+    error,
+    notFound,
+    refetch,
+    markRead,
+    sendMessage,
+    editMessage,
+    deleteMessage,
+  };
+}

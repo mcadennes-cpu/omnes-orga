@@ -35,6 +35,9 @@ export function useBoard(boardId) {
       setLoading(true);
       setError(null);
 
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const userId = currentUser?.id;
+
       // Chargement parallele : board + membres + cartes
       const [resBoard, resMembers, resCards] = await Promise.all([
         supabase
@@ -72,15 +75,76 @@ export function useBoard(boardId) {
 
       setBoard(resBoard.data || null);
       setMembers(resMembers.data || []);
-      setCards(resCards.data || []);
+
+      // Enrichissement des cartes : last message + unread count.
+      const baseCards = resCards.data || [];
+      if (baseCards.length === 0 || !userId) {
+        setCards(baseCards);
+        setLoading(false);
+        return;
+      }
+
+      const cardIds = baseCards.map((c) => c.id);
+
+      // Reads de l'utilisateur courant pour ces cartes
+      const { data: readsData } = await supabase
+        .from('immobilier_card_reads')
+        .select('card_id, last_read_at')
+        .eq('user_id', userId)
+        .in('card_id', cardIds);
+
+      const readsByCard = new Map(
+        (readsData || []).map((r) => [r.card_id, r.last_read_at])
+      );
+
+      // Tous les messages de ces cartes, pour calculer compteurs + dernier
+      const { data: messagesData } = await supabase
+        .from('immobilier_messages')
+        .select(`
+          id,
+          card_id,
+          contenu,
+          auteur_id,
+          created_at,
+          auteur:profiles!auteur_id (id, prenom, nom)
+        `)
+        .in('card_id', cardIds)
+        .order('created_at', { ascending: false });
+
+      // Group by card_id
+      const messagesByCard = new Map();
+      for (const m of messagesData || []) {
+        if (!messagesByCard.has(m.card_id)) messagesByCard.set(m.card_id, []);
+        messagesByCard.get(m.card_id).push(m);
+      }
+
+      const enrichedCards = baseCards.map((c) => {
+        const cardMessages = messagesByCard.get(c.id) || [];
+        const lastMessage = cardMessages[0] || null;
+        const lastReadAt = readsByCard.get(c.id);
+        const unreadCount = lastReadAt
+          ? cardMessages.filter(
+              (m) => new Date(m.created_at) > new Date(lastReadAt)
+                  && m.auteur_id !== userId
+            ).length
+          : cardMessages.filter((m) => m.auteur_id !== userId).length;
+        return {
+          ...c,
+          lastMessage,
+          unreadCount,
+        };
+      });
+
+      if (!active) return;
+      setCards(enrichedCards);
       setLoading(false);
     }
 
     fetchAll();
 
-    // Realtime cartes
-    const channel = supabase
-      .channel(`immobilier_board_${boardId}`)
+    // Realtime : cartes du tableau
+    const cardsChannel = supabase
+      .channel(`immobilier_board_${boardId}_cards`)
       .on(
         'postgres_changes',
         {
@@ -95,9 +159,28 @@ export function useBoard(boardId) {
       )
       .subscribe();
 
+    // Realtime : messages (pour refresh des compteurs / snippet sur les tiles).
+    // On ne peut pas filtrer par board_id ici (pas dans la table messages),
+    // donc on ecoute large et on filtre cote client via refetch.
+    const messagesChannel = supabase
+      .channel(`immobilier_board_${boardId}_messages`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'immobilier_messages',
+        },
+        () => {
+          if (active) refetch();
+        }
+      )
+      .subscribe();
+
     return () => {
       active = false;
-      supabase.removeChannel(channel);
+      supabase.removeChannel(cardsChannel);
+      supabase.removeChannel(messagesChannel);
     };
   }, [boardId, reloadKey]);
 
@@ -120,4 +203,37 @@ export function useBoard(boardId) {
     refetch,
     notMember,
   };
+}
+
+// Hook minimaliste : juste les owners d'un tableau.
+// Utile pour les pages qui ont besoin des droits sur les actions
+// de tableau/carte sans payer le cout d'un fetch complet + Realtime.
+// Pas de Realtime ici : si la composition d'owners change, l'utilisateur
+// rechargera ou naviguera.
+export function useBoardOwnerIds(boardId) {
+  const [ownerIds, setOwnerIds] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!boardId) return;
+    let active = true;
+
+    async function fetchOwners() {
+      setLoading(true);
+      const { data } = await supabase
+        .from('immobilier_board_members')
+        .select('user_id')
+        .eq('board_id', boardId)
+        .eq('role_in_board', 'owner');
+
+      if (!active) return;
+      setOwnerIds((data || []).map((row) => row.user_id));
+      setLoading(false);
+    }
+
+    fetchOwners();
+    return () => { active = false; };
+  }, [boardId]);
+
+  return { ownerIds, loading };
 }

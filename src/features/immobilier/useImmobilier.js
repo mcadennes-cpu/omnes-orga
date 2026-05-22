@@ -24,9 +24,9 @@ export function useImmobilier({ showArchived = false } = {}) {
       setLoading(true);
       setError(null);
 
-      // Filtrage par appartenance via la RLS SELECT : on charge tous
-      // les boards visibles, qui correspondent par definition aux
-      // tableaux ou je suis membre (cf. immobilier_boards_select).
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const userId = currentUser?.id;
+
       const { data, error: err } = await supabase
         .from('immobilier_boards')
         .select(`
@@ -38,7 +38,8 @@ export function useImmobilier({ showArchived = false } = {}) {
           auteur_id,
           last_activity_at,
           created_at,
-          updated_at
+          updated_at,
+          members:immobilier_board_members!board_id(user_id, last_read_at)
         `)
         .eq('archive', showArchived)
         .order('last_activity_at', { ascending: false });
@@ -49,7 +50,16 @@ export function useImmobilier({ showArchived = false } = {}) {
         setError(err);
         setBoards([]);
       } else {
-        setBoards(data || []);
+        // Enrichissement : hasUnread = last_activity > my last_read_at
+        const enriched = (data || []).map((b) => {
+          const myMembership = (b.members || []).find((m) => m.user_id === userId);
+          const lastReadAt = myMembership?.last_read_at;
+          const hasUnread = lastReadAt
+            ? new Date(b.last_activity_at) > new Date(lastReadAt)
+            : true; // membre sans last_read_at -> considere comme non-lu
+          return { ...b, hasUnread };
+        });
+        setBoards(enriched);
       }
       setLoading(false);
     }

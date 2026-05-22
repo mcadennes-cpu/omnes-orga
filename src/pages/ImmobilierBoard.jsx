@@ -28,7 +28,6 @@ import { getBoardColorClasses } from '../features/immobilier/immobilierColors';
 import MemberAvatars from '../features/immobilier/MemberAvatars';
 import CardTile from '../features/immobilier/CardTile';
 import CreateCardModal from '../features/immobilier/CreateCardModal';
-import EditCardModal from '../features/immobilier/EditCardModal';
 import BoardActionsMenu from '../features/immobilier/BoardActionsMenu';
 import EditBoardModal from '../features/immobilier/EditBoardModal';
 import ManageMembersModal from '../features/immobilier/ManageMembersModal';
@@ -52,7 +51,6 @@ export default function ImmobilierBoard() {
 
   const [filter, setFilter] = useState('ouvertes'); // 'ouvertes' | 'closes' | 'toutes'
   const [createOpen, setCreateOpen] = useState(false);
-  const [editingCard, setEditingCard] = useState(null);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [editBoardOpen, setEditBoardOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
@@ -262,11 +260,7 @@ export default function ImmobilierBoard() {
         )}
 
         {filteredCards.map((card) => (
-          <CardTile
-            key={card.id}
-            card={card}
-            onClick={() => setEditingCard(card)}
-          />
+          <CardTile key={card.id} card={card} />
         ))}
       </div>
 
@@ -278,13 +272,6 @@ export default function ImmobilierBoard() {
           boardId={board.id}
         />
       )}
-      <EditCardModal
-        open={!!editingCard}
-        onClose={() => setEditingCard(null)}
-        card={editingCard}
-        ownerIds={ownerIds}
-      />
-
       <BoardActionsMenu
         open={actionsOpen}
         onClose={() => setActionsOpen(false)}

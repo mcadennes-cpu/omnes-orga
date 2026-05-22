@@ -2,9 +2,7 @@
 // Tile cliquable d'un tableau Immobilier dans la page liste.
 // - Couleur d'identite a gauche (barre verticale)
 // - Titre + description tronquee + date de derniere activite
-// - Cliquable vers /immobilier/:id
-// Sobriete volontaire en 10B : pas d'avatars ni de compteur de cartes
-// (arriveront en 10C/10D quand les donnees seront disponibles).
+// - Point colore non-lu si board.hasUnread
 
 import { Link } from 'react-router-dom';
 import { formatRelativeDate } from '../../lib/dateFormat';
@@ -26,9 +24,17 @@ export default function ImmobilierBoardTile({ board }) {
         {/* Contenu */}
         <div className="flex-1 p-4 min-w-0">
           <div className="flex items-start justify-between gap-3">
-            <h3 className="text-body-l text-ink font-medium truncate">
-              {board.titre}
-            </h3>
+            <div className="min-w-0 flex-1 flex items-center gap-2">
+              <h3 className="text-body-l text-ink font-medium truncate">
+                {board.titre}
+              </h3>
+              {board.hasUnread && (
+                <span
+                  className={`w-2 h-2 rounded-full ${colors.bg} flex-shrink-0`}
+                  aria-label="Du nouveau"
+                />
+              )}
+            </div>
             <span className="text-caption text-faint flex-shrink-0">
               {formatRelativeDate(board.last_activity_at)}
             </span>

@@ -20,6 +20,7 @@ import Sim from './pages/Sim'
 import SimFolder from './pages/SimFolder'
 import Immobilier from './pages/Immobilier'
 import ImmobilierBoard from './pages/ImmobilierBoard'
+import ImmobilierCard from './pages/ImmobilierCard'
 
 export default function App() {
   return (
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="/sim/:id" element={<SimFolder />} />
         <Route path="/immobilier" element={<Immobilier />} />
         <Route path="/immobilier/:boardId" element={<ImmobilierBoard />} />
+        <Route path="/immobilier/:boardId/:cardId" element={<ImmobilierCard />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
