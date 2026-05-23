@@ -1,16 +1,21 @@
 // src/features/immobilier/StatusBadge.jsx
-// Petit badge "Ouvert" (canard) ou "Clos" (gris faint) pour une carte.
+// Pastille de statut d'une carte Immobilier : "Ouvert" (canard) ou "Clos" (gris).
+// Couleurs fixes, independantes de la couleur du tableau.
+// Pattern aligne sur Discussion (dot + label, sans fond).
 
-export default function StatusBadge({ statut }) {
+export default function StatusBadge({ statut, size = 'sm' }) {
   const isOpen = statut === 'ouvert';
+  const textSize = size === 'md' ? 'text-xs' : 'text-[10px]';
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-pill text-caption
-                  ${isOpen
-                    ? 'bg-canard/10 text-canard'
-                    : 'bg-fond text-faint'
-                  }`}
+      className={`inline-flex items-center gap-1 ${textSize} font-bold uppercase tracking-wide ${
+        isOpen ? 'text-canard' : 'text-muted'
+      }`}
     >
+      <span
+        className={`w-1.5 h-1.5 rounded-full ${isOpen ? 'bg-canard' : 'bg-muted'}`}
+        aria-hidden="true"
+      />
       {isOpen ? 'Ouvert' : 'Clos'}
     </span>
   );

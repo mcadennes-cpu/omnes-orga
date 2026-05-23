@@ -53,7 +53,7 @@ export default function CardMessage({
     : 'flex justify-start';
 
   const bubbleClasses = isMine
-    ? `${colors.bg} text-white rounded-card rounded-br-sm`
+    ? `${colors.bubble} rounded-card rounded-br-sm`
     : 'bg-carte border border-border text-ink rounded-card rounded-bl-sm';
 
   return (

@@ -5,7 +5,7 @@
 
 import {
   IMMOBILIER_BOARD_COLORS,
-  BOARD_COLOR_CLASSES,
+  getBoardColorClasses,
 } from './immobilierColors';
 
 export default function ColorPicker({ value, onChange }) {
@@ -14,7 +14,7 @@ export default function ColorPicker({ value, onChange }) {
       <div className="flex gap-2 flex-wrap">
         {IMMOBILIER_BOARD_COLORS.map((couleur) => {
           const isSelected = value === couleur;
-          const bgClass = BOARD_COLOR_CLASSES[couleur].bg;
+          const bgClass = getBoardColorClasses(couleur).dot;
           return (
             <button
               key={couleur}

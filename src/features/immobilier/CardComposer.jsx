@@ -81,7 +81,7 @@ export default function CardComposer({
           type="button"
           onClick={handleSend}
           disabled={!canSend}
-          className={`flex-shrink-0 p-2.5 ${colors.bg} text-white
+          className={`flex-shrink-0 p-2.5 ${colors.cta}
                       rounded-input shadow-button
                       disabled:opacity-40 disabled:cursor-not-allowed
                       transition-opacity`}

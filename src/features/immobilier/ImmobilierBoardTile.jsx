@@ -19,7 +19,7 @@ export default function ImmobilierBoardTile({ board }) {
     >
       <div className="flex">
         {/* Barre verticale couleur du tableau */}
-        <div className={`w-1.5 ${colors.bg} flex-shrink-0`} aria-hidden="true" />
+        <div className={`w-1.5 ${colors.dot} flex-shrink-0`} aria-hidden="true" />
 
         {/* Contenu */}
         <div className="flex-1 p-4 min-w-0">
@@ -30,7 +30,7 @@ export default function ImmobilierBoardTile({ board }) {
               </h3>
               {board.hasUnread && (
                 <span
-                  className={`w-2 h-2 rounded-full ${colors.bg} flex-shrink-0`}
+                  className={`w-2 h-2 rounded-full ${colors.dot} flex-shrink-0`}
                   aria-label="Du nouveau"
                 />
               )}

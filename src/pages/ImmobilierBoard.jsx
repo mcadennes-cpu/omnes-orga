@@ -228,8 +228,8 @@ export default function ImmobilierBoard() {
                     type="button"
                     onClick={() => setCreateOpen(true)}
                     className={`inline-flex items-center gap-1.5 px-3 py-2
-                                text-white text-button rounded-input
-                                shadow-button ${colors.bg}`}
+                                text-button rounded-input
+                                shadow-button ${colors.cta}`}
                     aria-label="Nouvelle carte"
                   >
                     <Plus size={18} aria-hidden="true" />
