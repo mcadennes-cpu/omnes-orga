@@ -9,7 +9,7 @@
 
 import { useMemo, useState } from 'react';
 import { useParams, Navigate, Link, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Plus, MoreVertical } from 'lucide-react';
+import { ArrowLeft, Plus, MoreVertical } from 'lucide-react';
 import AppLayout from '../components/layout/AppLayout';
 import { useAuth } from '../hooks/useAuth';
 import { useRole } from '../hooks/useRole';
@@ -31,6 +31,8 @@ import CreateCardModal from '../features/immobilier/CreateCardModal';
 import BoardActionsMenu from '../features/immobilier/BoardActionsMenu';
 import EditBoardModal from '../features/immobilier/EditBoardModal';
 import ManageMembersModal from '../features/immobilier/ManageMembersModal';
+import BoardSkeleton from '../features/immobilier/BoardSkeleton';
+import EmptyBoard from '../features/immobilier/EmptyBoard';
 
 export default function ImmobilierBoard() {
   const { boardId } = useParams();
@@ -55,6 +57,15 @@ export default function ImmobilierBoard() {
   const [editBoardOpen, setEditBoardOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [manageMembersOpen, setManageMembersOpen] = useState(false);
+
+  const counts = useMemo(
+    () => ({
+      ouvertes: cards.filter((c) => c.statut === 'ouvert').length,
+      closes: cards.filter((c) => c.statut === 'clos').length,
+      toutes: cards.length,
+    }),
+    [cards]
+  );
 
   const filteredCards = useMemo(() => {
     if (filter === 'ouvertes') return cards.filter((c) => c.statut === 'ouvert');
@@ -146,122 +157,157 @@ export default function ImmobilierBoard() {
   return (
     <AppLayout>
       {/* Header sticky */}
-      <div className="sticky top-0 z-10 bg-fond border-b border-border">
-        <div className="px-4 pt-3 pb-3">
-          <Link
-            to="/immobilier"
-            className="inline-flex items-center gap-1 text-body-m text-canard mb-2"
-          >
-            <ChevronLeft size={18} aria-hidden="true" />
-            <span>Tableaux</span>
-          </Link>
+      <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border">
+        {loading && !board && (
+          <div className="px-4 py-3 text-body-m text-muted">Chargement...</div>
+        )}
 
-          {loading && !board && (
-            <div className="text-body-m text-muted">Chargement...</div>
-          )}
+        {error && (
+          <div className="px-4 py-3 text-body-m text-brique">
+            Erreur : {error.message}
+          </div>
+        )}
 
-          {error && (
-            <div className="text-body-m text-brique">
-              Erreur : {error.message}
-            </div>
-          )}
-
-          {board && (
-            <>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <h1 className="text-h1 text-ink break-words">{board.titre}</h1>
-                  {board.description && (
-                    <p className="text-body-m text-muted mt-1 line-clamp-2">
-                      {board.description}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <MemberAvatars members={members} max={4} />
-                  {hasAnyBoardAction && (
-                    <button
-                      type="button"
-                      onClick={() => setActionsOpen(true)}
-                      className="p-2 text-muted hover:text-ink rounded-pill
-                                 hover:bg-fond transition-colors"
-                      aria-label="Actions du tableau"
-                    >
-                      <MoreVertical size={20} aria-hidden="true" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {board.archive && (
-                <div className="mt-3 px-3 py-2 bg-fond border border-border
-                                rounded-input text-caption text-muted">
-                  Ce tableau est archive.
-                </div>
+        {board && (
+          <>
+            {/* Ligne 1 : retour + titre + actions */}
+            <div className="flex items-center gap-1 px-2 py-3">
+              <Link
+                to="/immobilier"
+                aria-label="Retour a la liste des tableaux"
+                className="w-9 h-9 shrink-0 rounded-full flex items-center
+                           justify-center text-marine hover:bg-marine/5
+                           active:bg-marine/5 transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5" strokeWidth={2} />
+              </Link>
+              <h1 className="flex-1 min-w-0 truncate font-display font-extrabold
+                             text-marine text-xl">
+                {board.titre}
+              </h1>
+              {hasAnyBoardAction && (
+                <button
+                  type="button"
+                  onClick={() => setActionsOpen(true)}
+                  className="w-9 h-9 shrink-0 rounded-full flex items-center
+                             justify-center text-marine hover:bg-marine/5
+                             transition-colors"
+                  aria-label="Actions du tableau"
+                >
+                  <MoreVertical size={20} aria-hidden="true" />
+                </button>
               )}
+            </div>
 
-              <div className="mt-3 flex items-center justify-between gap-2">
-                {/* Filtre segmente */}
-                <div className="inline-flex bg-carte rounded-pill p-1 border border-border">
-                  {[
-                    { key: 'ouvertes', label: 'Ouvertes' },
-                    { key: 'closes',   label: 'Closes'   },
-                    { key: 'toutes',   label: 'Toutes'   },
-                  ].map((f) => (
+            {/* Ligne 2 : avatars + CTA nouvelle carte */}
+            <div className="flex items-center justify-between gap-3
+                            px-4 pb-3 min-h-[36px]">
+              <MemberAvatars members={members} max={4} />
+              {canCreate && (
+                <button
+                  type="button"
+                  onClick={() => setCreateOpen(true)}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2
+                              rounded-full ${getBoardColorClasses(board.couleur).cta}
+                              font-semibold text-sm
+                              active:opacity-80 transition-opacity`}
+                >
+                  <Plus className="w-4 h-4" strokeWidth={2.4} />
+                  Nouvelle carte
+                </button>
+              )}
+            </div>
+
+            {/* Ligne 3 : onglets de statut */}
+            <div className="px-4 pb-3">
+              <div className="flex gap-1 p-1 bg-fond rounded-full">
+                {[
+                  { key: 'ouvertes', label: 'Ouvertes' },
+                  { key: 'closes',   label: 'Closes'   },
+                  { key: 'toutes',   label: 'Toutes'   },
+                ].map((tab) => {
+                  const active = tab.key === filter;
+                  return (
                     <button
-                      key={f.key}
+                      key={tab.key}
                       type="button"
-                      onClick={() => setFilter(f.key)}
-                      className={`px-3 py-1 text-button rounded-pill transition-colors ${
-                        filter === f.key
-                          ? 'bg-marine text-white'
+                      onClick={() => setFilter(tab.key)}
+                      className={`flex-1 inline-flex items-center justify-center
+                                  gap-1.5 py-1.5 rounded-full text-sm
+                                  font-semibold transition-colors ${
+                        active
+                          ? 'bg-carte text-marine shadow-sm'
                           : 'text-muted'
                       }`}
                     >
-                      {f.label}
+                      {tab.label}
+                      <span
+                        className={`min-w-[18px] px-1 rounded-full text-[11px] ${
+                          active
+                            ? 'bg-marine/10 text-marine'
+                            : 'bg-marine/5 text-muted'
+                        }`}
+                      >
+                        {counts[tab.key]}
+                      </span>
                     </button>
-                  ))}
-                </div>
-
-                {canCreate && colors && (
-                  <button
-                    type="button"
-                    onClick={() => setCreateOpen(true)}
-                    className={`inline-flex items-center gap-1.5 px-3 py-2
-                                text-button rounded-input
-                                shadow-button ${colors.cta}`}
-                    aria-label="Nouvelle carte"
-                  >
-                    <Plus size={18} aria-hidden="true" />
-                    <span>Carte</span>
-                  </button>
-                )}
+                  );
+                })}
               </div>
-            </>
+            </div>
+          </>
+        )}
+      </header>
+
+      {/* Bandeau tableau archive */}
+      {board?.archive && (
+        <div className="px-4 py-2.5 bg-ocre/15 flex items-center justify-between gap-3">
+          <span className="text-marine text-xs font-medium">
+            Ce tableau est archive.
+          </span>
+          {canArchiveBoard && (
+            <button
+              type="button"
+              onClick={handleToggleArchive}
+              className="shrink-0 text-marine text-xs font-semibold underline underline-offset-2"
+            >
+              Desarchiver
+            </button>
           )}
         </div>
-      </div>
+      )}
 
       {/* Liste de cartes */}
-      <div className="px-4 py-4 space-y-3">
-        {!loading && filteredCards.length === 0 && (
-          <div className="bg-carte rounded-card border border-border p-8 text-center">
-            <h2 className="text-h2 text-ink">
-              {filter === 'closes' ? 'Aucune carte close' : 'Aucune carte'}
-            </h2>
-            <p className="text-body-m text-muted mt-2">
-              {filter === 'closes'
-                ? 'Les cartes que vous clorez apparaitront ici.'
-                : canCreate
-                  ? 'Creez une premiere carte pour suivre un sujet.'
-                  : 'Aucune carte pour le moment.'}
+      <div className="bg-carte">
+        {loading && board && <BoardSkeleton />}
+
+        {!loading && cards.length === 0 && (
+          <EmptyBoard
+            boardColor={board?.couleur}
+            canCreateCard={canCreate}
+            onCreateCard={() => setCreateOpen(true)}
+          />
+        )}
+
+        {!loading && cards.length > 0 && filteredCards.length === 0 && (
+          <div className="py-12 px-6 text-center">
+            <p className="text-muted text-sm">
+              {filter === 'ouvertes'
+                ? 'Aucune carte ouverte.'
+                : 'Aucune carte close.'}
             </p>
           </div>
         )}
 
-        {filteredCards.map((card) => (
-          <CardTile key={card.id} card={card} />
-        ))}
+        {!loading && filteredCards.length > 0 && (
+          <ul className="divide-y divide-border">
+            {filteredCards.map((card) => (
+              <li key={card.id}>
+                <CardTile card={card} />
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {/* Modales */}

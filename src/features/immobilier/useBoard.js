@@ -132,6 +132,7 @@ export function useBoard(boardId) {
           ...c,
           lastMessage,
           unreadCount,
+          messagesCount: cardMessages.length,
         };
       });
 
