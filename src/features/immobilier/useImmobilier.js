@@ -39,7 +39,8 @@ export function useImmobilier({ showArchived = false } = {}) {
           last_activity_at,
           created_at,
           updated_at,
-          members:immobilier_board_members!board_id(user_id, last_read_at)
+          members:immobilier_board_members!board_id(user_id, last_read_at),
+          cards:immobilier_cards!board_id(id, statut)
         `)
         .eq('archive', showArchived)
         .order('last_activity_at', { ascending: false });
@@ -50,14 +51,21 @@ export function useImmobilier({ showArchived = false } = {}) {
         setError(err);
         setBoards([]);
       } else {
-        // Enrichissement : hasUnread = last_activity > my last_read_at
+        // Enrichissement :
+        // - hasUnread = last_activity > my last_read_at
+        // - openCardsCount = nombre de cartes statut 'ouvert' (hors archivees implicitement)
+        // - membersCount = nombre de membres du tableau
         const enriched = (data || []).map((b) => {
           const myMembership = (b.members || []).find((m) => m.user_id === userId);
           const lastReadAt = myMembership?.last_read_at;
           const hasUnread = lastReadAt
             ? new Date(b.last_activity_at) > new Date(lastReadAt)
             : true; // membre sans last_read_at -> considere comme non-lu
-          return { ...b, hasUnread };
+          const openCardsCount = (b.cards || []).filter(
+            (c) => c.statut === 'ouvert'
+          ).length;
+          const membersCount = (b.members || []).length;
+          return { ...b, hasUnread, openCardsCount, membersCount };
         });
         setBoards(enriched);
       }

@@ -599,14 +599,13 @@ Permissions dans `src/lib/permissions.js` : `canAccessImmobilier`, `canCreateImm
 
 - Décisions de cadrage validées en début d'étape 10 : architecture **copier-adapter** depuis `features/discussion/` (pas de partage de composants), tables séparées préfixées `immobilier_`, accent module **canard** (différent de Discussion qui est `brique`).
 - L'`associe` invité peut **créer/modifier ses propres cartes** (la matrice initiale lui donnait juste « commenter »). Arbitré pour pertinence métier.
-- **Cohérence visuelle avec Discussion à finaliser en étape 10D-2-bis** : à la fin de 10D-2c, les écrans Immobilier sont fonctionnellement complets mais leur rendu visuel diverge de Discussion (tiles de cartes, header de carte, bulles de chat, avatars). Un alignement de cohérence est planifié avant clôture définitive de l'étape 10. Ne pas y toucher avant.
+- **Alignement visuel sur Discussion** (étape 10D-2-bis, sous-étapes a → d) : les écrans Immobilier ont été réharmonisés sur les patterns Discussion tout en préservant trois spécificités assumées : accent module canard (au lieu de brique), déroulement horizontal des pièces jointes, sous-titre du tableau parent dans le header de la vue carte. Décision de portée : on a aligné les composants visuels uniquement ; les hooks Immobilier gardent la convention snake_case (français) au lieu de camelCase (anglais) de Discussion. Cette dette de nommage entre modules est notée pour l'étape 12 bis.
 
 #### Limitations connues
 
 - **Nouveau tableau créé par un autre utilisateur** : visible uniquement après rechargement de `/immobilier` (la table `immobilier_board_members` n'est pas dans la publication Realtime ; une fix simple — ajouter la table à la publication — pourra être faite ultérieurement si l'usage le justifie).
 - **Suppression de PJ orpheline** : si la suppression DB réussit mais que la suppression du blob Storage échoue, le blob reste dans le bucket (inaccessible, sans fuite de données). Stratégie best-effort identique à Cabinet pratique, SIM, Événements et Discussion.
 - **Pas de breadcrumb riche** sur la vue carte : juste « retour au tableau ». Cohérent avec le pattern Discussion 7C.
-- **Cohérence visuelle Immobilier ↔ Discussion** : voir « Écarts au plan initial » ci-dessus. À traiter en 10D-2-bis.
 
 ---
 
@@ -943,7 +942,7 @@ Le module Discussion est désormais complet (étapes 7A à 7D).
    - 9C : Page racine `/sim` — `Sim.jsx` avec garde d'accès et décoration par élément (calcul de `canEdit`/`canDelete`/`canMenu` par dossier et fichier), 6 composants `features/sim/` adaptés de Cabinet pratique (`DrivePage` avec props `subtitle` et `accent`, `NewFolderModal`, `UploadModal`, `ActionsMenu` qui masque les actions interdites, `RenameModal`, `DeleteConfirmModal`). Route `/sim` dans `App.jsx`, navigation de la tuile SIM ajoutée dans `Home.jsx`.
    - 9D : Navigation arborescente — page `SimFolder.jsx` (route `/sim/:id`) calquée sur `CabinetFolder.jsx`, breadcrumb 2 segments, redirection vers `/sim` si dossier introuvable, décoration par auteur identique à la racine.
    - 9G : Tests multi-rôles formels + mise à jour de la documentation.
-10. ✓ **Étape 10 — FAITE** (sous-étapes 10A → 10D, alignement visuel 10D-2-bis restant) — Module Immobilier
+10. ✓ **Étape 10 — FAITE** (sous-étapes 10A → 10D + alignement visuel 10D-2-bis) — Module Immobilier
     - 10A : Fondations SQL — 6 tables `immobilier_*`, 5 fonctions SECURITY DEFINER (`is_immobilier_member`, `is_immobilier_board_member`, `is_immobilier_board_owner`, `can_create_immobilier_board`, `mark_immobilier_board_read`), trigger auto-owner, RLS + 21 policies, bucket Storage `immobilier-attachments` (privé, 25 Mo), Realtime sur 4 tables, REPLICA IDENTITY FULL. Helpers permissions React + hook racine `useImmobilier`. Stub de route + tuile Home conditionnelle.
     - 10B : Page liste `/immobilier` (recherche, filtre Actifs/Archivés, tile cliquable) + modale création tableau (ColorPicker 6 swatches + MemberPicker filtré non-remplaçants).
     - 10C-1 : Vue tableau `/immobilier/:boardId` (header avec avatars, filtre Ouvertes/Closes/Toutes, CTA `+ Carte` teinté, CRUD cartes via modale d'édition légère).
@@ -953,7 +952,15 @@ Le module Discussion est désormais complet (étapes 7A à 7D).
     - 10D-2a : Pièces jointes — helper `immobilierStorage.js` (validation taille + types calqués sur Discussion 7D), `AttachmentChip` (preview ou download selon MIME), `CardAttachments` (chips horizontales scrollables, bouton d'ajout, suppression auteur uniquement, désactivés si carte close). REPLICA IDENTITY FULL ajouté pour propagation des DELETE en Realtime. Suppressions optimistes côté client pour latence perçue.
     - 10D-2b : Recherche globale `/recherche` étendue à Immobilier (tableaux + cartes) **et à Discussion** (rattrapage d'une dette annoncée en 7D). Affichage par sections (Médecins / Discussion / Immobilier) avec compteur. Normalisation des noms anglais Discussion vers le français côté affichage.
     - 10D-2c : Tests multi-rôles formels + mise à jour de la doc + clôture commit.
-    - 10D-2-bis : **Alignement visuel ciblé sur Discussion** (à faire) — réharmonisation tiles de carte, header de carte, bulles de chat, avatars de membres. Conservé du côté Immobilier : déroulement horizontal des pièces jointes (préférence utilisateur).
+    - 10D-2-bis : Alignement visuel sur Discussion en 4 sous-blocs :
+      - 10D-2-bis-a : fondations (correction signature helpers profileFormat, MemberAvatars utilise getAvatarPalette centralisé pour cohérence inter-modules — clé `${prenom} ${nom}`).
+      - 10D-2-bis-b1 : StatusBadge en dot+label sans fond ; immobilierColors expose les 5 classes (cta, bubble, tileBg, tileText, dot) au lieu de (bg, text, ring).
+      - 10D-2-bis-b2 : CardTile refondue (statut+titre+chevron+unread / aperçu / méta avec compteur messages et date), header de tableau en 3 lignes avec onglets et compteurs intégrés, EmptyBoard riche et BoardSkeleton.
+      - 10D-2-bis-c1 : header vue carte avec badge statut au-dessus du titre, composer avec bouton Send circulaire + spinner Loader2, plus d'alert() natif. **Fix collatéral** : `useCard.setCardStatus` avec mise à jour optimiste (corrige bug où le composer restait visible après clôture de carte).
+      - 10D-2-bis-c2 : refonte CardMessage (retrait avatar latéral, édition inline avec textarea dans la bulle, confirmation suppression inline en zone rouge, mention « modifié · 14:32 », menu actions en texte sous bulle, plus de prompt()/confirm()/alert() natifs). **Fix collatéral** : zone scrollable du fil sur `bg-carte` au lieu de `bg-fond` pour que les bulles `bg-fond` des autres ressortent.
+      - 10D-2-bis-c3 : finitions PJ (état vide explicite « Aucune piece jointe. » en italique, suppression via ConfirmModal au lieu de confirm() natif). Nettoyage similaire de la suppression de carte dans CardPage.
+      - 10D-2-bis-d : refonte de la page liste `/immobilier` (bouton + rond canard, sous-header « Mes tableaux · N » avec filtre Actifs/Archives discret, tile en item de liste avec icône bulle colorée, divide-y, état vide riche et skeleton). Ajout de `openCardsCount` et `membersCount` dans `useImmobilier`.
+    - Spécificités Immobilier préservées : accent canard, déroulement horizontal des PJ, sous-titre du tableau parent dans la vue carte.
 11. **Étape 11** — Page Profil personnelle + gestion `profiles_compta`
 12. **Étape 12** — Configuration PWA (manifest, service worker, icônes, page guide d'installation)
     - **Étape 12 bis — Alignement du design system** — passe de mise au standard DS des écrans antérieurs à l'étape 6.0, dans l'ordre : shell (Home, Login, navigation), puis Trombinoscope, puis Annuaire. Migration des radii (`rounded-card` / `rounded-input` / `rounded-tile`), des surfaces (`bg-carte` / `bg-fond`), des bordures (`border-border`), des ombres (`shadow-card` / `shadow-button`) et de la typographie (classes `.text-h1` / `.text-h2` / etc. en Archivo). À traiter écran par écran en petits lots testés. Voir « Limitations connues ».

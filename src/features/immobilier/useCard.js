@@ -158,6 +158,29 @@ export function useCard(cardId) {
     });
   }, [card]);
 
+  // ----- Changement de statut de la carte (ouvert <-> clos) -----
+  // Mise a jour optimiste : on update le state local immediatement pour
+  // que le composer / la RLS coté UI reflete le bon statut sans attendre
+  // que Realtime relaie l'UPDATE.
+  const setCardStatus = useCallback(async (nouveauStatut) => {
+    if (!card) return { error: new Error('Carte non chargee') };
+    if (nouveauStatut !== 'ouvert' && nouveauStatut !== 'clos') {
+      return { error: new Error('Statut invalide') };
+    }
+    const ancienStatut = card.statut;
+    // Optimiste : on update le state local d'abord
+    setCard((prev) => (prev ? { ...prev, statut: nouveauStatut } : prev));
+    const { error: err } = await supabase
+      .from('immobilier_cards')
+      .update({ statut: nouveauStatut })
+      .eq('id', card.id);
+    if (err) {
+      // Rollback en cas d'echec
+      setCard((prev) => (prev ? { ...prev, statut: ancienStatut } : prev));
+    }
+    return { error: err };
+  }, [card]);
+
   // ----- Envoi / edition / suppression de message -----
   const sendMessage = useCallback(
     async (contenu) => {
@@ -231,5 +254,6 @@ export function useCard(cardId) {
     editMessage,
     deleteMessage,
     deleteAttachment: deleteAttachmentFn,
+    setCardStatus,
   };
 }

@@ -64,6 +64,10 @@ export default function CardAttachments({
         Pieces jointes ({attachments?.length || 0})
       </h3>
 
+      {(!attachments || attachments.length === 0) && !cardClosed && (
+        <p className="text-faint text-sm italic mb-2">Aucune piece jointe.</p>
+      )}
+
       <div className="flex gap-2 overflow-x-auto pb-1">
         {attachments?.map((att) => (
           <AttachmentChip

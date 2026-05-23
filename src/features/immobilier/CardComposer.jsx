@@ -1,95 +1,96 @@
 // src/features/immobilier/CardComposer.jsx
-// Composer sticky en bas de la vue carte.
-// - Textarea autosizing (sans dependance externe : on calcule le scrollHeight)
-// - Entree = retour a la ligne (l'envoi se fait par bouton, pattern Discussion 7C)
-// - Bouton "Envoyer" desactive si vide ou en cours d'envoi
-// - Si carte close : composer remplace par une bande "lecture seule"
+// Zone de saisie d'un message, en bas de la vue carte.
+// Pattern aligne sur Discussion :
+// - Textarea auto-redimensionne (max 120px)
+// - Bouton Send circulaire teinte couleur tableau, avec Loader2 pendant envoi
+// - Si carte close : bandeau "lecture seule" remplace le composer
+// - Pas d'alert() en cas d'erreur : on garde le texte saisi, console.error suffit
 
-import { useEffect, useRef, useState } from 'react';
-import { Send } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Send, Loader2 } from 'lucide-react';
 import { getBoardColorClasses } from './immobilierColors';
 
-const MAX_HEIGHT = 120; // px
+const MAX_LENGTH = 2000;
 
 export default function CardComposer({
   onSend,
-  disabled = false,
   cardClosed = false,
   boardColor = 'canard',
 }) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const textareaRef = useRef(null);
-  const colors = getBoardColorClasses(boardColor);
-
-  // Autosizing
-  useEffect(() => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    ta.style.height = 'auto';
-    const newHeight = Math.min(ta.scrollHeight, MAX_HEIGHT);
-    ta.style.height = `${newHeight}px`;
-  }, [text]);
+  const accent = getBoardColorClasses(boardColor);
 
   if (cardClosed) {
     return (
-      <div className="sticky bottom-0 bg-fond border-t border-border
-                      px-4 py-3 text-center">
-        <p className="text-body-m text-muted italic">
+      <div className="px-4 py-3 bg-fond border-t border-border">
+        <p className="text-muted text-xs text-center">
           Cette carte est close — les messages sont en lecture seule.
         </p>
       </div>
     );
   }
 
-  const canSend = text.trim().length > 0 && !sending && !disabled;
+  function handleChange(e) {
+    setText(e.target.value.slice(0, MAX_LENGTH));
+    const el = e.target;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+  }
+
+  const trimmed = text.trim();
+  const canSend = trimmed.length > 0 && !sending;
 
   async function handleSend() {
     if (!canSend) return;
     setSending(true);
-    const valeur = text;
-    setText(''); // reset optimiste
-    const result = await onSend(valeur);
-    setSending(false);
-    if (result?.error) {
-      // Restituer le texte en cas d'echec
-      setText(valeur);
-      // eslint-disable-next-line no-alert
-      alert(`Erreur a l'envoi : ${result.error.message}`);
+    try {
+      const result = await onSend(trimmed);
+      if (result?.error) {
+        // On garde le texte saisi pour reessayer ; pas d'alert intrusif.
+        // eslint-disable-next-line no-console
+        console.error('[CardComposer] send error:', result.error);
+      } else {
+        setText('');
+        if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[CardComposer] send error:', err);
+    } finally {
+      setSending(false);
     }
   }
 
   return (
-    <div className="sticky bottom-0 bg-carte border-t border-border
-                    px-3 py-2">
-      <div className="flex items-end gap-2">
-        <textarea
-          ref={textareaRef}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Votre message..."
-          rows={1}
-          disabled={disabled || sending}
-          className="flex-1 px-3 py-2 bg-fond border border-border
-                     rounded-input text-body-m text-ink
-                     placeholder:text-faint resize-none
-                     focus:outline-none focus:ring-2 focus:ring-canard
-                     disabled:opacity-50"
-          style={{ maxHeight: `${MAX_HEIGHT}px` }}
-        />
-        <button
-          type="button"
-          onClick={handleSend}
-          disabled={!canSend}
-          className={`flex-shrink-0 p-2.5 ${colors.cta}
-                      rounded-input shadow-button
-                      disabled:opacity-40 disabled:cursor-not-allowed
-                      transition-opacity`}
-          aria-label="Envoyer"
-        >
-          <Send size={18} aria-hidden="true" />
-        </button>
-      </div>
+    <div className="px-3 py-2.5 bg-carte border-t border-border flex items-end gap-2">
+      <textarea
+        ref={textareaRef}
+        value={text}
+        onChange={handleChange}
+        rows={1}
+        placeholder="Ecrire un message..."
+        className="flex-1 px-3 py-2 rounded-2xl bg-fond border border-border
+                   text-marine text-sm placeholder:text-faint
+                   focus:outline-none focus:ring-2 focus:ring-canard/30
+                   resize-none max-h-[120px]"
+      />
+      <button
+        type="button"
+        onClick={handleSend}
+        disabled={!canSend}
+        aria-label="Envoyer le message"
+        className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center
+                    ${accent.cta} disabled:opacity-40 active:opacity-80
+                    transition-opacity`}
+      >
+        {sending ? (
+          <Loader2 className="w-4 h-4 animate-spin" strokeWidth={2.2} />
+        ) : (
+          <Send className="w-4 h-4" strokeWidth={2.2} />
+        )}
+      </button>
     </div>
   );
 }

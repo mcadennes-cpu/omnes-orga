@@ -10,7 +10,7 @@
 
 import { useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Filter, MessageSquare, MessageSquarePlus, Users } from 'lucide-react';
 import AppLayout from '../components/layout/AppLayout';
 import { useRole } from '../hooks/useRole';
 import {
@@ -21,6 +21,7 @@ import { normalizeForSearch } from '../lib/profileFormat';
 import { useImmobilier } from '../features/immobilier/useImmobilier';
 import ImmobilierBoardTile from '../features/immobilier/ImmobilierBoardTile';
 import CreateBoardModal from '../features/immobilier/CreateBoardModal';
+import { getBoardColorClasses } from '../features/immobilier/immobilierColors';
 
 export default function Immobilier() {
   const { role, loading: roleLoading } = useRole();
@@ -63,100 +64,92 @@ export default function Immobilier() {
   return (
     <AppLayout>
       {/* Header sticky */}
-      <div className="sticky top-0 z-10 bg-fond border-b border-border">
-        <div className="px-4 pt-4 pb-3">
-          <div className="flex items-center justify-between">
-            <h1 className="text-h1 text-canard">Immobilier</h1>
-            {canCreate && (
-              <button
-                type="button"
-                className="inline-flex items-center gap-1.5 px-3 py-2
-                           bg-canard text-white text-button rounded-input
-                           shadow-button"
-                onClick={() => setCreateOpen(true)}
-                aria-label="Nouveau tableau"
-              >
-                <Plus size={18} aria-hidden="true" />
-                <span>Nouveau</span>
-              </button>
-            )}
-          </div>
+      <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border">
+        <div className="flex items-center justify-between px-4 py-3">
+          <h1 className="font-display font-extrabold text-marine text-2xl">
+            Immobilier
+          </h1>
+          {canCreate && (
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              aria-label="Creer un tableau"
+              className="w-9 h-9 rounded-full bg-canard text-white
+                         flex items-center justify-center
+                         active:opacity-80 transition-opacity"
+            >
+              <Plus className="w-5 h-5" strokeWidth={2.2} />
+            </button>
+          )}
+        </div>
 
-          {/* Barre de recherche */}
-          <div className="relative mt-3">
+        {/* Barre de recherche */}
+        <div className="px-4 pb-3">
+          <div className="relative">
             <Search
-              size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-faint"
-              aria-hidden="true"
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4
+                         text-faint pointer-events-none"
+              strokeWidth={1.8}
             />
             <input
-              type="text"
+              type="search"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Rechercher un tableau..."
-              className="w-full pl-10 pr-3 py-2 bg-carte border border-border
-                         rounded-input text-body-m text-ink
-                         placeholder:text-faint
-                         focus:outline-none focus:ring-2 focus:ring-canard"
+              className="w-full pl-9 pr-3 py-2.5 rounded-input bg-carte border
+                         border-border text-marine text-sm placeholder:text-faint
+                         focus:outline-none focus:ring-2 focus:ring-canard/30"
             />
           </div>
-
-          {/* Filtre segmente Actifs / Archives */}
-          <div className="mt-3 inline-flex bg-carte rounded-pill p-1 border border-border">
-            <button
-              type="button"
-              onClick={() => setShowArchived(false)}
-              className={`px-3 py-1 text-button rounded-pill transition-colors ${
-                !showArchived
-                  ? 'bg-marine text-white'
-                  : 'text-muted'
-              }`}
-            >
-              Actifs
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowArchived(true)}
-              className={`px-3 py-1 text-button rounded-pill transition-colors ${
-                showArchived
-                  ? 'bg-marine text-white'
-                  : 'text-muted'
-              }`}
-            >
-              Archives
-            </button>
-          </div>
         </div>
+      </header>
+
+      {/* Sous-header : compteur + filtre */}
+      <div className="flex items-center justify-between px-4 py-2.5
+                      text-muted text-xs uppercase tracking-wider">
+        <span className="font-semibold">
+          Mes tableaux
+          {filteredBoards.length > 0 && (
+            <span className="text-faint"> · {filteredBoards.length}</span>
+          )}
+        </span>
+        <button
+          type="button"
+          onClick={() => setShowArchived((v) => !v)}
+          className="inline-flex items-center gap-1 text-muted
+                     hover:text-marine transition-colors"
+        >
+          <Filter className="w-3.5 h-3.5" strokeWidth={1.8} />
+          {showArchived ? 'Archives' : 'Actifs'}
+        </button>
       </div>
 
       {/* Contenu */}
-      <div className="px-4 py-4 space-y-3">
-        {error && (
-          <div className="bg-carte border border-brique rounded-card p-4">
-            <p className="text-body-m text-brique">
-              Erreur de chargement : {error.message}
+      <div className="flex-1 bg-carte">
+        {error ? (
+          <div className="px-4 py-8 text-center">
+            <p className="text-muted text-sm mb-3">
+              Impossible de charger les tableaux.
             </p>
+            <p className="text-faint text-xs">{error.message}</p>
           </div>
-        )}
-
-        {loading && !error && (
-          <ListSkeleton />
-        )}
-
-        {!loading && !error && filteredBoards.length === 0 && (
+        ) : loading ? (
+          <LoadingSkeleton />
+        ) : filteredBoards.length === 0 ? (
           <EmptyState
-            showArchived={showArchived}
-            hasSearch={searchTerm.trim().length > 0}
             canCreate={canCreate}
+            onCreate={() => setCreateOpen(true)}
+            archivedView={showArchived}
+            hasSearch={Boolean(searchTerm.trim())}
           />
-        )}
-
-        {!loading && !error && filteredBoards.length > 0 && (
-          <div className="space-y-3">
+        ) : (
+          <ul className="divide-y divide-border">
             {filteredBoards.map((board) => (
-              <ImmobilierBoardTile key={board.id} board={board} />
+              <li key={board.id}>
+                <ImmobilierBoardTile board={board} />
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </div>
 
@@ -170,41 +163,66 @@ export default function Immobilier() {
 
 // ---------- Sous-composants locaux ----------
 
-function ListSkeleton() {
+function LoadingSkeleton() {
   return (
-    <div className="space-y-3" aria-label="Chargement">
+    <div className="px-4 py-3 space-y-3" aria-hidden>
       {[0, 1, 2].map((i) => (
-        <div
-          key={i}
-          className="bg-carte rounded-card border border-border h-20
-                     animate-pulse"
-        />
+        <div key={i} className="flex items-center gap-3 animate-pulse">
+          <div className="w-11 h-11 rounded-tile bg-border" />
+          <div className="flex-1 space-y-2">
+            <div className="h-3 bg-border rounded-full w-2/3" />
+            <div className="h-2.5 bg-border/60 rounded-full w-1/3" />
+          </div>
+        </div>
       ))}
     </div>
   );
 }
 
-function EmptyState({ showArchived, hasSearch, canCreate }) {
-  let title;
-  let body;
-
+function EmptyState({ canCreate, onCreate, archivedView, hasSearch }) {
   if (hasSearch) {
-    title = 'Aucun resultat';
-    body = 'Aucun tableau ne correspond a votre recherche.';
-  } else if (showArchived) {
-    title = 'Aucun tableau archive';
-    body = 'Les tableaux que vous archivez apparaitront ici.';
-  } else {
-    title = 'Aucun tableau';
-    body = canCreate
-      ? 'Creez un premier tableau pour suivre un projet immobilier.'
-      : 'Vous n\'avez ete invite a aucun tableau pour le moment.';
+    return (
+      <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+        <p className="text-muted text-sm">
+          Aucun tableau ne correspond a votre recherche.
+        </p>
+      </div>
+    );
+  }
+
+  if (archivedView) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+        <p className="text-muted text-sm">Aucun tableau archive.</p>
+      </div>
+    );
   }
 
   return (
-    <div className="bg-carte rounded-card border border-border p-8 text-center">
-      <h2 className="text-h2 text-ink">{title}</h2>
-      <p className="text-body-m text-muted mt-2">{body}</p>
+    <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+      <div className="w-14 h-14 rounded-tile bg-canard/15 flex items-center justify-center mb-4">
+        <MessageSquarePlus className="w-7 h-7 text-canard" strokeWidth={1.8} />
+      </div>
+      <h2 className="font-display font-extrabold text-marine text-lg mb-2">
+        Aucun tableau pour l'instant
+      </h2>
+      <p className="text-muted text-sm max-w-xs mb-5">
+        {canCreate
+          ? 'Creez un tableau pour rassembler les decisions d\'un projet immobilier : achat, travaux, bail...'
+          : 'Vous serez invite dans un tableau par un associe ou un gerant pour participer aux decisions.'}
+      </p>
+      {canCreate && (
+        <button
+          type="button"
+          onClick={onCreate}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full
+                     bg-canard text-white font-semibold text-sm
+                     active:opacity-80 transition-opacity"
+        >
+          <Plus className="w-4 h-4" strokeWidth={2.2} />
+          Creer un tableau
+        </button>
+      )}
     </div>
   );
 }

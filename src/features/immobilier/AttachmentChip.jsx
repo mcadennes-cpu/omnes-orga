@@ -21,6 +21,7 @@ import {
   formatBytes,
   fileTypeCategory,
 } from './immobilierStorage';
+import ConfirmModal from '../../components/ConfirmModal';
 
 const ICON_BY_CATEGORY = {
   image: ImageIcon,
@@ -38,6 +39,7 @@ export default function AttachmentChip({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const Icon = ICON_BY_CATEGORY[fileTypeCategory(attachment.mime_type)] || Paperclip;
 
@@ -54,18 +56,23 @@ export default function AttachmentChip({
     }
   }
 
-  async function handleDelete(e) {
+  function handleDeleteClick(e) {
     e.stopPropagation();
     if (busy) return;
-    // eslint-disable-next-line no-alert
-    if (!confirm(`Supprimer la piece jointe "${attachment.nom}" ?`)) return;
+    setConfirmOpen(true);
+  }
+
+  async function handleConfirmDelete() {
     setBusy(true);
     setError(null);
     try {
       const { error: err } = await onDelete(attachment.id);
       if (err) throw err;
+      setConfirmOpen(false);
     } catch (err) {
       setError(err);
+      setConfirmOpen(false);
+      throw err; // propager pour que ConfirmModal puisse afficher son erreur interne
     } finally {
       setBusy(false);
     }
@@ -103,7 +110,7 @@ export default function AttachmentChip({
         {canDelete && (
           <button
             type="button"
-            onClick={handleDelete}
+            onClick={handleDeleteClick}
             disabled={busy}
             className="p-1 text-muted hover:text-brique
                        rounded-pill hover:bg-brique/10
@@ -119,6 +126,16 @@ export default function AttachmentChip({
           {error.message}
         </p>
       )}
+      <ConfirmModal
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title="Supprimer la piece jointe ?"
+        message={`Vous etes sur le point de supprimer "${attachment.nom}". Cette action est definitive.`}
+        confirmLabel="Supprimer"
+        cancelLabel="Annuler"
+        danger
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 }
