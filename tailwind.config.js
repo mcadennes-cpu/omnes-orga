@@ -8,12 +8,13 @@ export default {
     extend: {
       colors: {
         // Couleurs principales (extraites du logo Omnès Médecins)
-        marine:  '#1C3D52',
-        canard:  '#2A8FA8',
-        ocre:    '#E8A135',
-        olive:   '#6B7A3A',
-        brique:  '#D4503A',
-        fuchsia: '#D94F7E',
+        marine:    '#1C3D52',
+        canard:    '#2A8FA8',
+        ocre:      '#E8A135',
+        'ocre-fonce': '#A06A0E',
+        olive:     '#6B7A3A',
+        brique:    '#D4503A',
+        fuchsia:   '#D94F7E',
 
         // Couleurs neutres
         fond:  '#F5F7F9',

@@ -8,7 +8,7 @@
 const SOFT_VARIANTS = {
   marine: 'bg-marine/10 text-marine',
   canard: 'bg-canard/15 text-canard',
-  ocre: 'bg-ocre/15 text-ocre',
+  ocre: 'bg-ocre/15 text-ocre-fonce',
   olive: 'bg-olive/15 text-olive',
   brique: 'bg-brique/10 text-brique',
   fuchsia: 'bg-fuchsia/15 text-fuchsia',
