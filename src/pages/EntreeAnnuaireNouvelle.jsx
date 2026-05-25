@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ChevronLeft } from 'lucide-react'
 import AppLayout from '../components/layout/AppLayout'
 import EntreeAnnuaireForm from '../components/annuaire/EntreeAnnuaireForm'
 import { supabase } from '../lib/supabaseClient'
@@ -69,21 +69,23 @@ export default function EntreeAnnuaireNouvelle() {
 
   return (
     <AppLayout>
-      <header className="flex items-center gap-3 px-5 pt-6 pb-4">
-        <button
-          type="button"
-          onClick={handleCancel}
-          aria-label="Retour à l'annuaire"
-          className="h-10 w-10 flex items-center justify-center rounded-full text-marine hover:bg-marine/5"
-        >
-          <ArrowLeft size={22} strokeWidth={2} />
-        </button>
-        <h1 className="font-display font-extrabold text-2xl text-marine truncate">
-          Nouvelle entrée
-        </h1>
+      <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border">
+        <div className="flex items-center gap-2 px-4 py-3">
+          <button
+            type="button"
+            onClick={handleCancel}
+            aria-label="Retour à l'annuaire"
+            className="h-9 w-9 flex items-center justify-center rounded-full shrink-0"
+          >
+            <ChevronLeft size={20} strokeWidth={2} className="text-marine" />
+          </button>
+          <h1 className="flex-1 text-h1 text-marine truncate">
+            Nouvelle entrée
+          </h1>
+        </div>
       </header>
 
-      <div className="px-5 pt-2">
+      <div className="px-4 pt-6 pb-8">
         <EntreeAnnuaireForm
           existingCategories={existingCategories}
           onSubmit={handleSubmit}
