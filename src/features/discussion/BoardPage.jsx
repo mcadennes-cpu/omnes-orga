@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { ArrowLeft, Plus, MessageSquarePlus } from 'lucide-react'
+import { ChevronLeft, Plus, MessageSquarePlus } from 'lucide-react'
 import CardListItem from './CardListItem'
 import MemberAvatars from './MemberAvatars'
 import { getBoardColorClasses } from './boardColors'
@@ -64,7 +64,7 @@ export default function BoardPage({
             aria-label="Retour à la liste des tableaux"
             className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-marine hover:bg-marine/5 active:bg-marine/5 transition-colors"
           >
-            <ArrowLeft className="w-5 h-5" strokeWidth={2} />
+            <ChevronLeft className="w-5 h-5" strokeWidth={2} />
           </button>
           <h1 className="flex-1 min-w-0 truncate font-display font-extrabold text-marine text-xl">
             {board?.title}

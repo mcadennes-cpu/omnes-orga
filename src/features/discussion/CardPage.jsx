@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { ArrowLeft, ChevronDown } from 'lucide-react'
+import { ChevronLeft, ChevronDown } from 'lucide-react'
 import StatusBadge from './StatusBadge'
 import CardActionsMenu from './CardActionsMenu'
 import CardMessage from './CardMessage'
@@ -75,7 +75,7 @@ export default function CardPage({
             aria-label="Retour au tableau"
             className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-marine hover:bg-marine/5 active:bg-marine/5 transition-colors"
           >
-            <ArrowLeft className="w-5 h-5" strokeWidth={2} />
+            <ChevronLeft className="w-5 h-5" strokeWidth={2} />
           </button>
           <div className="flex-1 min-w-0 pt-1">
             <StatusBadge status={card.status} />

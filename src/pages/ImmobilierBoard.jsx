@@ -9,7 +9,7 @@
 
 import { useMemo, useState } from 'react';
 import { useParams, Navigate, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, MoreVertical } from 'lucide-react';
+import { ChevronLeft, Plus, MoreVertical } from 'lucide-react';
 import AppLayout from '../components/layout/AppLayout';
 import { useAuth } from '../hooks/useAuth';
 import { useRole } from '../hooks/useRole';
@@ -179,7 +179,7 @@ export default function ImmobilierBoard() {
                            justify-center text-marine hover:bg-marine/5
                            active:bg-marine/5 transition-colors"
               >
-                <ArrowLeft className="w-5 h-5" strokeWidth={2} />
+                <ChevronLeft className="w-5 h-5" strokeWidth={2} />
               </Link>
               <h1 className="flex-1 min-w-0 truncate font-display font-extrabold
                              text-marine text-xl">

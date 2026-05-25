@@ -10,7 +10,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, ChevronUp, MoreVertical } from 'lucide-react';
+import { ChevronLeft, ChevronDown, ChevronUp, MoreVertical } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../hooks/useAuth';
 import { useRole } from '../../hooks/useRole';
@@ -171,7 +171,7 @@ export default function CardPage({ boardId, cardId }) {
                        justify-center text-marine hover:bg-marine/5
                        active:bg-marine/5 transition-colors"
           >
-            <ArrowLeft className="w-5 h-5" strokeWidth={2} />
+            <ChevronLeft className="w-5 h-5" strokeWidth={2} />
           </button>
           <div className="flex-1 min-w-0 pt-1">
             <StatusBadge statut={card.statut} />
