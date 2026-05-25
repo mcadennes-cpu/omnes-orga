@@ -10,7 +10,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Search, MessageSquare, Building2 } from 'lucide-react'
+import { ChevronLeft, Search, MessageSquare, Building2 } from 'lucide-react'
 import AppLayout from '../components/layout/AppLayout'
 import MedecinCard from '../components/trombinoscope/MedecinCard'
 import { useMedecins } from '../hooks/useMedecins'
@@ -149,7 +149,7 @@ export default function Recherche() {
           aria-label="Retour à l'accueil"
           className="h-10 w-10 flex items-center justify-center rounded-full text-marine hover:bg-marine/5"
         >
-          <ArrowLeft size={22} strokeWidth={2} />
+          <ChevronLeft size={22} strokeWidth={2} />
         </button>
         <h1 className="font-display font-extrabold text-2xl text-marine">
           Rechercher
