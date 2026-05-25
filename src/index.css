@@ -45,3 +45,25 @@
 body {
   @apply bg-fond text-ink font-sans;
 }
+
+/* Masquer la scrollbar des conteneurs scrollables horizontaux (pills catégorie) */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Masquer le bouton clear natif des inputs type="search" (Safari, Chrome, IE) */
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+input[type="search"]::-ms-clear,
+input[type="search"]::-ms-reveal {
+  display: none;
+  width: 0;
+  height: 0;
+}
