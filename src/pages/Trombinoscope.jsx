@@ -44,7 +44,7 @@ export default function Trombinoscope() {
         )}
 
         {/* Contenu */}
-        <div className="flex-1 bg-carte px-4 py-3">
+        <div className="flex-1 px-4 py-3">
           {loading && <TrombiSkeleton />}
 
           {!loading && error && (
