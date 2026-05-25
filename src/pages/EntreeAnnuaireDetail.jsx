@@ -4,6 +4,7 @@ import { ChevronLeft, Phone, Mail, User, Calendar, Pencil } from 'lucide-react'
 import AppLayout from '../components/layout/AppLayout'
 import EntreeAnnuaireForm from '../components/annuaire/EntreeAnnuaireForm'
 import Pill from '../components/common/Pill'
+import ConfirmDialog from '../components/common/ConfirmDialog'
 import { supabase } from '../lib/supabaseClient'
 import { useEntreeAnnuaire } from '../hooks/useEntreeAnnuaire'
 import { useEntreesAnnuaire } from '../hooks/useEntreesAnnuaire'
@@ -11,6 +12,7 @@ import { useRole } from '../hooks/useRole'
 import { useAuth } from '../hooks/useAuth'
 import {
   canEditEntreeAnnuaire,
+  canDeleteEntreeAnnuaire,
 } from '../lib/permissions'
 
 function formatDateFR(iso) {
@@ -51,6 +53,8 @@ export default function EntreeAnnuaireDetail() {
   const [mode, setMode] = useState('view')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState(null)
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false)
 
   const existingCategories = useMemo(() => {
     const set = new Set(
@@ -62,6 +66,11 @@ export default function EntreeAnnuaireDetail() {
   }, [allEntrees])
 
   const canEdit = canEditEntreeAnnuaire({
+    role,
+    currentUserId: user?.id,
+    auteurId: entree?.auteur_id,
+  })
+  const canDelete = canDeleteEntreeAnnuaire({
     role,
     currentUserId: user?.id,
     auteurId: entree?.auteur_id,
@@ -94,6 +103,20 @@ export default function EntreeAnnuaireDetail() {
     }
     refetch()
     setMode('view')
+  }
+
+  async function handleDelete() {
+    if (!entree?.id) return
+    setDeleteSubmitting(true)
+    const { error: deleteError } = await supabase
+      .from('annuaire')
+      .delete()
+      .eq('id', entree.id)
+    setDeleteSubmitting(false)
+    setConfirmDeleteOpen(false)
+    if (!deleteError) {
+      navigate('/annuaire')
+    }
   }
 
   const hasContact = entree?.telephone || entree?.email
@@ -153,6 +176,8 @@ export default function EntreeAnnuaireDetail() {
             onCancel={handleCancel}
             submitting={submitting}
             error={submitError}
+            canDelete={canDelete}
+            onDelete={() => setConfirmDeleteOpen(true)}
           />
         )}
 
@@ -278,6 +303,19 @@ export default function EntreeAnnuaireDetail() {
           </div>
         )}
       </div>
+
+      {entree && (
+        <ConfirmDialog
+          open={confirmDeleteOpen}
+          title="Supprimer cette entrée ?"
+          message="Cette action est irréversible. L'entrée sera supprimée de l'annuaire pour tous les utilisateurs."
+          confirmLabel="Supprimer"
+          confirmVariant="danger"
+          onConfirm={handleDelete}
+          onCancel={() => setConfirmDeleteOpen(false)}
+          submitting={deleteSubmitting}
+        />
+      )}
     </AppLayout>
   )
 }

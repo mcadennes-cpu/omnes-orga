@@ -90,6 +90,7 @@ export default function EntreeAnnuaireNouvelle() {
           onCancel={handleCancel}
           submitting={submitting}
           error={submitError}
+          isNew={true}
         />
       </div>
     </AppLayout>
