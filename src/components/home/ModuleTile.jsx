@@ -30,10 +30,10 @@ export default function ModuleTile({
     <button
       type="button"
       onClick={onClick}
-      className={`relative aspect-square w-full rounded-tile p-[14px] text-left transition-opacity hover:opacity-95 active:opacity-90 ${bgClass}`}
+      className={`relative aspect-square w-full rounded-tile p-[14px] text-left shadow-tile transition-opacity hover:opacity-95 active:opacity-90 ${bgClass}`}
     >
       <div
-        className="flex h-[30px] w-[30px] items-center justify-center rounded-[10px]"
+        className="absolute left-[14px] top-[14px] flex h-[30px] w-[30px] items-center justify-center rounded-[10px]"
         style={{ backgroundColor: 'rgba(255,255,255,0.18)' }}
       >
         {Icon && <Icon size={18} className="text-white" strokeWidth={2} />}
