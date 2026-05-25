@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Phone, Calendar, Mail } from 'lucide-react'
+import { ChevronLeft, Phone, Mail, Calendar, Pencil, ShieldOff, ShieldCheck } from 'lucide-react'
 import AppLayout from '../components/layout/AppLayout'
 import MedecinForm from '../components/trombinoscope/MedecinForm'
 import ConfirmDialog from '../components/common/ConfirmDialog'
+import Pill from '../components/common/Pill'
 import { supabase } from '../lib/supabaseClient'
 import { useMedecin } from '../hooks/useMedecin'
 import { useRole } from '../hooks/useRole'
@@ -40,7 +41,9 @@ export default function MedecinDetail() {
     ? [medecin.prenom, medecin.nom].filter(Boolean).join(' ').trim()
     : ''
   const initials = medecin ? getInitials(medecin.prenom, medecin.nom) : '?'
-  const avatar = getAvatarPalette(medecin ? `${medecin.prenom} ${medecin.nom}` : null)
+  const avatar = getAvatarPalette(
+    medecin ? `${medecin.prenom} ${medecin.nom}` : null
+  )
 
   const canEdit = canEditMedecin({
     role,
@@ -83,7 +86,7 @@ export default function MedecinDetail() {
       setSubmitError(
         updateError.message
           ? `Erreur : ${updateError.message}`
-          : 'Impossible d\'enregistrer les modifications.'
+          : "Impossible d'enregistrer les modifications."
       )
       return
     }
@@ -105,49 +108,58 @@ export default function MedecinDetail() {
     if (!toggleError) refetch()
   }
 
+  const roleLabel = medecin?.role ? ROLE_LABELS[medecin.role] ?? medecin.role : null
+
   return (
     <AppLayout>
-      <header className="flex items-center gap-3 px-5 pt-6 pb-4">
-        <button
-          type="button"
-          onClick={() => {
-            if (mode === 'edit') {
-              handleCancel()
-              return
-            }
-            navigate('/trombinoscope')
-          }}
-          aria-label={mode === 'edit' ? 'Annuler la modification' : 'Retour au trombinoscope'}
-          className="h-10 w-10 flex items-center justify-center rounded-full text-marine hover:bg-marine/5"
-        >
-          <ArrowLeft size={22} strokeWidth={2} />
-        </button>
-        <h1 className="font-display font-extrabold text-2xl text-marine truncate">
-          {loading
-            ? 'Chargement…'
-            : mode === 'edit'
-            ? 'Modifier la fiche'
-            : fullName || 'Fiche médecin'}
-        </h1>
+      {/* Header sticky */}
+      <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border">
+        <div className="flex items-center gap-2 px-4 py-3">
+          <button
+            type="button"
+            onClick={() => {
+              if (mode === 'edit') {
+                handleCancel()
+                return
+              }
+              navigate('/trombinoscope')
+            }}
+            aria-label={mode === 'edit' ? 'Annuler la modification' : 'Retour au trombinoscope'}
+            className="h-9 w-9 flex items-center justify-center rounded-full shrink-0"
+          >
+            <ChevronLeft size={20} strokeWidth={2} className="text-marine" />
+          </button>
+          <h1 className="flex-1 text-h1 text-marine truncate">
+            {loading
+              ? 'Chargement…'
+              : mode === 'edit'
+              ? 'Modifier la fiche'
+              : fullName || 'Fiche médecin'}
+          </h1>
+        </div>
       </header>
 
-      <div className="px-5 pt-2">
+      <div className="px-4 pt-6 pb-8">
+        {/* Loading */}
         {loading && (
           <p className="text-center text-muted py-12">Chargement…</p>
         )}
 
+        {/* Error */}
         {!loading && error && (
           <p className="text-center text-brique py-12">
             Impossible de charger la fiche.
           </p>
         )}
 
+        {/* Not found */}
         {!loading && !error && !medecin && (
           <p className="text-center text-muted py-12">
             Médecin introuvable.
           </p>
         )}
 
+        {/* Edit mode : passe au formulaire (geometrie inchangee, sera refondu en trombi-d) */}
         {!loading && !error && medecin && mode === 'edit' && (
           <MedecinForm
             initialValues={medecin}
@@ -159,89 +171,121 @@ export default function MedecinDetail() {
           />
         )}
 
+        {/* View mode : nouvelle UI variante A */}
         {!loading && !error && medecin && mode === 'view' && (
-          <article className="bg-carte border border-border rounded-card p-5 flex flex-col gap-4">
-            <div className="flex items-start gap-4">
+          <div className="flex flex-col gap-6">
+            {/* Identite centree : photo + nom + role + statut */}
+            <div className="flex flex-col items-center gap-3 pt-2">
               {medecin.photo_url ? (
                 <img
                   src={medecin.photo_url}
                   alt={fullName}
-                  className="h-20 w-20 rounded-full object-cover flex-shrink-0"
+                  className="h-[108px] w-[108px] rounded-full object-cover"
                 />
               ) : (
                 <div
                   aria-hidden="true"
-                  className={`h-20 w-20 rounded-full ${avatar.bg} ${avatar.text} font-bold text-2xl flex items-center justify-center flex-shrink-0`}
+                  className={`h-[108px] w-[108px] rounded-full ${avatar.bg} ${avatar.text} font-display font-extrabold text-[38px] flex items-center justify-center`}
                 >
                   {initials}
                 </div>
               )}
-
-              <div className="min-w-0 flex-1">
-                <h2 className="font-display font-bold text-xl text-marine break-words">
+              <div className="text-center">
+                <h2 className="font-display font-extrabold text-marine text-[22px] tracking-[-0.01em] break-words">
                   {fullName}
                 </h2>
                 {medecin.specialite && (
-                  <p className="text-sm text-muted break-words mt-0.5">
+                  <p className="mt-1 text-body-m text-muted break-words">
                     {medecin.specialite}
                   </p>
                 )}
-                {medecin.role && (
-                  <p className="mt-2 inline-block text-xs font-semibold text-marine bg-marine/10 px-2 py-0.5 rounded-full">
-                    {ROLE_LABELS[medecin.role] ?? medecin.role}
-                  </p>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap justify-center">
+                {roleLabel && (
+                  <Pill color="canard" variant="soft" size="sm">
+                    {roleLabel}
+                  </Pill>
                 )}
                 {!medecin.actif && (
-                  <p className="mt-2 ml-2 inline-block text-xs font-semibold text-brique bg-brique/10 px-2 py-0.5 rounded-full">
+                  <Pill color="brique" variant="soft" size="sm">
                     Désactivé
-                  </p>
+                  </Pill>
                 )}
               </div>
             </div>
 
-            <div className="flex flex-col gap-2 border-t border-border pt-4">
-              {medecin.email && (
-                <p className="text-sm text-ink flex items-center gap-2 break-words">
-                  <Mail size={14} strokeWidth={1.8} className="text-canard flex-shrink-0" />
-                  <span className="break-all">{medecin.email}</span>
-                </p>
-              )}
-              {medecin.telephone && (
-                <a
-                  href={`tel:${medecin.telephone.replace(/\s/g, '')}`}
-                  className="text-sm text-ink flex items-center gap-2 hover:text-canard transition-colors"
-                >
-                  <Phone size={14} strokeWidth={1.8} className="text-canard flex-shrink-0" />
-                  <span>{medecin.telephone}</span>
-                </a>
-              )}
-              {showSensitive && medecin.jours_disponibles && (
-                <p className="text-sm text-ink flex items-center gap-2">
-                  <Calendar size={14} strokeWidth={1.8} className="text-canard flex-shrink-0" />
-                  <span className="break-words">{medecin.jours_disponibles}</span>
-                </p>
-              )}
-            </div>
-
-            {showSensitive && medecin.notes_internes && medecin.notes_internes.trim() !== '' && (
-              <div className="border-t border-border pt-4">
-                <p className="text-xs font-semibold text-muted uppercase tracking-wide mb-1">
-                  Notes internes
-                </p>
-                <p className="text-sm italic text-ink bg-marine/5 rounded-lg p-3 break-words">
-                  {medecin.notes_internes}
-                </p>
+            {/* Section Contact */}
+            <Section title="Contact">
+              <div className="bg-carte border border-border rounded-card shadow-card overflow-hidden">
+                {medecin.telephone && (
+                  <>
+                    <ContactRow
+                      icon={Phone}
+                      label="Téléphone"
+                      value={medecin.telephone}
+                      href={`tel:${medecin.telephone.replace(/\s/g, '')}`}
+                    />
+                    {medecin.email && (
+                      <div className="h-px bg-border ml-[62px]" />
+                    )}
+                  </>
+                )}
+                {medecin.email && (
+                  <ContactRow
+                    icon={Mail}
+                    label="E-mail"
+                    value={medecin.email}
+                    href={`mailto:${medecin.email}`}
+                    multiline
+                  />
+                )}
               </div>
+            </Section>
+
+            {/* Section Disponibilites */}
+            {showSensitive && medecin.jours_disponibles && (
+              <Section title="Disponibilités">
+                <div className="bg-carte border border-border rounded-card shadow-card px-4 py-3.5 flex items-center gap-3">
+                  <span
+                    className="h-9 w-9 rounded-pill flex items-center justify-center shrink-0"
+                    style={{ backgroundColor: 'rgba(42,143,168,0.10)' }}
+                  >
+                    <Calendar size={18} strokeWidth={1.8} className="text-canard" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-field-label">Jours présents</p>
+                    <p className="text-body-l font-medium text-marine mt-0.5 break-words">
+                      {medecin.jours_disponibles}
+                    </p>
+                  </div>
+                </div>
+              </Section>
             )}
 
+            {/* Section Notes internes */}
+            {showSensitive &&
+              medecin.notes_internes &&
+              medecin.notes_internes.trim() !== '' && (
+                <Section title="Notes internes">
+                  <div
+                    className="rounded-card px-4 py-3.5 text-body-m italic text-marine leading-relaxed break-words"
+                    style={{ backgroundColor: 'rgba(28,61,82,0.04)' }}
+                  >
+                    {medecin.notes_internes}
+                  </div>
+                </Section>
+              )}
+
+            {/* Actions bar */}
             {(canEdit || canToggle) && (
-              <div className="border-t border-border pt-4 flex flex-col gap-2">
+              <div className="flex gap-2.5 pt-2">
                 {canEdit && (
                   <button
                     type="button"
                     onClick={() => setMode('edit')}
-                    className="h-12 w-full rounded-input bg-marine font-semibold text-white hover:bg-marine/90 transition-colors"
+                    className="flex-1 h-12 rounded-input bg-marine text-white text-button shadow-button flex items-center justify-center gap-2"
                   >
+                    <Pencil size={16} strokeWidth={2} />
                     Modifier
                   </button>
                 )}
@@ -249,18 +293,26 @@ export default function MedecinDetail() {
                   <button
                     type="button"
                     onClick={() => setConfirmOpen(true)}
-                    className={`h-12 w-full rounded-input font-semibold transition-colors ${
-                      medecin.actif
-                        ? 'bg-brique/10 text-brique hover:bg-brique/20'
-                        : 'bg-olive/10 text-olive hover:bg-olive/20'
+                    className={`flex-1 h-12 rounded-input bg-carte border border-border text-button flex items-center justify-center gap-2 ${
+                      medecin.actif ? 'text-brique' : 'text-olive'
                     }`}
                   >
-                    {medecin.actif ? 'Désactiver' : 'Réactiver'}
+                    {medecin.actif ? (
+                      <>
+                        <ShieldOff size={16} strokeWidth={2} />
+                        Désactiver
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck size={16} strokeWidth={2} />
+                        Réactiver
+                      </>
+                    )}
                   </button>
                 )}
               </div>
             )}
-          </article>
+          </div>
         )}
       </div>
 
@@ -281,5 +333,41 @@ export default function MedecinDetail() {
         />
       )}
     </AppLayout>
+  )
+}
+
+// ----------------------------------------------------------------------------
+// Sous-composants locaux : Section, ContactRow
+// ----------------------------------------------------------------------------
+
+function Section({ title, children }) {
+  return (
+    <section>
+      <p className="text-field-label mb-2 px-1">{title}</p>
+      {children}
+    </section>
+  )
+}
+
+function ContactRow({ icon: Icon, label, value, href, multiline = false }) {
+  return (
+    <a href={href} className="flex items-center gap-3.5 px-4 py-3.5">
+      <span
+        className="h-9 w-9 rounded-pill flex items-center justify-center shrink-0"
+        style={{ backgroundColor: 'rgba(42,143,168,0.10)' }}
+      >
+        <Icon size={18} strokeWidth={1.8} className="text-canard" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-field-label">{label}</p>
+        <p
+          className={`text-body-l font-medium text-marine mt-0.5 ${
+            multiline ? 'break-words' : 'truncate'
+          }`}
+        >
+          {value}
+        </p>
+      </div>
+    </a>
   )
 }
