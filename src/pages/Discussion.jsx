@@ -7,6 +7,7 @@ import {
   MessageSquare,
   MessageSquarePlus,
   Users,
+  ChevronLeft,
 } from 'lucide-react';
 import AppLayout from '../components/layout/AppLayout';
 import { useDiscussion } from '../features/discussion/useDiscussion';
@@ -180,8 +181,16 @@ export default function Discussion() {
       <div className="flex flex-col">
         {/* Header sticky */}
         <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border">
-          <div className="flex items-center justify-between px-4 py-3">
-            <h1 className="font-display font-extrabold text-marine text-2xl">
+          <div className="flex items-center gap-2 px-4 py-3">
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              aria-label="Retour"
+              className="h-9 w-9 flex items-center justify-center rounded-full shrink-0"
+            >
+              <ChevronLeft size={20} strokeWidth={2} className="text-marine" />
+            </button>
+            <h1 className="flex-1 font-display font-extrabold text-marine text-2xl">
               Discussion
             </h1>
             {canCreate && (
@@ -189,7 +198,7 @@ export default function Discussion() {
                 type="button"
                 onClick={handleCreateClick}
                 aria-label="Créer un tableau"
-                className="w-9 h-9 rounded-full bg-brique text-white flex items-center justify-center active:opacity-80 transition-opacity"
+                className="w-9 h-9 rounded-full bg-brique text-white flex items-center justify-center active:opacity-80 transition-opacity shrink-0"
               >
                 <Plus className="w-5 h-5" strokeWidth={2.2} />
               </button>

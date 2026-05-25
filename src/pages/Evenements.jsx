@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, MapPin, Paperclip, Calendar } from 'lucide-react'
+import { Plus, Search, MapPin, Paperclip, Calendar, ChevronLeft } from 'lucide-react'
 import AppLayout from '../components/layout/AppLayout'
 import { useEvenements } from '../features/evenements/useEvenements'
 import { useRole } from '../hooks/useRole'
@@ -9,6 +9,7 @@ import { normalizeForSearch } from '../lib/profileFormat'
 import { getEventColorClasses } from '../features/evenements/eventColors'
 import { isPastEvent } from '../features/evenements/eventDate'
 import EventDateBlock from '../features/evenements/EventDateBlock'
+import EvenementFormModal from '../features/evenements/EvenementFormModal'
 
 // ----------------------------------------------------------------------------
 // Sous-composants
@@ -121,10 +122,11 @@ function LoadingSkeleton() {
 export default function Evenements() {
   const navigate = useNavigate()
   const { role } = useRole()
-  const { evenements, loading, error } = useEvenements()
+  const { evenements, loading, error, createEvenement } = useEvenements()
 
   const [search, setSearch] = useState('')
   const [filtre, setFiltre] = useState('avenir') // 'avenir' | 'passes'
+  const [createOpen, setCreateOpen] = useState(false)
 
   const canCreate = canCreateEvenement(role)
   const hasSearch = search.trim() !== ''
@@ -155,17 +157,21 @@ export default function Evenements() {
     return result
   }, [evenements, filtre, search])
 
-  function handleCreateClick() {
-    // La modale de creation est branchee au lot 8D. Inerte pour l'instant.
-  }
-
   return (
     <AppLayout>
       <div className="flex flex-col">
         {/* Header sticky : titre + recherche */}
         <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border">
-          <div className="px-4 py-3">
-            <h1 className="font-display font-extrabold text-marine text-2xl">
+          <div className="flex items-center gap-2 px-4 py-3">
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              aria-label="Retour"
+              className="h-9 w-9 flex items-center justify-center rounded-full shrink-0"
+            >
+              <ChevronLeft size={20} strokeWidth={2} className="text-marine" />
+            </button>
+            <h1 className="flex-1 font-display font-extrabold text-marine text-2xl">
               Événements
             </h1>
           </div>
@@ -212,7 +218,7 @@ export default function Evenements() {
           {canCreate && (
             <button
               type="button"
-              onClick={handleCreateClick}
+              onClick={() => setCreateOpen(true)}
               className="w-full h-12 rounded-input bg-marine text-white font-semibold shadow-button flex items-center justify-center gap-2 active:opacity-90 transition-opacity"
             >
               <Plus className="w-5 h-5" strokeWidth={2.2} />
@@ -248,6 +254,14 @@ export default function Evenements() {
           )}
         </div>
       </div>
+
+      {/* Modale de creation */}
+      <EvenementFormModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        mode="create"
+        onSubmit={createEvenement}
+      />
     </AppLayout>
   )
 }

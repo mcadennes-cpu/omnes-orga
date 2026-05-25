@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { ChevronLeft } from 'lucide-react'
 import { useEntreesAnnuaire } from '../hooks/useEntreesAnnuaire'
 import AppLayout from '../components/layout/AppLayout'
 
@@ -36,8 +37,16 @@ export default function Annuaire() {
 
   return (
     <AppLayout>
-      <div className="flex items-start justify-between gap-3 px-5 pt-6">
-        <div>
+      <div className="flex items-start gap-2 px-5 pt-6">
+        <button
+          type="button"
+          onClick={() => navigate('/')}
+          aria-label="Retour"
+          className="h-9 w-9 flex items-center justify-center rounded-full shrink-0"
+        >
+          <ChevronLeft size={20} strokeWidth={2} className="text-marine" />
+        </button>
+        <div className="flex-1">
           <h1 className="text-2xl font-bold text-marine">Annuaire</h1>
           <p className="mt-1 text-sm text-muted">
             Carnet d'adresses partagé du cabinet

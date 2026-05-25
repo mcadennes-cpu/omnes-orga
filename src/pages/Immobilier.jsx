@@ -9,8 +9,8 @@
 // - CTA "+ Nouveau tableau" : visible mais inerte en 10B-1 (cable en 10B-2).
 
 import { useMemo, useState } from 'react';
-import { Navigate } from 'react-router-dom';
-import { Plus, Search, Filter, MessageSquare, MessageSquarePlus, Users } from 'lucide-react';
+import { Navigate, useNavigate } from 'react-router-dom';
+import { Plus, Search, Filter, MessageSquare, MessageSquarePlus, Users, ChevronLeft } from 'lucide-react';
 import AppLayout from '../components/layout/AppLayout';
 import { useRole } from '../hooks/useRole';
 import {
@@ -25,6 +25,7 @@ import { getBoardColorClasses } from '../features/immobilier/immobilierColors';
 
 export default function Immobilier() {
   const { role, loading: roleLoading } = useRole();
+  const navigate = useNavigate();
   const [showArchived, setShowArchived] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
@@ -65,8 +66,16 @@ export default function Immobilier() {
     <AppLayout>
       {/* Header sticky */}
       <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border">
-        <div className="flex items-center justify-between px-4 py-3">
-          <h1 className="font-display font-extrabold text-marine text-2xl">
+        <div className="flex items-center gap-2 px-4 py-3">
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            aria-label="Retour"
+            className="h-9 w-9 flex items-center justify-center rounded-full shrink-0"
+          >
+            <ChevronLeft size={20} strokeWidth={2} className="text-marine" />
+          </button>
+          <h1 className="flex-1 font-display font-extrabold text-marine text-2xl">
             Immobilier
           </h1>
           {canCreate && (
@@ -76,7 +85,7 @@ export default function Immobilier() {
               aria-label="Creer un tableau"
               className="w-9 h-9 rounded-full bg-canard text-white
                          flex items-center justify-center
-                         active:opacity-80 transition-opacity"
+                         active:opacity-80 transition-opacity shrink-0"
             >
               <Plus className="w-5 h-5" strokeWidth={2.2} />
             </button>
