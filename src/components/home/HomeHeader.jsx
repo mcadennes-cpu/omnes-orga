@@ -14,10 +14,10 @@ export default function HomeHeader({ prenom }) {
 
   return (
     <header className="px-5 pt-8 pb-5">
-      <p className="text-[11px] font-semibold tracking-wider text-faint">
+      <p className="text-eyebrow">
         {dateLabel}
       </p>
-      <h1 className="mt-2 font-display text-2xl font-extrabold text-marine">
+      <h1 className="mt-2 text-h1 text-marine">
         {greeting}
       </h1>
     </header>
