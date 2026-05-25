@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ShieldCheck } from 'lucide-react'
 import { ROLES, ROLE_LABELS } from '../../lib/modules'
 
 function toStringValue(v) {
@@ -62,117 +63,92 @@ export default function MedecinForm({
     onSubmit(values)
   }
 
-  const inputClass =
-    'h-11 w-full rounded-input border border-border bg-white px-3 text-sm text-ink focus:border-canard focus:outline-none disabled:bg-fond disabled:text-muted'
-  const labelClass = 'text-xs font-semibold text-muted uppercase tracking-wide'
-  const fieldClass = 'flex flex-col gap-1.5'
-
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="bg-carte border border-border rounded-card p-5 flex flex-col gap-4"
-      noValidate
-    >
-      {initialValues.email && (
-        <div className={fieldClass}>
-          <label className={labelClass}>Adresse e-mail</label>
-          <p className="text-sm text-muted break-all bg-fond rounded-input px-3 py-2.5 border border-border">
-            {initialValues.email}
-          </p>
-        </div>
-      )}
+    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
+      {/* Carte champs utilisateur */}
+      <div className="bg-carte border border-border rounded-card shadow-card p-4 flex flex-col gap-3.5">
+        {/* Email lecture seule */}
+        {initialValues.email && (
+          <Field label="Adresse e-mail" readOnly hint="Lié au compte de connexion — non modifiable">
+            <ReadOnlyInput value={initialValues.email} />
+          </Field>
+        )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className={fieldClass}>
-          <label htmlFor="medecin-prenom" className={labelClass}>
-            Prénom <span className="text-brique">*</span>
-          </label>
-          <input
-            id="medecin-prenom"
-            type="text"
-            value={prenom}
-            onChange={(e) => setPrenom(e.target.value)}
-            className={inputClass}
+        {/* Prenom / Nom sur 2 colonnes */}
+        <div className="grid grid-cols-2 gap-2.5">
+          <Field label="Prénom *">
+            <Input
+              id="medecin-prenom"
+              value={prenom}
+              onChange={(e) => setPrenom(e.target.value)}
+              disabled={submitting}
+              required
+            />
+          </Field>
+          <Field label="Nom *">
+            <Input
+              id="medecin-nom"
+              value={nom}
+              onChange={(e) => setNom(e.target.value)}
+              disabled={submitting}
+              required
+            />
+          </Field>
+        </div>
+
+        <Field label="Spécialité">
+          <Input
+            id="medecin-specialite"
+            value={specialite}
+            onChange={(e) => setSpecialite(e.target.value)}
             disabled={submitting}
-            required
+            placeholder="Ex. Médecine générale"
           />
-        </div>
+        </Field>
 
-        <div className={fieldClass}>
-          <label htmlFor="medecin-nom" className={labelClass}>
-            Nom <span className="text-brique">*</span>
-          </label>
-          <input
-            id="medecin-nom"
-            type="text"
-            value={nom}
-            onChange={(e) => setNom(e.target.value)}
-            className={inputClass}
+        <Field label="Téléphone">
+          <Input
+            id="medecin-telephone"
+            type="tel"
+            value={telephone}
+            onChange={(e) => setTelephone(e.target.value)}
             disabled={submitting}
-            required
+            placeholder="06 XX XX XX XX"
           />
-        </div>
+        </Field>
+
+        <Field label="Jours disponibles">
+          <Input
+            id="medecin-jours"
+            value={joursDisponibles}
+            onChange={(e) => setJoursDisponibles(e.target.value)}
+            disabled={submitting}
+            placeholder="Ex. Lun · Mar · Jeu"
+          />
+        </Field>
       </div>
 
-      <div className={fieldClass}>
-        <label htmlFor="medecin-specialite" className={labelClass}>
-          Spécialité
-        </label>
-        <input
-          id="medecin-specialite"
-          type="text"
-          value={specialite}
-          onChange={(e) => setSpecialite(e.target.value)}
-          className={inputClass}
-          disabled={submitting}
-        />
-      </div>
-
-      <div className={fieldClass}>
-        <label htmlFor="medecin-telephone" className={labelClass}>
-          Téléphone
-        </label>
-        <input
-          id="medecin-telephone"
-          type="tel"
-          value={telephone}
-          onChange={(e) => setTelephone(e.target.value)}
-          className={inputClass}
-          disabled={submitting}
-        />
-      </div>
-
-      <div className={fieldClass}>
-        <label htmlFor="medecin-jours" className={labelClass}>
-          Jours disponibles
-        </label>
-        <input
-          id="medecin-jours"
-          type="text"
-          value={joursDisponibles}
-          onChange={(e) => setJoursDisponibles(e.target.value)}
-          className={inputClass}
-          disabled={submitting}
-          placeholder="Ex : Lundi, mardi matin, jeudi"
-        />
-      </div>
-
+      {/* Section administration */}
       {canEditPrivilegedFields && (
         <>
-          <div className="border-t border-border pt-4 flex flex-col gap-4">
-            <p className="text-xs font-semibold text-canard uppercase tracking-wide">
+          <div className="flex items-center gap-2 px-1">
+            <span
+              className="h-6 w-6 rounded-md flex items-center justify-center shrink-0"
+              style={{ backgroundColor: 'rgba(42,143,168,0.12)' }}
+            >
+              <ShieldCheck size={14} strokeWidth={2} className="text-canard" />
+            </span>
+            <span className="text-field-label">
               Champs réservés à l'administration
-            </p>
+            </span>
+          </div>
 
-            <div className={fieldClass}>
-              <label htmlFor="medecin-role" className={labelClass}>
-                Rôle
-              </label>
-              <select
+          <div className="bg-carte border border-border rounded-card shadow-card p-4 flex flex-col gap-3.5">
+            <Field label="Rôle">
+              <Select
                 id="medecin-role"
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className={inputClass}
                 disabled={submitting}
               >
                 {Object.values(ROLES).map((r) => (
@@ -180,68 +156,160 @@ export default function MedecinForm({
                     {ROLE_LABELS[r] ?? r}
                   </option>
                 ))}
-              </select>
-            </div>
+              </Select>
+            </Field>
 
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex flex-col">
-                <span className={labelClass}>Compte actif</span>
-                <span className="text-xs text-muted mt-0.5">
-                  {actif
-                    ? 'Le médecin apparaît dans le trombinoscope'
-                    : 'Le médecin est masqué du trombinoscope'}
-                </span>
-              </div>
-              <input
-                id="medecin-actif"
-                type="checkbox"
-                checked={actif}
-                onChange={(e) => setActif(e.target.checked)}
+            <Field label="Compte actif" inline>
+              <Toggle
+                on={actif}
+                onChange={setActif}
                 disabled={submitting}
-                className="h-5 w-5 rounded border-border text-canard focus:ring-canard"
               />
-            </div>
+            </Field>
+            <p className="text-caption text-faint -mt-2 px-1">
+              {actif
+                ? 'Le médecin apparaît dans le trombinoscope'
+                : 'Le médecin est masqué du trombinoscope'}
+            </p>
 
-            <div className={fieldClass}>
-              <label htmlFor="medecin-notes" className={labelClass}>
-                Notes internes
-              </label>
-              <textarea
+            <Field label="Notes internes">
+              <Textarea
                 id="medecin-notes"
                 value={notesInternes}
                 onChange={(e) => setNotesInternes(e.target.value)}
-                className="min-h-[96px] w-full rounded-input border border-border bg-white px-3 py-2.5 text-sm text-ink focus:border-canard focus:outline-none disabled:bg-fond disabled:text-muted resize-y"
                 disabled={submitting}
                 rows={4}
+                placeholder="Remarques, contexte, infos d'organisation..."
               />
-            </div>
+            </Field>
           </div>
         </>
       )}
 
+      {/* Erreur */}
       {(validationError || error) && (
-        <p className="text-sm text-brique bg-brique/10 rounded-input px-3 py-2">
+        <p
+          className="text-brique text-body-m font-medium rounded-input px-3 py-2"
+          style={{ backgroundColor: 'rgba(212,80,58,0.10)' }}
+        >
           {validationError || error}
         </p>
       )}
 
-      <div className="border-t border-border pt-4 flex flex-col-reverse sm:flex-row gap-2 sm:gap-3">
+      {/* Boutons */}
+      <div className="flex gap-2.5 pt-1">
         <button
           type="button"
           onClick={onCancel}
           disabled={submitting}
-          className="h-12 sm:flex-1 rounded-input border border-border text-marine font-semibold hover:bg-marine/5 disabled:cursor-not-allowed disabled:opacity-60 transition-colors"
+          className="flex-1 h-12 rounded-input bg-carte border border-border text-marine text-button disabled:opacity-60 disabled:cursor-not-allowed"
         >
           Annuler
         </button>
         <button
           type="submit"
           disabled={submitting || !isValid}
-          className="h-12 sm:flex-1 rounded-input bg-marine text-white font-semibold hover:bg-marine/90 disabled:cursor-not-allowed disabled:opacity-60 transition-colors"
+          className="flex-[1.6] h-12 rounded-input bg-marine text-white text-button shadow-button disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {submitting ? 'Enregistrement…' : 'Enregistrer'}
         </button>
       </div>
     </form>
+  )
+}
+
+// ----------------------------------------------------------------------------
+// Sous-composants locaux : Field, Input, ReadOnlyInput, Select, Textarea, Toggle
+// ----------------------------------------------------------------------------
+
+function Field({ label, children, hint, inline = false, readOnly = false }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div
+        className={`flex justify-between gap-3 ${inline ? 'items-center' : 'items-start'}`}
+      >
+        <label className="text-field-label">
+          {label}
+          {readOnly && <span className="ml-1.5 text-faint normal-case tracking-normal"> · lecture</span>}
+        </label>
+        {inline && children}
+      </div>
+      {!inline && children}
+      {hint && (
+        <p className="text-caption text-faint px-0.5">{hint}</p>
+      )}
+    </div>
+  )
+}
+
+function Input(props) {
+  return (
+    <input
+      type={props.type || 'text'}
+      {...props}
+      className="h-11 w-full px-3.5 rounded-input bg-fond text-marine text-body-l font-medium border border-border focus:outline-none focus:border-canard focus:ring-1 focus:ring-canard disabled:opacity-60 disabled:cursor-not-allowed"
+    />
+  )
+}
+
+function ReadOnlyInput({ value }) {
+  return (
+    <div className="h-11 w-full px-3.5 rounded-input border border-border bg-transparent text-muted text-body-l font-medium flex items-center break-all cursor-not-allowed">
+      {value}
+    </div>
+  )
+}
+
+function Select({ children, ...props }) {
+  return (
+    <select
+      {...props}
+      className="h-11 w-full px-3.5 rounded-input bg-fond text-marine text-body-l font-medium border border-border focus:outline-none focus:border-canard focus:ring-1 focus:ring-canard disabled:opacity-60 disabled:cursor-not-allowed appearance-none"
+      style={{
+        backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%231C3D52\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3E%3Cpolyline points=\'6 9 12 15 18 9\'%3E%3C/polyline%3E%3C/svg%3E")',
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: 'right 14px center',
+        paddingRight: '36px',
+      }}
+    >
+      {children}
+    </select>
+  )
+}
+
+function Textarea(props) {
+  return (
+    <textarea
+      {...props}
+      className="w-full min-h-[96px] px-3.5 py-3 rounded-input bg-fond text-marine text-body-m border border-border focus:outline-none focus:border-canard focus:ring-1 focus:ring-canard resize-y disabled:opacity-60 disabled:cursor-not-allowed"
+    />
+  )
+}
+
+/**
+ * Toggle iOS-style : slider canard quand on, gris-marine quand off.
+ * - Tap large (46x28)
+ * - aria-pressed pour l'accessibilite
+ */
+function Toggle({ on, onChange, disabled = false }) {
+  return (
+    <button
+      type="button"
+      onClick={() => !disabled && onChange(!on)}
+      aria-pressed={on}
+      disabled={disabled}
+      className={`relative w-[46px] h-7 rounded-full transition-colors shrink-0 ${
+        on ? 'bg-canard' : ''
+      } ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+      style={!on ? { backgroundColor: 'rgba(28,61,82,0.18)' } : undefined}
+    >
+      <span
+        className="absolute top-[3px] w-[22px] h-[22px] rounded-full bg-white transition-[left]"
+        style={{
+          left: on ? '21px' : '3px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+        }}
+      />
+    </button>
   )
 }
