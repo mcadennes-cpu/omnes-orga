@@ -54,10 +54,26 @@ export default defineConfig({
             purpose: 'maskable',
           },
         ],
+        screenshots: [
+          {
+            src: 'screenshot-mobile.png',
+            sizes: '776x1689',
+            type: 'image/png',
+            form_factor: 'narrow',
+            label: "Page d'accueil de l'application sur mobile",
+          },
+          {
+            src: 'screenshot-desktop.png',
+            sizes: '1920x1080',
+            type: 'image/png',
+            form_factor: 'wide',
+            label: "Page d'accueil de l'application sur desktop",
+          },
+        ],
       },
 
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2}'],
 
         // Quand l'utilisateur navigue vers une URL non précachée (ex. /trombinoscope/abc
         // en SPA après refresh), on lui sert index.html en fallback (comportement SPA standard).

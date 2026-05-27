@@ -34,10 +34,14 @@ L'application est distribuée comme une **Progressive Web App** : pas de publica
 - Notifications push natives, comportement proche d'une app native
 
 ### Composants techniques PWA
-- `manifest.json` (nom, icônes, couleurs, mode d'affichage)
-- Service worker (cache, push, mode hors-ligne basique)
-- Icônes en plusieurs tailles (192x192, 512x512, maskable)
-- Plugin `vite-plugin-pwa` pour automatiser la génération
+Tout est en place depuis l'étape 12 (cf. plan de développement pour les détails).
+- `manifest.webmanifest` généré par `vite-plugin-pwa` à partir de la config dans `vite.config.js` (nom, icônes, couleurs DS, screenshots iOS/desktop, mode `standalone`, orientation portrait).
+- Service worker Workbox en stratégie **shell uniquement** : précache du bundle JS/CSS/HTML + icônes + offline.html (18 entrées, ~900 ko). Pas de cache des requêtes Supabase. Runtime caching pour les polices Google (1 an).
+- 5 icônes générées : `pwa-192x192.png`, `pwa-512x512.png`, `pwa-maskable-512x512.png`, `apple-touch-icon.png` (180×180), `favicon.ico`.
+- Page `public/offline.html` autoporteuse comme fallback de secours.
+- Bannière `OfflineBanner` (top, brique, icône WifiOff) montée dans `AppLayout`, déclenchée par le hook `useOnlineStatus`.
+- Modale `InstallPromptModal` auto-affichée sur mobile non-installé (3 étapes iOS / bouton natif Android), montée dans `AppLayout`. Dismiss "Plus tard" persiste 7 jours dans `localStorage`.
+- Page `/installer` permanente accessible depuis Profil, avec instructions adaptées à la plateforme détectée.
 
 ---
 
@@ -691,7 +695,15 @@ Les tokens couleurs, typographies, radii et shadows sont centralisés dans `tail
 ```
 omnes-orga/
 ├── public/
-│   └── (icônes PWA, manifest — à venir étape 12)
+│   ├── favicon.ico
+│   ├── apple-touch-icon.png
+│   ├── pwa-192x192.png
+│   ├── pwa-512x512.png
+│   ├── pwa-maskable-512x512.png
+│   ├── screenshot-mobile.png
+│   ├── screenshot-desktop.png
+│   ├── offline.html
+│   └── logo-omnes.webp
 ├── docs/
 │   ├── cabinet-medical-app.md      ← ce fichier
 │   └── sql/                        ← scripts SQL versionnés (4B-1, 4B-2, 5A-1, 5A-2, ...)
@@ -704,7 +716,10 @@ omnes-orga/
 │   │   ├── annuaire/
 │   │   │   └── EntreeAnnuaireForm.jsx
 │   │   ├── common/
-│   │   │   └── ConfirmDialog.jsx
+│   │   │   ├── ConfirmDialog.jsx
+│   │   │   ├── InstallPromptModal.jsx       ← etape 12E
+│   │   │   ├── OfflineBanner.jsx            ← etape 12D-bis
+│   │   │   └── Pill.jsx
 │   │   ├── home/
 │   │   │   ├── HomeHeader.jsx
 │   │   │   ├── ModuleTile.jsx
@@ -722,7 +737,9 @@ omnes-orga/
 │   │   ├── useMedecins.js          ← liste filtrée actif=true
 │   │   ├── useMedecin.js           ← fiche unique, ne filtre pas actif
 │   │   ├── useEntreesAnnuaire.js   ← liste annuaire avec auteur joint
-│   │   └── useEntreeAnnuaire.js    ← fiche annuaire unique
+│   │   ├── useEntreeAnnuaire.js    ← fiche annuaire unique
+│   │   ├── useOnlineStatus.js      ← etape 12D-bis
+│   │   └── useInstallPrompt.js     ← etape 12E
 │   ├── lib/
 │   │   ├── supabaseClient.js
 │   │   ├── modules.js              ← ROLES, ROLE_LABELS, MODULES, getVisibleModules
@@ -736,7 +753,8 @@ omnes-orga/
 │       ├── Profil.jsx              ← etape 4-bis
 │       ├── Annuaire.jsx            ← etape 5
 │       ├── EntreeAnnuaireDetail.jsx ← etape 5
-│       └── EntreeAnnuaireNouvelle.jsx ← etape 5
+│       ├── EntreeAnnuaireNouvelle.jsx ← etape 5
+│       └── Installer.jsx           ← etape 12E
 ├── vite.config.js
 ├── tailwind.config.js
 ├── .env
@@ -744,7 +762,7 @@ omnes-orga/
 └── README.md
 ```
 
-**Fichiers à venir (étapes ultérieures)** : pages `Annuaire`, `CabinetPratique`, `Discussion`, `Evenements`, `SIM`, `Immobilier`, `InstallGuide` ; composants `TrelloBoard`, `DriveFolder`, `ChatThread`, `InstallPrompt`, `ModuleIcon` ; hooks `useNotifications`, `useInstallPrompt` ; lib `firebase.js`.
+**Fichiers à venir (étapes ultérieures)** : hooks `useNotifications` ; lib `firebase.js` (étape 14 — notifications push FCM).
 
 ---
 
@@ -964,7 +982,25 @@ Le module Discussion est désormais complet (étapes 7A à 7D).
       - 10D-2-bis-d : refonte de la page liste `/immobilier` (bouton + rond canard, sous-header « Mes tableaux · N » avec filtre Actifs/Archives discret, tile en item de liste avec icône bulle colorée, divide-y, état vide riche et skeleton). Ajout de `openCardsCount` et `membersCount` dans `useImmobilier`.
     - Spécificités Immobilier préservées : accent canard, déroulement horizontal des PJ, sous-titre du tableau parent dans la vue carte.
 11. **Étape 11** — Page Profil personnelle + gestion `profiles_compta`
-12. **Étape 12** — Configuration PWA (manifest, service worker, icônes, page guide d'installation)
+12. ✓ **Étape 12 — FAITE** (sous-étapes 12A → 12F) — Configuration PWA complète
+    - 12A : Setup `vite-plugin-pwa` (mode `autoUpdate`, `devOptions.enabled` pour tester en dev) + premier build qui génère `dist/sw.js`, `dist/workbox-*.js` et `dist/manifest.webmanifest`.
+    - 12B : Génération des 5 icônes PWA à partir du logo source Omnès Orga (PNG 500×500). Tailles produites : `pwa-192x192.png`, `pwa-512x512.png`, `pwa-maskable-512x512.png` (logo centré avec marge 10% pour la safe zone Android), `apple-touch-icon.png` (180×180), `favicon.ico` (multi-sizes 16+32). Toutes déposées dans `public/`.
+    - 12C : Manifest complet — `name`, `short_name`, `description`, `theme_color` marine (#1a3a52), `background_color` fond (#F5F7F9), `display: standalone`, `orientation: portrait`, `start_url: /`, `scope: /`, `lang: fr`, `categories: [medical, productivity, business]`, 3 icônes (any + maskable). Balises `<link rel="apple-touch-icon">`, `<meta name="apple-mobile-web-app-capable">` et `<meta name="theme-color">` ajoutées dans `index.html`.
+    - 12D : Service worker en stratégie **shell uniquement** via Workbox. `globPatterns` couvre js/css/html/ico/png/svg/webp/woff2. `navigateFallback: index.html` pour le SPA. `navigateFallbackDenylist` exclut `*supabase.co*` et les assets binaires. `runtimeCaching` pour les polices Google (`StaleWhileRevalidate` sur le CSS, `CacheFirst` sur les .woff2, expiration 1 an). `skipWaiting + clientsClaim` pour activation immédiate des nouvelles versions. Page `public/offline.html` autoporteuse (CSS inline, référence `/apple-touch-icon.png`) comme fallback de secours. Au build, 18 entrées précachées (~900 ko).
+    - 12D-bis : Bannière hors-ligne — hook `useOnlineStatus` (écoute des événements `online`/`offline` du window), composant `OfflineBanner` (barre brique en haut avec icône `WifiOff`, `env(safe-area-inset-top)` pour les iPhones à encoche, `role="status"` + `aria-live="polite"`). Monté dans `AppLayout` donc visible sur toutes les pages protégées. Limite connue de DevTools : le mode "Network → Offline" ne déclenche pas `navigator.onLine = false`, seul un vrai mode avion ou couper le Wi-Fi le fait. Validé en conditions réelles iPhone.
+    - 12E : Install prompt en 4 sous-blocs.
+      - 12E-1 : Hook `useInstallPrompt` — détection plateforme (`ios` / `android` / `desktop` / `other`) via UA + `navigator.maxTouchPoints` pour iPad récent ; détection installation (`navigator.standalone` iOS + `matchMedia('(display-mode: standalone)')`) ; capture de l'événement `beforeinstallprompt` (Android) ; gestion du "Plus tard" via `localStorage.installPrompt:dismissedAt` avec délai 7 jours. Expose `triggerInstall()` et `dismiss()`.
+      - 12E-2 : Composant `InstallPromptModal` — bottom-sheet via `createPortal(document.body)`, animation `slide-up`, overlay marine/40, fermeture par tap dehors ou bouton `X`. Variantes selon plateforme : Android → bouton "Installer" qui appelle `triggerInstall()` (déclenche le prompt natif Chrome) ; iOS → instructions visuelles en 3 étapes (Partager → Sur l'écran d'accueil → Ajouter) avec icônes `Share` et `Plus` canard. Auto-géré : lit lui-même `useInstallPrompt`, aucune prop à passer.
+      - 12E-3 : Page permanente `/installer` — accessible depuis Profil ("Installer l'application" avec icône `Smartphone` canard + chevron). 4 états selon la plateforme détectée : déjà installé (confirmation olive), iOS Safari (3 étapes + bandeau canard "ouvrir dans Safari obligatoire"), Android Chrome (bouton install natif ou instructions menu), desktop/other (message "ouvrez sur votre mobile"). Bloc "Pourquoi installer l'application" en bas avec 3 bénéfices.
+      - 12E-4 : Intégration — `InstallPromptModal` monté dans `AppLayout` après `BottomNav`. S'affiche automatiquement sur mobile non-installé non-dismissé, sur toutes les pages protégées (pas sur Login).
+    - 12F : Tests + polish + doc en 6 sous-étapes.
+      - 12F-1 : Ajout de `webp` au `globPatterns` Workbox pour précacher `logo-omnes.webp` (utilisé sur Login).
+      - 12F-2 : Tests fonctionnels Mac validés (bannière offline en coupant le Wi-Fi, modale iOS simulée, dismiss + délai 7j, service worker activé, cache rempli).
+      - 12F-3 : Tests iPhone via IP locale (`npm run preview -- --host`). Affichage mobile OK, modale d'installation iOS s'affiche correctement, navigation fluide, bannière offline en mode avion OK. **Confirmé** : sur Safari iOS en HTTP, le raccourci d'installation se crée et le mode standalone s'active, mais le service worker ne s'enregistre **pas** (Safari iOS exige HTTPS sauf sur localhost direct, pas sur IP locale). Test offline réel reporté à l'étape 13 (Vercel = HTTPS).
+      - 12F-4 : Audit Lighthouse en navigation privée — **Best Practices 100/100**, **Performance 86/100**. La catégorie "Progressive Web App" a été retirée de Lighthouse fin 2023 ; la validation PWA passe désormais par Application → Manifest dans DevTools.
+      - 12F-bonus : Screenshots PWA dans le manifest pour le "Richer PWA Install UI" (`screenshot-mobile.png` 776×1689 `form_factor: narrow`, `screenshot-desktop.png` 1920×1080 `form_factor: wide`). Plus de warnings dans Application → Manifest.
+      - 12F-5 : Mise à jour de la documentation projet (ce bloc).
+      - 12F-6 : Commit Git final de l'étape 12.
     - ✓ **Étape 12 bis — Alignement du design system** — FAITE (sauf alignement nommage Discussion, reporté). Passe de mise au standard DS des écrans antérieurs à l'étape 6.0, en 3 sous-chantiers :
       - **Shell** : Home (HomeHeader DS + ModuleTile avec icône top-left + shadow-tile), Login (refonte identité marque — wordmark Archivo Black étiré + logo Omnès + filigrane), AppLayout et BottomNav vérifiés au standard. Filigrane unifié (cercle + triangle, opacité 0.05) appliqué à toutes les pages via AppLayout. Chevron retour ajouté sur Discussion / Événements / Annuaire / Immobilier (pages liste) ; harmonisation `ArrowLeft → ChevronLeft` sur Discussion/Immobilier (board + card vues) et sur Recherche. Pages Trombinoscope/Cabinet/SIM gardaient déjà ChevronLeft.
       - **Trombinoscope** : page liste avec header sticky DS + skeletons + empty state riche ; carte médecin refondue (`shadow-card`, typo Inter pour le nom, helper `getAvatarPalette` partagé) ; fiche détail variante "tile centrée" (avatar 108×108 + sections Contact/Disponibilités/Notes + 2 boutons côte à côte Modifier + Désactiver/Réactiver) ; formulaire d'édition refondu (labels `.text-field-label`, inputs `bg-fond`, toggle iOS pour "Compte actif", section admin séparée).
@@ -984,6 +1020,9 @@ Le module Discussion est désormais complet (étapes 7A à 7D).
 - **Pas d'UI pour `profiles_compta`** — la table existe et est protégée par RLS, mais la gestion des informations bancaires sera traitée à l'étape 11.
 - **Cohérence du nommage Discussion** — le module Discussion utilise des noms anglais (`title`, `status`, `archived`, `created_by`) en BDD, hooks et composants, alors qu'Immobilier utilise le français (`titre`, `statut`, `archive`, `auteur_id`). Cette dette de nommage transverse rend la lecture du code plus pénible (helpers de normalisation en transit dans `Recherche.jsx`) mais n'a pas d'impact utilisateur. Renommage prévu en étape 12 ter ou après le déploiement Vercel : impacte les colonnes Postgres, les RLS, les fonctions SECURITY DEFINER (`is_board_member`, `is_board_owner`, `mark_board_read`), les hooks (`useDiscussion`, `useBoard`, `useCard`), les composants et la doc. Sous-chantiers prévus : (a) SQL + RLS + fonctions, (b) hooks JS, (c) composants et UI, (d) doc et limitations.
 - **Breadcrumb des Drives à 2 segments** — les modules Cabinet pratique et SIM affichent un breadcrumb réduit à `Module > NomDossierActuel` quel que soit le niveau d'imbrication. Au-delà du 2e niveau, le contexte intermédiaire n'est pas visible dans le fil ; le retour racine se fait en un clic. Un breadcrumb complet (remontée des `parent_id`) sera ajouté en transverse sur les deux modules si le besoin se confirme avec l'usage.
+- **Service worker en HTTP iOS** — sur Safari iOS, l'enregistrement du service worker n'est possible **qu'en HTTPS** (sauf sur `localhost` direct, pas sur une IP de réseau local). En conséquence, le test du précache et du mode offline réel n'est pas faisable avant le déploiement Vercel (étape 13). Sur Android Chrome, l'enregistrement marche en HTTP local — non testé puisque la cible principale est iOS. Le shell visuel s'installe correctement sur iPhone même en HTTP (raccourci sur écran d'accueil, mode standalone OK), mais sans le SW, l'app n'est pas utilisable hors ligne.
+- **`navigator.onLine` non simulable dans DevTools** — la case "Network → Offline" ainsi que la case "Application → Service Workers → Offline" de Chrome DevTools coupent les requêtes mais ne déclenchent **pas** l'événement JS `offline` ni ne changent `navigator.onLine`. La bannière "Hors ligne" se teste donc uniquement en conditions réelles (couper le Wi-Fi du Mac, ou mode avion sur l'iPhone). Validé OK dans les deux modes en 12F.
+- **Pas de cache des données Supabase** — choix assumé en 12D ("shell uniquement"). Hors ligne, le shell de l'app s'affiche depuis le précache mais les modules tombent en erreur (pas de Trombinoscope, pas d'Annuaire, etc.) puisque les requêtes Supabase passent par le réseau. La bannière "Hors ligne" signale clairement l'état dégradé. Pour une expérience offline plus riche (lecture seule des données déjà consultées), il faudrait passer en stratégie intermédiaire avec runtime caching côté Supabase, sujet à part qu'on n'a pas voulu mêler à la 12 (risques sur Realtime Discussion/Immobilier, sur les 401 quand la session expire, etc.).
 
 ---
 
@@ -1006,5 +1045,7 @@ Pendant le développement local (`npm run dev`), pour tester sur ton téléphone
 - Récupérer l'IP locale du PC (ex : `192.168.1.42`)
 - Lancer Vite avec : `npm run dev -- --host`
 - Ouvrir `http://192.168.1.42:5173` sur le téléphone
+
+**Test rapide de la PWA en local** : `npm run build && npm run preview` (port 4173) plutôt que `npm run dev`. Le SW et le précache ne sont actifs qu'en build prod. Pour tester sur iPhone via IP locale, utiliser `npm run preview -- --host` (cf. étape 12F-3). Limite : Safari iOS refuse d'enregistrer le SW en HTTP même sur IP locale ; le test offline réel ne sera possible qu'après le déploiement Vercel.
 
 ⚠️ Pour tester l'installation PWA et les push, il faut un **HTTPS réel** : ce ne sera donc possible qu'après déploiement sur Vercel (HTTPS automatique).
