@@ -1,6 +1,7 @@
 import Filigrane from './Filigrane'
 import BottomNav from './BottomNav'
 import OfflineBanner from '../common/OfflineBanner'
+import InstallPromptModal from '../common/InstallPromptModal'
 
 export default function AppLayout({ children, showFiligrane = true }) {
   return (
@@ -9,6 +10,7 @@ export default function AppLayout({ children, showFiligrane = true }) {
       {showFiligrane && <Filigrane />}
       <main className="relative z-10 pb-[110px]">{children}</main>
       <BottomNav />
+      <InstallPromptModal />
     </div>
   )
 }

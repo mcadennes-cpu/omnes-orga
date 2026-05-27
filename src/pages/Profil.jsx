@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Smartphone, ChevronRight } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useRole } from '../hooks/useRole'
 import { ROLE_LABELS } from '../lib/modules'
@@ -42,6 +44,24 @@ export default function Profil() {
         {email && (
           <p className="mt-1 text-sm text-muted break-words">{email}</p>
         )}
+
+        {/* Lien vers la page d'aide à l'installation */}
+        <Link
+          to="/installer"
+          className="
+            mt-6 flex items-center justify-between
+            h-14 px-4 rounded-card
+            bg-carte shadow-card
+            text-marine
+          "
+        >
+          <span className="flex items-center gap-3">
+            <Smartphone className="w-5 h-5 text-canard" />
+            <span className="text-body-m font-semibold">Installer l'application</span>
+          </span>
+          <ChevronRight className="w-4 h-4 text-marine/35" />
+        </Link>
+
         <button
           type="button"
           onClick={handleSignOut}

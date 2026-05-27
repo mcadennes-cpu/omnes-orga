@@ -21,6 +21,7 @@ import SimFolder from './pages/SimFolder'
 import Immobilier from './pages/Immobilier'
 import ImmobilierBoard from './pages/ImmobilierBoard'
 import ImmobilierCard from './pages/ImmobilierCard'
+import Installer from './pages/Installer'
 
 export default function App() {
   return (
@@ -47,6 +48,7 @@ export default function App() {
         <Route path="/immobilier" element={<Immobilier />} />
         <Route path="/immobilier/:boardId" element={<ImmobilierBoard />} />
         <Route path="/immobilier/:boardId/:cardId" element={<ImmobilierCard />} />
+        <Route path="/installer" element={<Installer />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
