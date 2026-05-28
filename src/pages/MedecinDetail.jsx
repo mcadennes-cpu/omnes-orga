@@ -17,6 +17,7 @@ import {
   canToggleActif,
   canViewSensitiveFields,
   canViewCompta,
+  canEditRole,
 } from '../lib/permissions'
 import { getAvatarPalette } from '../lib/avatarColor'
 
@@ -53,6 +54,7 @@ export default function MedecinDetail() {
     medecinId: medecin?.id,
   })
   const canEditPrivileged = canEditPrivilegedFields(role)
+  const canEditRoleField = canEditRole(role)
   const canToggle = canToggleActif(role)
   const showSensitive = canViewSensitiveFields(role)
   const showCompta = canViewCompta(role)
@@ -65,15 +67,23 @@ export default function MedecinDetail() {
   async function handleSubmit(values) {
     if (!medecin?.id) return
 
-    const safeValues = canEditPrivileged
-      ? values
-      : {
-          nom: values.nom,
-          prenom: values.prenom,
-          telephone: values.telephone,
-          specialite: values.specialite,
-          jours_disponibles: values.jours_disponibles,
-        }
+    // Champs de base, toujours autorisés (édition de sa propre fiche incluse)
+    const safeValues = {
+      nom: values.nom,
+      prenom: values.prenom,
+      telephone: values.telephone,
+      specialite: values.specialite,
+      jours_disponibles: values.jours_disponibles,
+    }
+    // notes_internes : super_admin + associe_gerant
+    if (canEditPrivileged && 'notes_internes' in values) {
+      safeValues.notes_internes = values.notes_internes
+    }
+    // role + actif : super_admin uniquement (jamais poussés sinon)
+    if (canEditRoleField) {
+      if ('role' in values) safeValues.role = values.role
+      if ('actif' in values) safeValues.actif = values.actif
+    }
 
     setSubmitting(true)
     setSubmitError(null)
@@ -169,6 +179,7 @@ export default function MedecinDetail() {
             onSubmit={handleSubmit}
             onCancel={handleCancel}
             canEditPrivilegedFields={canEditPrivileged}
+            canEditRole={canEditRoleField}
             submitting={submitting}
             error={submitError}
           />

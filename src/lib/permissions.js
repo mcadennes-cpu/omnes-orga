@@ -11,6 +11,11 @@ export function canEditPrivilegedFields(role) {
 export function canToggleActif(role) {
   return role === ROLES.SUPER_ADMIN
 }
+// Édition du champ `role` (+ `actif` côté formulaire) : super_admin seul.
+// Même règle que canToggleActif mais sémantique distincte (rôle ≠ statut actif).
+export function canEditRole(role) {
+  return role === ROLES.SUPER_ADMIN
+}
 export function canViewSensitiveFields(role) {
   return Boolean(role) && role !== ROLES.REMPLACANT
 }

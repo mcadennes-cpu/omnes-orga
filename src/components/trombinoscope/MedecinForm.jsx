@@ -11,6 +11,7 @@ export default function MedecinForm({
   onSubmit,
   onCancel,
   canEditPrivilegedFields = false,
+  canEditRole = false,
   submitting = false,
   error = null,
 }) {
@@ -55,9 +56,11 @@ export default function MedecinForm({
     }
 
     if (canEditPrivilegedFields) {
+      values.notes_internes = notesInternes.trim() || null
+    }
+    if (canEditRole) {
       values.role = role
       values.actif = actif
-      values.notes_internes = notesInternes.trim() || null
     }
 
     onSubmit(values)
@@ -144,33 +147,37 @@ export default function MedecinForm({
           </div>
 
           <div className="bg-carte border border-border rounded-card shadow-card p-4 flex flex-col gap-3.5">
-            <Field label="Rôle">
-              <Select
-                id="medecin-role"
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                disabled={submitting}
-              >
-                {Object.values(ROLES).map((r) => (
-                  <option key={r} value={r}>
-                    {ROLE_LABELS[r] ?? r}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+            {canEditRole && (
+              <>
+                <Field label="Rôle">
+                  <Select
+                    id="medecin-role"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    disabled={submitting}
+                  >
+                    {Object.values(ROLES).map((r) => (
+                      <option key={r} value={r}>
+                        {ROLE_LABELS[r] ?? r}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
 
-            <Field label="Compte actif" inline>
-              <Toggle
-                on={actif}
-                onChange={setActif}
-                disabled={submitting}
-              />
-            </Field>
-            <p className="text-caption text-faint -mt-2 px-1">
-              {actif
-                ? 'Le médecin apparaît dans le trombinoscope'
-                : 'Le médecin est masqué du trombinoscope'}
-            </p>
+                <Field label="Compte actif" inline>
+                  <Toggle
+                    on={actif}
+                    onChange={setActif}
+                    disabled={submitting}
+                  />
+                </Field>
+                <p className="text-caption text-faint -mt-2 px-1">
+                  {actif
+                    ? 'Le médecin apparaît dans le trombinoscope'
+                    : 'Le médecin est masqué du trombinoscope'}
+                </p>
+              </>
+            )}
 
             <Field label="Notes internes">
               <Textarea
