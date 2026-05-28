@@ -310,3 +310,35 @@ export function canCommentImmobilier(role) {
 export function canEditOwnImmobilierMessage({ role, currentUserId, auteurId }) {
   return canAccessImmobilier(role) && auteurId === currentUserId;
 }
+
+// ----------------------------------------------------------------------------
+// Module Compta / RIB (etape 11)
+// ----------------------------------------------------------------------------
+// Regle metier : le super_admin saisit et gere tous les RIB (en pratique ceux
+// des remplacants, pour les payer par virement). Les trois roles "associes"
+// (super_admin, associe_gerant, associe) lisent toute la table. Le remplacant
+// ne voit RIEN, pas meme sa propre ligne.
+//
+// Ces helpers sont le miroir cote React des fonctions Postgres :
+//   canViewCompta  <-> can_read_compta()  (SELECT)
+//   canEditCompta  <-> is_super_admin()   (INSERT / UPDATE / DELETE)
+// La verite de fond reste la RLS ; ces helpers pilotent l'affichage des
+// sections et des champs editables cote UI.
+
+/**
+ * Peut consulter un RIB (section RIB visible en lecture).
+ * super_admin / associe_gerant / associe. Remplacant exclu.
+ */
+export function canViewCompta(role) {
+  return role === ROLES.SUPER_ADMIN
+      || role === ROLES.ASSOCIE_GERANT
+      || role === ROLES.ASSOCIE
+}
+
+/**
+ * Peut saisir / modifier / supprimer un RIB.
+ * super_admin uniquement.
+ */
+export function canEditCompta(role) {
+  return role === ROLES.SUPER_ADMIN
+}
