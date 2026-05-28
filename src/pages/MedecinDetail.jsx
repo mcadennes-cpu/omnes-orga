@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft, Phone, Mail, Calendar, Pencil, ShieldOff, ShieldCheck } from 'lucide-react'
 import AppLayout from '../components/layout/AppLayout'
 import MedecinForm from '../components/trombinoscope/MedecinForm'
+import MedecinCompta from '../components/trombinoscope/MedecinCompta'
 import ConfirmDialog from '../components/common/ConfirmDialog'
 import Pill from '../components/common/Pill'
 import { supabase } from '../lib/supabaseClient'
@@ -15,6 +16,7 @@ import {
   canEditPrivilegedFields,
   canToggleActif,
   canViewSensitiveFields,
+  canViewCompta,
 } from '../lib/permissions'
 import { getAvatarPalette } from '../lib/avatarColor'
 
@@ -53,6 +55,7 @@ export default function MedecinDetail() {
   const canEditPrivileged = canEditPrivilegedFields(role)
   const canToggle = canToggleActif(role)
   const showSensitive = canViewSensitiveFields(role)
+  const showCompta = canViewCompta(role)
 
   function handleCancel() {
     setMode('view')
@@ -275,6 +278,11 @@ export default function MedecinDetail() {
                   </div>
                 </Section>
               )}
+
+            {/* Section RIB — visible super_admin / associe_gerant / associe */}
+            {showCompta && medecin && (
+              <MedecinCompta medecinId={medecin.id} role={role} />
+            )}
 
             {/* Actions bar */}
             {(canEdit || canToggle) && (
