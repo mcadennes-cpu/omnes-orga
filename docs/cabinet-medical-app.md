@@ -108,12 +108,15 @@ created_at               timestamp
 updated_at               timestamp
 ```
 
-**RLS en place (7 policies, étape 2C-3) :**
-- super_admin / associe_gerant / associe peuvent lire toute la table.
-- remplaçant ne lit que sa propre ligne.
-- Chaque user peut INSERT/UPDATE sa propre ligne ; super_admin peut tout modifier ; suppression réservée à super_admin.
+**RLS en place (4 policies, étape 11A — refonte de l'étape 2C) :**
+- `compta_select_reader` (SELECT) : super_admin / associe_gerant / associe via la fonction `can_read_compta()`. Le remplaçant ne lit aucune ligne, pas même la sienne.
+- `compta_insert_super_admin` (INSERT) : super_admin uniquement via `is_super_admin()`.
+- `compta_update_super_admin` (UPDATE) : super_admin uniquement.
+- `compta_delete_super_admin` (DELETE) : super_admin uniquement.
 
-**Pas d'UI dédiée pour l'instant** — la gestion des informations bancaires sera codée dans l'étape 11 (Page Profil personnelle + gestion profiles_compta).
+Note d'historique : l'étape 2C avait initialement créé 7 policies sur un modèle « chacun gère sa propre ligne + les associés lisent ». Ce modèle a été abandonné en 11A : les remplaçants ne saisissent pas leur RIB eux-mêmes (le super_admin centralise la saisie), et ils ne doivent pas pouvoir lire les RIB. Les anciennes policies (jamais archivées en SQL) ont été supprimées et remplacées. Le SQL est désormais versionné dans `docs/sql/11A-1`.
+
+**UI (étape 11)** — la gestion des informations bancaires se fait dans la fiche médecin du Trombinoscope (composant `MedecinCompta`, section « Coordonnées bancaires (RIB) »). Cf. module Trombinoscope, sous-section RIB.
 
 ---
 
@@ -195,6 +198,16 @@ Cette approche (option D du plan 4D) évite de manipuler `auth.admin.createUser`
 
 - `/trombinoscope` — liste des médecins actifs (cartes cliquables).
 - `/trombinoscope/:id` — fiche détail. Affiche en lecture par défaut ; bouton "Modifier" passe en mode édition (toggle sur la même page, pas de nouvelle route). Bouton "Désactiver / Réactiver" visible pour super_admin.
+
+#### Coordonnées bancaires (RIB) — étape 11
+
+La fiche détail (`/trombinoscope/:id`, mode lecture) affiche une section « Coordonnées bancaires (RIB) » alimentée par la table `profiles_compta` (champs `iban`, `bic`, `nom_titulaire_compte`). Objectif métier : permettre aux médecins associés de récupérer le RIB des remplaçants pour les payer par virement.
+
+- **Visibilité** : super_admin / associe_gerant / associe voient la section (en lecture) sur toutes les fiches. Le remplaçant ne voit aucune section RIB, sur aucune fiche.
+- **Édition** : super_admin uniquement (ajout / modification / suppression). Les remplaçants ne gèrent pas leur propre RIB — ils préviennent le super_admin en cas de changement.
+- **Composant** : `src/components/trombinoscope/MedecinCompta.jsx` (lecture + édition inline). Appelle `useProfilCompta(medecinId)` et `canEditCompta(role)`. Validation IBAN par checksum mod-97 intégrée (fonction exportée `isValidIban`).
+- **Écriture** : upsert sur la clé primaire `id` de `profiles_compta` (`onConflict: 'id'`), qui est aussi FK vers `profiles(id)`. Une ligne RIB par médecin.
+- **Défense en profondeur** : la RLS (cf. 11A) applique les mêmes règles côté Postgres, indépendamment de l'UI.
 
 ---
 
@@ -688,6 +701,8 @@ Les tokens couleurs, typographies, radii et shadows sont centralisés dans `tail
 
 `src/lib/permissions.js` centralise les règles d'accès du Trombinoscope (cf. section "Permissions fines" du module 1). Les pages et composants importent ces helpers plutôt que de tester `role` directement, ce qui rend les règles modifiables d'un seul endroit.
 
+Depuis l'étape 11, `permissions.js` couvre aussi le RIB : `canViewCompta(role)` et `canEditCompta(role)`, miroirs React des fonctions Postgres `can_read_compta()` et `is_super_admin()` (cf. 11A).
+
 ---
 
 ## Structure du projet
@@ -706,7 +721,7 @@ omnes-orga/
 │   └── logo-omnes.webp
 ├── docs/
 │   ├── cabinet-medical-app.md      ← ce fichier
-│   └── sql/                        ← scripts SQL versionnés (4B-1, 4B-2, 5A-1, 5A-2, ...)
+│   └── sql/                        ← scripts SQL versionnés (4B-1, 4B-2, 5A-1, 5A-2, ..., 11A-1-profiles-compta-rls.sql)
 ├── src/
 │   ├── App.jsx                     ← routing react-router-dom
 │   ├── main.jsx                    ← BrowserRouter wrapper
@@ -730,7 +745,8 @@ omnes-orga/
 │   │   │   └── Filigrane.jsx
 │   │   └── trombinoscope/
 │   │       ├── MedecinCard.jsx
-│   │       └── MedecinForm.jsx
+│   │       ├── MedecinForm.jsx
+│   │       └── MedecinCompta.jsx            ← etape 11C (section RIB)
 │   ├── hooks/
 │   │   ├── useAuth.js
 │   │   ├── useRole.js
@@ -738,12 +754,13 @@ omnes-orga/
 │   │   ├── useMedecin.js           ← fiche unique, ne filtre pas actif
 │   │   ├── useEntreesAnnuaire.js   ← liste annuaire avec auteur joint
 │   │   ├── useEntreeAnnuaire.js    ← fiche annuaire unique
+│   │   ├── useProfilCompta.js      ← etape 11B (lecture RIB d'un médecin)
 │   │   ├── useOnlineStatus.js      ← etape 12D-bis
 │   │   └── useInstallPrompt.js     ← etape 12E
 │   ├── lib/
 │   │   ├── supabaseClient.js
 │   │   ├── modules.js              ← ROLES, ROLE_LABELS, MODULES, getVisibleModules
-│   │   └── permissions.js          ← helpers d'autorisation Trombinoscope
+│   │   └── permissions.js          ← helpers d'autorisation Trombinoscope (+ RIB : canViewCompta / canEditCompta, etape 11B)
 │   └── pages/
 │       ├── Login.jsx
 │       ├── Home.jsx
@@ -981,7 +998,12 @@ Le module Discussion est désormais complet (étapes 7A à 7D).
       - 10D-2-bis-c3 : finitions PJ (état vide explicite « Aucune piece jointe. » en italique, suppression via ConfirmModal au lieu de confirm() natif). Nettoyage similaire de la suppression de carte dans CardPage.
       - 10D-2-bis-d : refonte de la page liste `/immobilier` (bouton + rond canard, sous-header « Mes tableaux · N » avec filtre Actifs/Archives discret, tile en item de liste avec icône bulle colorée, divide-y, état vide riche et skeleton). Ajout de `openCardsCount` et `membersCount` dans `useImmobilier`.
     - Spécificités Immobilier préservées : accent canard, déroulement horizontal des PJ, sous-titre du tableau parent dans la vue carte.
-11. **Étape 11** — Page Profil personnelle + gestion `profiles_compta`
+11. ✓ **Étape 11 — FAITE** (sous-étapes 11A → 11E) — Page Profil + gestion des RIB (`profiles_compta`)
+    - 11A : Réécriture RLS de `profiles_compta`. Abandon du modèle 2C « chacun gère sa propre ligne » au profit d'un modèle centralisé : SELECT pour super_admin / associe_gerant / associe ; INSERT / UPDATE / DELETE pour super_admin uniquement. 2 fonctions SECURITY DEFINER (`is_super_admin()`, `can_read_compta()`) sur le pattern de `is_sim_member()`. 4 policies (une par commande). SQL archivé `docs/sql/11A-1-profiles-compta-rls.sql` (répare au passage l'absence d'archivage SQL de l'étape 2C).
+    - 11B : Hook `useProfilCompta(profileId)` (lecture d'une ligne RIB, pattern calqué sur `useEntreeAnnuaire`) + helpers `canViewCompta(role)` / `canEditCompta(role)` dans `permissions.js` (miroirs React des fonctions Postgres).
+    - 11C : Section RIB dans la fiche médecin. Composant `MedecinCompta` monté dans `MedecinDetail` (mode lecture), visible si `canViewCompta`. Lecture seule pour associe / associe_gerant, édition inline (ajout / modif / suppression via ConfirmDialog) pour super_admin. Upsert sur la PK `id` (= id médecin, FK profiles). Validation IBAN mod-97 (ISO 13616) sans dépendance externe.
+    - 11D : Refonte de la page `/profil` au standard DS (header sticky, bloc identité centré avec avatar/rôle, sections en cartes, classes typo composées). Comportement inchangé (infos compte, lien Installer, déconnexion). Pas de RIB dans Profil — le RIB vit exclusivement dans le Trombinoscope.
+    - 11E : Tests multi-rôles + mise à jour doc.
 12. ✓ **Étape 12 — FAITE** (sous-étapes 12A → 12F) — Configuration PWA complète
     - 12A : Setup `vite-plugin-pwa` (mode `autoUpdate`, `devOptions.enabled` pour tester en dev) + premier build qui génère `dist/sw.js`, `dist/workbox-*.js` et `dist/manifest.webmanifest`.
     - 12B : Génération des 5 icônes PWA à partir du logo source Omnès Orga (PNG 500×500). Tailles produites : `pwa-192x192.png`, `pwa-512x512.png`, `pwa-maskable-512x512.png` (logo centré avec marge 10% pour la safe zone Android), `apple-touch-icon.png` (180×180), `favicon.ico` (multi-sizes 16+32). Toutes déposées dans `public/`.
@@ -1024,7 +1046,7 @@ Le module Discussion est désormais complet (étapes 7A à 7D).
 
 - **Création d'un médecin sans UI dédiée** — pas de bouton "+" dans l'application. Workflow actuel : super_admin crée un AuthUser dans le dashboard Supabase, le trigger `on_auth_user_created` insère la ligne `profiles` avec valeurs par défaut, puis super_admin enrichit le profil via le formulaire d'édition. Industrialisation possible plus tard via une Supabase Edge Function (cf. section Trombinoscope > Création d'un médecin).
 - **Filtrage des champs sensibles côté frontend** — la RLS `profiles_select_all_authenticated` autorise la lecture de toute la table `profiles` à tout utilisateur authentifié. Le masquage de `jours_disponibles` et `notes_internes` pour les remplaçants se fait côté React. Si on a besoin d'une sécurité forte (les remplaçants ne doivent jamais voir ces données via une requête manuelle), migrer vers une vue PostgreSQL filtrée par rôle.
-- **Pas d'UI pour `profiles_compta`** — la table existe et est protégée par RLS, mais la gestion des informations bancaires sera traitée à l'étape 11.
+- **Gestion des RIB centralisée sur le super_admin** — depuis l'étape 11, les RIB (`profiles_compta`) sont saisis et modifiés uniquement par le super_admin, depuis la fiche Trombinoscope de chaque médecin. Les médecins associés (associe / associe_gerant) les consultent en lecture pour payer les remplaçants. Les remplaçants n'ont aucun accès (ni lecture ni écriture). Pas de validation BIC (seul l'IBAN est validé par checksum mod-97). Pas d'historique des modifications de RIB (hard delete, dernière valeur écrase).
 - **Cohérence du nommage Discussion** — le module Discussion utilise des noms anglais (`title`, `status`, `archived`, `created_by`) en BDD, hooks et composants, alors qu'Immobilier utilise le français (`titre`, `statut`, `archive`, `auteur_id`). Cette dette de nommage transverse rend la lecture du code plus pénible (helpers de normalisation en transit dans `Recherche.jsx`) mais n'a pas d'impact utilisateur. Renommage prévu en étape 12 ter ou après le déploiement Vercel : impacte les colonnes Postgres, les RLS, les fonctions SECURITY DEFINER (`is_board_member`, `is_board_owner`, `mark_board_read`), les hooks (`useDiscussion`, `useBoard`, `useCard`), les composants et la doc. Sous-chantiers prévus : (a) SQL + RLS + fonctions, (b) hooks JS, (c) composants et UI, (d) doc et limitations.
 - **Breadcrumb des Drives à 2 segments** — les modules Cabinet pratique et SIM affichent un breadcrumb réduit à `Module > NomDossierActuel` quel que soit le niveau d'imbrication. Au-delà du 2e niveau, le contexte intermédiaire n'est pas visible dans le fil ; le retour racine se fait en un clic. Un breadcrumb complet (remontée des `parent_id`) sera ajouté en transverse sur les deux modules si le besoin se confirme avec l'usage.
 - **Service worker en HTTP iOS** — sur Safari iOS, l'enregistrement du service worker n'est possible **qu'en HTTPS** (sauf sur `localhost` direct, pas sur une IP de réseau local). En conséquence, le test du précache et du mode offline réel n'est pas faisable avant le déploiement Vercel (étape 13). Sur Android Chrome, l'enregistrement marche en HTTP local — non testé puisque la cible principale est iOS. Le shell visuel s'installe correctement sur iPhone même en HTTP (raccourci sur écran d'accueil, mode standalone OK), mais sans le SW, l'app n'est pas utilisable hors ligne. ✓ Résolu en étape 13 : SW enregistré et offline réel validés en HTTPS sur Vercel.
