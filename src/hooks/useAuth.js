@@ -28,10 +28,6 @@ export function useAuth() {
     }
   }, [])
 
-  async function signUp(email, password) {
-    return supabase.auth.signUp({ email, password })
-  }
-
   async function signIn(email, password) {
     return supabase.auth.signInWithPassword({ email, password })
   }
@@ -40,5 +36,5 @@ export function useAuth() {
     return supabase.auth.signOut()
   }
 
-  return { session, user, loading, signUp, signIn, signOut }
+  return { session, user, loading, signIn, signOut }
 }
