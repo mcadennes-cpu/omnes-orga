@@ -30,3 +30,7 @@ dev-dist
 # Environment
 .env
 .env.local
+
+# Supabase CLI
+supabase/.branches
+supabase/.temp
