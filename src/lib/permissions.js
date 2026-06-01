@@ -347,3 +347,16 @@ export function canViewCompta(role) {
 export function canEditCompta(role) {
   return role === ROLES.SUPER_ADMIN
 }
+
+// =============================================================================
+// Permissions de création de comptes médecins (étape 4B)
+// =============================================================================
+
+/**
+ * Seul le super_admin peut créer un nouveau médecin via l'app.
+ * La validation côté serveur est portée par l'Edge Function `create-medecin`
+ * (cf. supabase/functions/create-medecin/index.ts).
+ */
+export function canCreateMedecin(role) {
+  return role === ROLES.SUPER_ADMIN
+}

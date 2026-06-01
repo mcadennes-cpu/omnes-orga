@@ -1,9 +1,10 @@
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Users } from 'lucide-react'
+import { ChevronLeft, Plus, Users } from 'lucide-react'
 import AppLayout from '../components/layout/AppLayout'
 import MedecinCard from '../components/trombinoscope/MedecinCard'
 import { useMedecins } from '../hooks/useMedecins'
 import { useRole } from '../hooks/useRole'
+import { canCreateMedecin } from '../lib/permissions'
 
 export default function Trombinoscope() {
   const navigate = useNavigate()
@@ -12,6 +13,12 @@ export default function Trombinoscope() {
 
   const canViewNotes = role && role !== 'remplacant'
   const canViewSchedule = role && role !== 'remplacant'
+  const canCreate = canCreateMedecin(role)
+
+  function handleCreateClick() {
+    // TODO 4C : ouvrir la modale CreateMedecinModal
+    console.log('[4B] Bouton "+ Nouveau médecin" cliqué — modale à venir en 4C')
+  }
 
   return (
     <AppLayout>
@@ -30,6 +37,16 @@ export default function Trombinoscope() {
             <h1 className="flex-1 text-h1 text-marine">
               Trombinoscope
             </h1>
+            {canCreate && (
+              <button
+                type="button"
+                onClick={handleCreateClick}
+                aria-label="Créer un nouveau médecin"
+                className="h-10 w-10 flex items-center justify-center rounded-full bg-canard text-white shadow-button shrink-0 active:scale-95 transition-transform"
+              >
+                <Plus size={20} strokeWidth={2.2} />
+              </button>
+            )}
           </div>
         </header>
 
