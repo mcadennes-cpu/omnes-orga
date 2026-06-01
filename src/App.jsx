@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
 import MotDePasseOublie from './pages/MotDePasseOublie'
+import NouveauMotDePasse from './pages/NouveauMotDePasse'
 import Home from './pages/Home'
 import Trombinoscope from './pages/Trombinoscope'
 import MedecinDetail from './pages/MedecinDetail'
@@ -29,6 +30,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/mot-de-passe-oublie" element={<MotDePasseOublie />} />
+      <Route path="/nouveau-mot-de-passe" element={<NouveauMotDePasse />} />
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<Home />} />
         <Route path="/trombinoscope" element={<Trombinoscope />} />
