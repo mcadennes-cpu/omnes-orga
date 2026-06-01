@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import Filigrane from '../components/layout/Filigrane'
@@ -131,6 +131,15 @@ export default function Login() {
                 {error}
               </p>
             )}
+
+            <div className="mt-4 text-right">
+              <Link
+                to="/mot-de-passe-oublie"
+                className="text-body-m text-canard hover:underline"
+              >
+                Mot de passe oublié ?
+              </Link>
+            </div>
 
             <button
               type="submit"
