@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, UserPlus, Loader2 } from 'lucide-react'
+import { X, UserPlus, Loader2, Mail } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 
 const ROLES = [
@@ -15,6 +15,7 @@ export default function CreateMedecinModal({ open, onClose, onCreated }) {
   const [nom, setNom] = useState('')
   const [prenom, setPrenom] = useState('')
   const [role, setRole] = useState('remplacant')
+  const [sendEmail, setSendEmail] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
 
@@ -27,6 +28,7 @@ export default function CreateMedecinModal({ open, onClose, onCreated }) {
     setNom('')
     setPrenom('')
     setRole('remplacant')
+    setSendEmail(false)
     setSubmitting(false)
     setError(null)
     // Léger délai pour laisser le slide-up se faire avant le focus
@@ -88,6 +90,7 @@ export default function CreateMedecinModal({ open, onClose, onCreated }) {
             nom: nom.trim(),
             prenom: prenom.trim(),
             role,
+            sendEmail,
           },
         }
       )
@@ -122,6 +125,8 @@ export default function CreateMedecinModal({ open, onClose, onCreated }) {
       onCreated({
         email: data.email,
         tempPassword: data.tempPassword,
+        emailSent: data.emailSent ?? false,
+        emailError: data.emailError,
       })
       // Le parent va fermer cette modale. Pas besoin de reset submitting :
       // le useEffect sur `open` le fera au prochain ouvrir.
@@ -244,6 +249,36 @@ export default function CreateMedecinModal({ open, onClose, onCreated }) {
           <p className="text-caption text-muted mb-5">
             Modifiable plus tard depuis la fiche du médecin.
           </p>
+
+          {/* Case à cocher : envoi par email */}
+          <label
+            htmlFor="cm-send-email"
+            className={`flex items-start gap-3 px-3 py-3 mb-4 rounded-input border cursor-pointer transition-colors ${
+              sendEmail
+                ? 'bg-canard/10 border-canard/40'
+                : 'bg-fond border-border'
+            } ${submitting ? 'opacity-60 cursor-not-allowed' : ''}`}
+          >
+            <input
+              id="cm-send-email"
+              type="checkbox"
+              checked={sendEmail}
+              onChange={(e) => setSendEmail(e.target.checked)}
+              disabled={submitting}
+              className="mt-0.5 h-4 w-4 accent-canard cursor-pointer disabled:cursor-not-allowed"
+            />
+            <div className="flex-1">
+              <div className="flex items-center gap-1.5">
+                <Mail size={15} className="text-canard" strokeWidth={2} />
+                <span className="text-body-m text-ink font-medium">
+                  Envoyer aussi par email
+                </span>
+              </div>
+              <p className="text-caption text-muted mt-0.5 leading-snug">
+                Le mot de passe sera envoyé à l'adresse du médecin. Vous pourrez aussi le transmettre manuellement après création.
+              </p>
+            </div>
+          </label>
 
           {/* Erreur */}
           {error && (

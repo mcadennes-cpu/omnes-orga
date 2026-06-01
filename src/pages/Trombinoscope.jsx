@@ -26,8 +26,8 @@ export default function Trombinoscope() {
     setCreateOpen(true)
   }
 
-  function handleMedecinCreated({ email, tempPassword }) {
-    setCreatedData({ email, tempPassword })
+  function handleMedecinCreated({ email, tempPassword, emailSent, emailError }) {
+    setCreatedData({ email, tempPassword, emailSent, emailError })
     setCreateOpen(false)
     setCreatedOpen(true)
   }
@@ -121,6 +121,8 @@ export default function Trombinoscope() {
         onClose={handleCreatedClose}
         email={createdData?.email ?? ''}
         tempPassword={createdData?.tempPassword ?? ''}
+        emailSent={createdData?.emailSent ?? false}
+        emailError={createdData?.emailError}
       />
     </AppLayout>
   )

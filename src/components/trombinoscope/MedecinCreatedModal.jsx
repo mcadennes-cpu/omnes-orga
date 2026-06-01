@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, Copy, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { Check, Copy, CheckCircle2, AlertTriangle, MailCheck, MailX } from 'lucide-react'
 
-export default function MedecinCreatedModal({ open, onClose, email, tempPassword }) {
+export default function MedecinCreatedModal({ open, onClose, email, tempPassword, emailSent, emailError }) {
   const [copiedField, setCopiedField] = useState(null) // 'password' | 'both' | null
 
   // Reset le feedback "copié" à l'ouverture
@@ -96,6 +96,35 @@ export default function MedecinCreatedModal({ open, onClose, email, tempPassword
               </p>
             </div>
           </div>
+
+          {/* Statut d'envoi par email */}
+          {emailSent && (
+            <div className="mb-5 px-3 py-2.5 bg-olive/15 rounded-input flex items-start gap-2.5">
+              <MailCheck size={18} className="text-olive shrink-0 mt-0.5" strokeWidth={2} />
+              <div className="flex-1">
+                <p className="text-body-m text-ink font-medium">
+                  Email envoyé au médecin
+                </p>
+                <p className="text-caption text-muted leading-snug">
+                  Le mot de passe a été transmis à {email}.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {!emailSent && emailError && (
+            <div className="mb-5 px-3 py-2.5 bg-ocre/15 rounded-input flex items-start gap-2.5">
+              <MailX size={18} className="text-ocre-fonce shrink-0 mt-0.5" strokeWidth={2} />
+              <div className="flex-1">
+                <p className="text-body-m text-ocre-fonce font-medium">
+                  Envoi par email échoué
+                </p>
+                <p className="text-caption text-ocre-fonce/80 leading-snug">
+                  Transmettez le mot de passe manuellement. (Détail : {emailError})
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Boutons de copie */}
           <div className="flex flex-col gap-2 mb-5">

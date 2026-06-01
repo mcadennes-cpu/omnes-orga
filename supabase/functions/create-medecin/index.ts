@@ -31,6 +31,7 @@ interface CreateMedecinBody {
   nom: string;
   prenom: string;
   role: Role;
+  sendEmail?: boolean;
 }
 
 interface SuccessResponse {
@@ -38,6 +39,8 @@ interface SuccessResponse {
   userId: string;
   email: string;
   tempPassword: string;
+  emailSent: boolean;
+  emailError?: string;
 }
 
 interface ErrorResponse {
@@ -139,6 +142,100 @@ function isValidEmail(email: string): boolean {
   // Regex simple, suffit pour bloquer les saisies clairement erronees.
   // Supabase fera de toute facon sa propre validation a auth.admin.createUser.
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+/**
+ * Envoie le mot de passe temporaire au nouveau medecin via Resend.
+ * Retourne { ok: true } en cas de succes, { ok: false, error: string } sinon.
+ * L'echec d'envoi n'est PAS bloquant pour la creation du compte.
+ */
+async function sendTempPasswordEmail(params: {
+  toEmail: string;
+  prenom: string;
+  nom: string;
+  tempPassword: string;
+  resendApiKey: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const { toEmail, prenom, nom, tempPassword, resendApiKey } = params;
+
+  // Corps de l'email en HTML simple + texte brut.
+  // Expediteur : onboarding@resend.dev (sandbox Resend, suffisant en dev).
+  // A remplacer par "noreply@<domaine>" quand un domaine sera configure.
+  const subject = "Votre acces a l'application Omnes Medecins";
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #1a3a52;">
+      <h2 style="font-size: 22px; margin-bottom: 16px;">Bienvenue ${prenom} ${nom}</h2>
+      <p style="font-size: 15px; line-height: 1.5;">
+        Un compte a ete cree pour vous sur l'application Omnes Medecins.
+      </p>
+      <p style="font-size: 15px; line-height: 1.5;">
+        Voici vos identifiants de connexion :
+      </p>
+      <table style="margin: 20px 0; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 6px 12px 6px 0; font-weight: 600;">Adresse e-mail :</td>
+          <td style="padding: 6px 0; font-family: ui-monospace, monospace;">${toEmail}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 12px 6px 0; font-weight: 600;">Mot de passe :</td>
+          <td style="padding: 6px 0; font-family: ui-monospace, monospace; background: #f0f4f7; padding: 6px 10px; border-radius: 6px; display: inline-block;">${tempPassword}</td>
+        </tr>
+      </table>
+      <p style="font-size: 15px; line-height: 1.5;">
+        Connectez-vous a l'adresse : <a href="https://omnes-orga.vercel.app" style="color: #2a8c8c;">https://omnes-orga.vercel.app</a>
+      </p>
+      <p style="font-size: 13px; color: #6b7c8a; margin-top: 24px;">
+        Ce mot de passe vous a ete envoye une seule fois. Si vous le perdez, vous pourrez le reinitialiser depuis l'ecran de connexion.
+      </p>
+    </div>
+  `;
+  const text = `
+Bienvenue ${prenom} ${nom},
+
+Un compte a ete cree pour vous sur l'application Omnes Medecins.
+
+Adresse e-mail : ${toEmail}
+Mot de passe : ${tempPassword}
+
+Connectez-vous a l'adresse : https://omnes-orga.vercel.app
+
+Ce mot de passe vous a ete envoye une seule fois. Si vous le perdez, vous pourrez le reinitialiser depuis l'ecran de connexion.
+  `.trim();
+
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${resendApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: "Omnes Medecins <onboarding@resend.dev>",
+        to: [toEmail],
+        subject,
+        html,
+        text,
+      }),
+    });
+
+    if (!response.ok) {
+      let errorMsg = `Resend API a renvoye ${response.status}`;
+      try {
+        const errorBody = await response.json();
+        errorMsg = errorBody?.message ?? errorBody?.error ?? errorMsg;
+      } catch {
+        // ignore parse error
+      }
+      console.error("Erreur Resend :", errorMsg);
+      return { ok: false, error: errorMsg };
+    }
+
+    return { ok: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("Exception Resend :", message);
+    return { ok: false, error: message };
+  }
 }
 
 // ============================================================================
@@ -305,13 +402,41 @@ Deno.serve(async (req: Request): Promise<Response> => {
     );
   }
 
-  // ---------- 9. Succes ----------
+  // ---------- 9. Envoi optionnel du mot de passe par email ----------
+  // L'echec d'envoi n'annule pas la creation : le super_admin a deja
+  // le mot de passe affiche dans l'UI, il peut le transmettre manuellement.
+  let emailSent = false;
+  let emailError: string | undefined;
+
+  if (body.sendEmail === true) {
+    const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+    if (!RESEND_API_KEY) {
+      console.error("RESEND_API_KEY manquante, envoi mail ignore");
+      emailError = "Configuration email indisponible cote serveur.";
+    } else {
+      const result = await sendTempPasswordEmail({
+        toEmail: email,
+        prenom,
+        nom,
+        tempPassword,
+        resendApiKey: RESEND_API_KEY,
+      });
+      emailSent = result.ok;
+      if (!result.ok) {
+        emailError = result.error;
+      }
+    }
+  }
+
+  // ---------- 10. Succes ----------
   return jsonResponse(
     {
       success: true,
       userId: newUserId,
       email,
       tempPassword,
+      emailSent,
+      emailError,
     },
     200,
   );
