@@ -11,7 +11,7 @@ import { canCreateMedecin } from '../lib/permissions'
 
 export default function Trombinoscope() {
   const navigate = useNavigate()
-  const { medecins, loading, error } = useMedecins()
+  const { medecins, loading, error, refetch } = useMedecins()
   const { role } = useRole()
 
   const canViewNotes = role && role !== 'remplacant'
@@ -20,9 +20,22 @@ export default function Trombinoscope() {
 
   const [createOpen, setCreateOpen] = useState(false)
   const [createdOpen, setCreatedOpen] = useState(false)
+  const [createdData, setCreatedData] = useState(null)
 
   function handleCreateClick() {
     setCreateOpen(true)
+  }
+
+  function handleMedecinCreated({ email, tempPassword }) {
+    setCreatedData({ email, tempPassword })
+    setCreateOpen(false)
+    setCreatedOpen(true)
+  }
+
+  function handleCreatedClose() {
+    setCreatedOpen(false)
+    setCreatedData(null)
+    refetch()
   }
 
   return (
@@ -101,12 +114,13 @@ export default function Trombinoscope() {
       <CreateMedecinModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
+        onCreated={handleMedecinCreated}
       />
       <MedecinCreatedModal
         open={createdOpen}
-        onClose={() => setCreatedOpen(false)}
-        email="test-medecin-1@example.com"
-        tempPassword="&k@76aVb$idg"
+        onClose={handleCreatedClose}
+        email={createdData?.email ?? ''}
+        tempPassword={createdData?.tempPassword ?? ''}
       />
     </AppLayout>
   )
