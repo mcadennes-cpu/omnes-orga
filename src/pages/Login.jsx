@@ -21,7 +21,7 @@ export default function Login() {
 
   function validate() {
     if (!email.trim()) return 'Veuillez saisir votre adresse e-mail.'
-    if (password.length < 10) return 'Le mot de passe doit contenir au moins 10 caractères.'
+    if (password.length < 6) return 'Le mot de passe doit contenir au moins 6 caractères.'
     return null
   }
 
