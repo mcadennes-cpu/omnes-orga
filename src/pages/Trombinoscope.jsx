@@ -4,6 +4,7 @@ import { ChevronLeft, Plus, Users } from 'lucide-react'
 import AppLayout from '../components/layout/AppLayout'
 import MedecinCard from '../components/trombinoscope/MedecinCard'
 import CreateMedecinModal from '../components/trombinoscope/CreateMedecinModal'
+import MedecinCreatedModal from '../components/trombinoscope/MedecinCreatedModal'
 import { useMedecins } from '../hooks/useMedecins'
 import { useRole } from '../hooks/useRole'
 import { canCreateMedecin } from '../lib/permissions'
@@ -18,6 +19,7 @@ export default function Trombinoscope() {
   const canCreate = canCreateMedecin(role)
 
   const [createOpen, setCreateOpen] = useState(false)
+  const [createdOpen, setCreatedOpen] = useState(false)
 
   function handleCreateClick() {
     setCreateOpen(true)
@@ -99,6 +101,12 @@ export default function Trombinoscope() {
       <CreateMedecinModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
+      />
+      <MedecinCreatedModal
+        open={createdOpen}
+        onClose={() => setCreatedOpen(false)}
+        email="test-medecin-1@example.com"
+        tempPassword="&k@76aVb$idg"
       />
     </AppLayout>
   )
