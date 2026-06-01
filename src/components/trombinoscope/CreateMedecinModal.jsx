@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, UserPlus, Loader2 } from 'lucide-react'
+import { supabase } from '../../lib/supabaseClient'
 
 const ROLES = [
   { value: 'remplacant', label: 'Remplaçant' },
@@ -9,7 +10,7 @@ const ROLES = [
   { value: 'super_admin', label: 'Super administrateur' },
 ]
 
-export default function CreateMedecinModal({ open, onClose }) {
+export default function CreateMedecinModal({ open, onClose, onCreated }) {
   const [email, setEmail] = useState('')
   const [nom, setNom] = useState('')
   const [prenom, setPrenom] = useState('')
@@ -78,18 +79,57 @@ export default function CreateMedecinModal({ open, onClose }) {
     setError(null)
     setSubmitting(true)
 
-    // TODO 4C-3 : appeler l'Edge Function create-medecin via supabase.functions.invoke
-    console.log('[4C-1] Création médecin (mock) :', {
-      email: email.trim().toLowerCase(),
-      nom: nom.trim(),
-      prenom: prenom.trim(),
-      role,
-    })
+    try {
+      const { data, error: invokeError } = await supabase.functions.invoke(
+        'create-medecin',
+        {
+          body: {
+            email: email.trim().toLowerCase(),
+            nom: nom.trim(),
+            prenom: prenom.trim(),
+            role,
+          },
+        }
+      )
 
-    // Simulation d'un délai réseau pour valider l'état "submitting"
-    await new Promise((r) => setTimeout(r, 800))
-    setSubmitting(false)
-    onClose()
+      if (invokeError) {
+        let businessError = invokeError.message ?? 'Erreur inconnue.'
+        try {
+          // invokeError.context EST directement l'objet Response.
+          // On essaie de lire le body JSON pour extraire notre message metier.
+          if (invokeError.context && typeof invokeError.context.json === 'function') {
+            const responseBody = await invokeError.context.json()
+            if (responseBody?.error) {
+              businessError = responseBody.error
+            }
+          }
+        } catch {
+          // Si le body n'est pas du JSON ou deja consomme : on garde le generique
+        }
+        setError(businessError)
+        setSubmitting(false)
+        return
+      }
+
+      // Cas 2 : 200 mais success: false (peu probable, defensive)
+      if (!data?.success) {
+        setError(data?.error ?? "La création n'a pas abouti.")
+        setSubmitting(false)
+        return
+      }
+
+      // Cas 3 : succes. On propage les valeurs a la page parent.
+      onCreated({
+        email: data.email,
+        tempPassword: data.tempPassword,
+      })
+      // Le parent va fermer cette modale. Pas besoin de reset submitting :
+      // le useEffect sur `open` le fera au prochain ouvrir.
+    } catch (err) {
+      console.error('Erreur invoke create-medecin :', err)
+      setError('Erreur réseau. Vérifiez votre connexion et réessayez.')
+      setSubmitting(false)
+    }
   }
 
   return createPortal(
