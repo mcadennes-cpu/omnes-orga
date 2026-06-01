@@ -159,8 +159,8 @@ async function sendTempPasswordEmail(params: {
   const { toEmail, prenom, nom, tempPassword, resendApiKey } = params;
 
   // Corps de l'email en HTML simple + texte brut.
-  // Expediteur : onboarding@resend.dev (sandbox Resend, suffisant en dev).
-  // A remplacer par "noreply@<domaine>" quand un domaine sera configure.
+  // Expediteur : noreply@app.omnesmedecins.fr (sous-domaine verifie dans Resend,
+  // cf. etape 14 bis de la doc projet). DKIM + SPF + MX configures cote OVH.
   const subject = "Votre acces a l'application Omnes Medecins";
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #1a3a52;">
@@ -210,7 +210,7 @@ Ce mot de passe vous a ete envoye une seule fois. Si vous le perdez, vous pourre
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "Omnes Medecins <onboarding@resend.dev>",
+        from: "Omnes Medecins <noreply@app.omnesmedecins.fr>",
         to: [toEmail],
         subject,
         html,
