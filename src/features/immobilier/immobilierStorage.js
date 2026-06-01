@@ -4,6 +4,7 @@
 // Calque sur discussionStorage.js et cabinetStorage.js.
 
 import { supabase } from '../../lib/supabaseClient';
+import { openOrDownload } from '../../lib/storageOpen';
 
 const BUCKET = 'immobilier-attachments';
 const MAX_BYTES = 25 * 1024 * 1024; // 25 Mo
@@ -34,16 +35,6 @@ const ACCEPTED_MIME_TYPES = [
   'application/x-iwork-numbers-sffnumbers',
   'application/x-iwork-keynote-sffkey',
 ];
-
-// Types pour lesquels on prefere ouvrir dans un nouvel onglet (preview natif)
-// plutot que forcer un telechargement.
-const PREVIEWABLE_MIME_TYPES = new Set([
-  'image/jpeg',
-  'image/png',
-  'image/gif',
-  'image/webp',
-  'application/pdf',
-]);
 
 export const IMMOBILIER_ATTACHMENT_LIMITS = {
   maxBytes: MAX_BYTES,
@@ -124,35 +115,25 @@ export async function deleteAttachment(attachmentId) {
   return {};
 }
 
-// Ouverture : recupere une URL signee, ouvre selon le type.
-// Previewable -> nouvel onglet (preview natif du navigateur).
-// Sinon -> download via Blob pour preserver le nom de fichier UTF-8.
+// Ouverture : delegue au helper transverse openOrDownload qui choisit la
+// strategie selon le type de fichier et le contexte :
+//   - non previewable           -> telechargement Blob (nom propre preserve)
+//   - previewable + PWA installee -> telechargement Blob (contourne iOS standalone)
+//   - previewable + navigateur classique -> preview dans un nouvel onglet
+//
+// Note d'evolution : avant le refactor, cette fonction utilisait fetch() puis
+// blob() pour le download, avec un round-trip reseau supplementaire. Le helper
+// transverse utilise supabase.storage.download() qui est plus direct.
 export async function openAttachment(attachment) {
-  const { data, error } = await supabase.storage
-    .from(BUCKET)
-    .createSignedUrl(attachment.id, 60);
+  if (!attachment?.id) throw new Error('openAttachment: attachment.id requis');
 
-  if (error || !data?.signedUrl) {
-    throw error || new Error("Impossible de generer l'URL d'acces.");
-  }
-
-  const isPreviewable = PREVIEWABLE_MIME_TYPES.has(attachment.mime_type);
-  if (isPreviewable) {
-    window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
-    return;
-  }
-
-  // Fallback : telechargement Blob pour preserver le nom
-  const response = await fetch(data.signedUrl);
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = attachment.nom;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  return openOrDownload({
+    supabase,
+    bucket: BUCKET,
+    storagePath: attachment.id,
+    filename: attachment.nom,
+    mimeType: attachment.mime_type,
+  });
 }
 
 // Helper pour formater une taille en Ko/Mo lisible
