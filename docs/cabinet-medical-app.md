@@ -727,6 +727,16 @@ Expose aussi `isPreviewable(mimeType)` (factorisé : était dupliqué dans 4 hel
 
 Les 5 helpers de module (`cabinetStorage.js`, `simStorage.js`, `evenementStorage.js`, `discussionStorage.js`, `immobilierStorage.js`) délèguent désormais leur fonction `openXxxFile` ou `openAttachment` à `openOrDownload`. Les signatures publiques sont inchangées — les composants appelants n'ont pas été modifiés.
 
+### Composants Branding
+
+`src/components/common/LogoOmnes.jsx` (introduit en étape 15 ter) affiche le mark Omnès Médecins teinté dans n'importe quelle couleur du DS, sans dépendre d'une bibliothèque d'icônes ni d'un SVG. Technique : un seul PNG noir opaque (`public/watermark-mask.png`, ~16 ko) est utilisé en `mask-image` CSS, colorisé via `background-color`. Une seule image, n couleurs. Props : `color` (clé DS ou valeur CSS libre), `width`, `height`, `opacity`, `className`, `style`. Le composant inclut les préfixes `-webkit-mask-*` requis pour Safari/iOS (PWA).
+
+`src/components/common/HeaderWatermark.jsx` (introduit en étape 15 ter) est un wrapper de `LogoOmnes` qui positionne le logo en filigrane dans un header sticky. Le composant est en `position: absolute` à droite, `pointer-events-none`, `select-none` ; il ne capte ni clics ni sélection. Props : `color`, `size` (`sm` / `md` / `lg`), `opacity` (défaut 0.18), `offsetRight` (défaut -10 px pour effet « déborde »), `verticalAlign` (`center` par défaut / `top` pour les headers multi-lignes type BoardPage). Le header parent doit avoir `relative overflow-hidden`, et les éventuels `<div>` enfants doivent avoir `relative z-10` (pattern défensif d'empilement pour que les boutons restent au-dessus du watermark).
+
+Distinction d'usage entre les deux composants :
+- `HeaderWatermark` : filigrane d'arrière-plan dans le header des pages module et utilitaires (Trombinoscope, Annuaire, Cabinet pratique, Discussion, Événements, SIM, Immobilier, Profil, Recherche).
+- `LogoOmnes` direct : élément d'identité de marque sur la Home (taille 320×128, opacité 0.07, position custom débordant à droite). Sémantique différente — c'est une signature, pas un filigrane.
+
 ---
 
 ## Structure du projet
@@ -742,7 +752,8 @@ omnes-orga/
 │   ├── screenshot-mobile.png
 │   ├── screenshot-desktop.png
 │   ├── offline.html
-│   └── logo-omnes.webp
+│   ├── logo-omnes.webp
+│   └── watermark-mask.png          ← masque CSS pour LogoOmnes (étape 15 ter)
 ├── docs/
 │   ├── cabinet-medical-app.md      ← ce fichier
 │   └── sql/                        ← scripts SQL versionnés (4B-1, 4B-2, 5A-1, 5A-2, ..., 11A-1-profiles-compta-rls.sql)
@@ -756,7 +767,9 @@ omnes-orga/
 │   │   │   └── EntreeAnnuaireForm.jsx
 │   │   ├── common/
 │   │   │   ├── ConfirmDialog.jsx
+│   │   │   ├── HeaderWatermark.jsx          ← etape 15 ter
 │   │   │   ├── InstallPromptModal.jsx       ← etape 12E
+│   │   │   ├── LogoOmnes.jsx                ← etape 15 ter
 │   │   │   ├── OfflineBanner.jsx            ← etape 12D-bis
 │   │   │   └── Pill.jsx
 │   │   ├── home/
@@ -1100,6 +1113,21 @@ Le module Discussion est désormais complet (étapes 7A à 7D).
      - Immobilier passe de `fetch().blob()` à `supabase.storage.download()` (un round-trip réseau en moins, plus de souci CORS potentiel)
      - `video/mp4` et `audio/*` désormais previewable dans Immobilier (était restreint à 5 types, maintenant aligné sur les 4 autres modules)
    - Compromis UX assumé : sur PWA installée iOS, les images ne s'ouvrent plus directement dans un onglet mais passent par la feuille de partage (tap supplémentaire pour ouvrir dans Aperçu/Photos). Acceptable car c'est le comportement iOS natif standard, prévisible et fiable. Les PDF continuent à s'ouvrir directement (viewer PDF natif iOS). Comportement sur Mac et Safari iOS non-installé totalement inchangé.
+
+15 ter. ✓ **Étape 15 ter — FAITE** — Filigrane logo Omnès teinté par module dans les headers
+   - Objectif : remplacer le filigrane décoratif plein écran (cercle + triangle, opacité 0.05) par un filigrane logo Omnès positionné dans le header sticky de chaque page, **teinté de la couleur du module**. Identification visuelle rapide du contexte au coup d'œil, identité de marque renforcée.
+   - Asset : `public/watermark-mask.png` — PNG noir opaque (~16 ko) du mark Omnès, fourni par Claude Design. Renommé depuis `logo-omnes-mark-mask.png` pour éviter la confusion avec `logo-omnes.webp` (logo Login). Le PNG est utilisé en `mask-image` CSS, colorisé par `background-color` : une seule image, n couleurs.
+   - Composant atomique : `src/components/common/LogoOmnes.jsx`. Affiche le logo dans n'importe quelle couleur DS (`marine`, `canard`, `ocre`, `olive`, `brique`, `fuchsia`) ou n'importe quelle valeur CSS libre (hex, `currentColor`, `var(--…)`). Props : `color`, `width`, `height`, `opacity`, `className`, `style`. Préfixes `-webkit-mask-*` inclus pour Safari/iOS, indispensables pour la PWA.
+   - Wrapper filigrane : `src/components/common/HeaderWatermark.jsx`. Positionne `LogoOmnes` en `position: absolute` dans un header parent `relative`, opacité par défaut 0.18, taille `md` (150×60) avec presets `sm` / `md` / `lg`, décalage à droite de -10px par défaut (effet « déborde hors écran »). Props : `color`, `size`, `opacity`, `offsetRight`, `verticalAlign` ('center' par défaut / 'top' pour les headers multi-lignes). Le composant est en `pointer-events-none` + `select-none` : purement décoratif, n'intercepte ni les clics ni la sélection.
+   - Pattern d'intégration dans un header : (a) ajouter `relative overflow-hidden` à la className du `<header>`, (b) ajouter `relative z-10` à chaque `<div>` enfant direct contenant des éléments interactifs (pattern défensif d'empilement), (c) placer `<HeaderWatermark color="..." />` comme dernier enfant du `<header>` juste avant la fermeture.
+   - Couleurs par module : Trombinoscope canard, Annuaire ocre, Cabinet pratique marine, Discussion brique, Événements fuchsia, SIM olive, Immobilier canard. Home, Profil, Recherche : marine (couleur système, pages BottomNav non-module).
+   - Cas particuliers :
+     - **Headers à 3 lignes (BoardPage Discussion et Immobilier)** : `verticalAlign="top"` (top: 8px) au lieu du centrage vertical par défaut. Sans ce paramètre, le watermark se positionnait pile à hauteur du bouton « + Nouvelle carte » de la ligne 2 et était entièrement masqué.
+     - **Headers non-sticky (`EvenementDetail.jsx`, `Recherche.jsx`)** : watermark intégré quand même, il scrolle avec le contenu — cohérent avec un header non-sticky. Pas de pattern défensif `relative z-10` car ces headers n'ont pas de `<div>` enfant englobant (flex direct sur les boutons et le titre) ; le watermark est pointer-events-none donc ne capte pas les clics.
+     - **Vue carte plein écran (`CardPage` Discussion et Immobilier)** : header `shrink-0` (pas sticky) car la page entière est en flex 100vh hors `AppLayout` (pattern messagerie). Watermark intégré pareil. Cas particulièrement utile : c'est l'écran le plus immersif (pas de BottomNav), le filigrane couleur module est un ancrage discret pour rappeler le contexte.
+     - **Home** : utilise `LogoOmnes` directement, pas le wrapper `HeaderWatermark`. Sémantiquement différent — c'est un élément d'identité de marque, pas un filigrane d'arrière-plan. Taille 320×128, opacité 0.07, `position: absolute` à droite avec `top: 40` et `right: -30` pour déborder du viewport. Effet « grand logo fond de page ». Le bloc texte « MARDI 2 JUIN » + « Bonjour {prenom} » est en `relative z-10` pour rester au-dessus.
+   - `AppLayout.jsx` : retrait de `<Filigrane />` (cercle + triangle plein écran) et de la prop `showFiligrane` désormais inutile. Le composant `src/components/layout/Filigrane.jsx` reste en place car utilisé sur les 3 pages publiques d'authentification (`Login`, `MotDePasseOublie`, `NouveauMotDePasse`) qui gardent leur identité visuelle actuelle (filigrane cercle + triangle conservé, étape 12 bis).
+   - Total : 22 fichiers touchés (3 nouveaux + 19 modifiés). Aucune migration SQL, aucun changement de signature publique des composants existants, aucun impact sur les permissions ou la sécurité.
 
 16. **Étape 16** — Notifications push Firebase FCM (à faire après que la PWA fonctionne).
 
