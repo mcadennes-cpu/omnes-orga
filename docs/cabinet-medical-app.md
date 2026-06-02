@@ -715,6 +715,18 @@ Les tokens couleurs, typographies, radii et shadows sont centralisés dans `tail
 
 Depuis l'étape 11, `permissions.js` couvre aussi le RIB : `canViewCompta(role)` et `canEditCompta(role)`, miroirs React des fonctions Postgres `can_read_compta()` et `is_super_admin()` (cf. 11A).
 
+### Helpers Storage
+
+`src/lib/storageOpen.js` (introduit en étape 15 bis) centralise la logique d'ouverture des fichiers stockés dans Supabase Storage. Expose `openOrDownload({ supabase, bucket, storagePath, filename, mimeType })` qui choisit dynamiquement la meilleure stratégie selon le type de fichier et le contexte d'exécution :
+
+- Fichier non previewable → téléchargement Blob (préserve les accents et l'encodage UTF-8 du nom de fichier)
+- Fichier previewable + PWA installée (iOS standalone) → téléchargement Blob, pour contourner le blocage Safari sur `window.open()` et `<a target="_blank">` après une opération asynchrone
+- Fichier previewable + navigateur classique → ouverture dans un nouvel onglet via URL signée
+
+Expose aussi `isPreviewable(mimeType)` (factorisé : était dupliqué dans 4 helpers de module) et `isStandaloneMode()` (détection PWA installée combinant `matchMedia('(display-mode: standalone)')` et `navigator.standalone` iOS).
+
+Les 5 helpers de module (`cabinetStorage.js`, `simStorage.js`, `evenementStorage.js`, `discussionStorage.js`, `immobilierStorage.js`) délèguent désormais leur fonction `openXxxFile` ou `openAttachment` à `openOrDownload`. Les signatures publiques sont inchangées — les composants appelants n'ont pas été modifiés.
+
 ---
 
 ## Structure du projet
@@ -772,7 +784,8 @@ omnes-orga/
 │   ├── lib/
 │   │   ├── supabaseClient.js
 │   │   ├── modules.js              ← ROLES, ROLE_LABELS, MODULES, getVisibleModules
-│   │   └── permissions.js          ← helpers d'autorisation Trombinoscope (+ RIB : canViewCompta / canEditCompta, etape 11B)
+│   │   ├── permissions.js          ← helpers d'autorisation Trombinoscope (+ RIB : canViewCompta / canEditCompta, etape 11B)
+│   │   └── storageOpen.js          ← helper transverse d'ouverture/téléchargement de fichiers Supabase Storage (étape 15 bis)
 │   └── pages/
 │       ├── Login.jsx
 │       ├── Home.jsx
@@ -1071,6 +1084,23 @@ Le module Discussion est désormais complet (étapes 7A à 7D).
    - 15C : Page publique `/nouveau-mot-de-passe` (`src/pages/NouveauMotDePasse.jsx`). C'est la page la plus subtile techniquement de l'étape 15 : quand l'utilisateur clique sur le lien dans l'email, Supabase crée une **session authentifiée temporaire** côté client (token valide pendant 1h) et redirige vers cette page. Trois mécanismes en parallèle convergent vers `recoveryReady=true` pour détecter cet état : (a) `supabase.auth.onAuthStateChange` qui capte les events `PASSWORD_RECOVERY` et `SIGNED_IN`, (b) `supabase.auth.getSession()` au montage pour le cas où l'event est arrivé avant que le `useEffect` se monte (race condition possible), (c) un timer de fallback à 5s qui bascule sur `linkInvalid=true` si rien n'a confirmé la session. Cleanup propre du listener + clearTimeout + flag `cancelled` au démontage. **Politique de mot de passe** alignée sur la politique Supabase durcie en 14A (10 caractères + 4 classes : minuscule, majuscule, chiffre, symbole), avec **indicateur visuel temps réel** : liste de 5 critères avec puces `CheckCircle` olive si rempli / `Circle` faint sinon, transition de couleur sur le texte. Second champ « Confirmer le mot de passe » avec vérification d'égalité inline. Bouton submit désactivé tant que `policy.allOk && passwordsMatch && passwordConfirm.length > 0`. Bouton œil (`Eye`/`EyeOff`) partagé entre les deux champs pour comparer visuellement. Appel `supabase.auth.updateUser({ password })`. Après succès : **pas de déconnexion** (Option B), bouton « Continuer vers l'application » qui fait `navigate('/', { replace: true })` — la session de reset est légitime (token validé par Supabase), pas de raison de la casser. Quatre états visuels gérés par cascade conditionnelle : `linkInvalid` (alerte brique + lien retour vers `/mot-de-passe-oublie`) > `!recoveryReady` (spinner « Vérification du lien… ») > `success` (confirmation olive + bouton continuer) > formulaire. Route publique dans `App.jsx`, hors `ProtectedRoute`.
    - 15D : Lien « Mot de passe oublié ? » sur la page Login (`src/pages/Login.jsx`). Insertion d'un `<Link to="/mot-de-passe-oublie">` discret en couleur canard, aligné à droite (convention universelle Gmail/Outlook/GitHub), positionné entre le bandeau d'erreur conditionnel et le bouton « Se connecter » — emplacement où l'utilisateur en galère cherche naturellement. Import `Link` ajouté à react-router-dom. Tests prod end-to-end validés sur `https://omnes-orga.vercel.app` : email reçu depuis `noreply@app.omnesmedecins.fr`, lien dans l'email pointe bien vers le domaine de prod (pas localhost), flow complet clic email → changement MDP → reconnexion avec le nouveau MDP fonctionne. Ancien MDP correctement refusé après changement.
 
+15 bis. ✓ **Étape 15 bis — FAITE** — Fix PJ non ouvrables en PWA standalone iOS
+   - Symptôme : depuis le déploiement Vercel (étape 13), cliquer sur une pièce jointe ne déclenchait rien sur iPhone en app installée, alors que ça marchait sur Mac et en Safari iOS classique. Le menu « ... → Télécharger » continuait à fonctionner (download Blob synchrone).
+   - Cause racine : Safari iOS bloque silencieusement `window.open()` et `<a target="_blank">` lorsqu'ils sont appelés après une opération asynchrone (typiquement après le `await` d'un `createSignedUrl`), uniquement en mode `standalone` (PWA installée). Sur Mac et en Safari iOS non-installé, la même chaîne de promesses passait.
+   - Solution : nouveau helper transverse `src/lib/storageOpen.js` exposant `openOrDownload(...)` et `isStandaloneMode()`. La détection standalone combine `window.matchMedia('(display-mode: standalone)').matches` (Android/desktop installé) et `window.navigator.standalone === true` (iOS Safari, propriété historique). En mode standalone, on bascule sur un téléchargement Blob systématique (même pour les types previewable). Le fichier s'ouvre alors via la feuille de partage native iOS (Aperçu pour PDF, Photos pour images, etc.).
+   - Refactor des 5 helpers de module pour déléguer à `openOrDownload` :
+     - `cabinetStorage.openCabinetFile`
+     - `simStorage.openSimFile`
+     - `evenementStorage.openEvenementFile`
+     - `discussionStorage.openAttachment`
+     - `immobilierStorage.openAttachment`
+   - **Aucun changement de signature** des helpers publics : les composants appelants n'ont pas été modifiés. L'encapsulation reste stable, seul le détail d'implémentation a changé.
+   - Gains secondaires :
+     - `isPreviewable` factorisé (était dupliqué 5 fois)
+     - Immobilier passe de `fetch().blob()` à `supabase.storage.download()` (un round-trip réseau en moins, plus de souci CORS potentiel)
+     - `video/mp4` et `audio/*` désormais previewable dans Immobilier (était restreint à 5 types, maintenant aligné sur les 4 autres modules)
+   - Compromis UX assumé : sur PWA installée iOS, les images ne s'ouvrent plus directement dans un onglet mais passent par la feuille de partage (tap supplémentaire pour ouvrir dans Aperçu/Photos). Acceptable car c'est le comportement iOS natif standard, prévisible et fiable. Les PDF continuent à s'ouvrir directement (viewer PDF natif iOS). Comportement sur Mac et Safari iOS non-installé totalement inchangé.
+
 16. **Étape 16** — Notifications push Firebase FCM (à faire après que la PWA fonctionne).
 
 ---
@@ -1082,6 +1112,7 @@ Le module Discussion est désormais complet (étapes 7A à 7D).
 - **Gestion des RIB centralisée sur le super_admin** — depuis l'étape 11, les RIB (`profiles_compta`) sont saisis et modifiés uniquement par le super_admin, depuis la fiche Trombinoscope de chaque médecin. Les médecins associés (associe / associe_gerant) les consultent en lecture pour payer les remplaçants. Les remplaçants n'ont aucun accès (ni lecture ni écriture). Pas de validation BIC (seul l'IBAN est validé par checksum mod-97). Pas d'historique des modifications de RIB (hard delete, dernière valeur écrase).
 - **Cohérence du nommage Discussion** — le module Discussion utilise des noms anglais (`title`, `status`, `archived`, `created_by`) en BDD, hooks et composants, alors qu'Immobilier utilise le français (`titre`, `statut`, `archive`, `auteur_id`). Cette dette de nommage transverse rend la lecture du code plus pénible (helpers de normalisation en transit dans `Recherche.jsx`) mais n'a pas d'impact utilisateur. Renommage prévu en étape 12 ter ou après le déploiement Vercel : impacte les colonnes Postgres, les RLS, les fonctions SECURITY DEFINER (`is_board_member`, `is_board_owner`, `mark_board_read`), les hooks (`useDiscussion`, `useBoard`, `useCard`), les composants et la doc. Sous-chantiers prévus : (a) SQL + RLS + fonctions, (b) hooks JS, (c) composants et UI, (d) doc et limitations.
 - **Breadcrumb des Drives à 2 segments** — les modules Cabinet pratique et SIM affichent un breadcrumb réduit à `Module > NomDossierActuel` quel que soit le niveau d'imbrication. Au-delà du 2e niveau, le contexte intermédiaire n'est pas visible dans le fil ; le retour racine se fait en un clic. Un breadcrumb complet (remontée des `parent_id`) sera ajouté en transverse sur les deux modules si le besoin se confirme avec l'usage.
+- **Images en PWA standalone iOS : feuille de partage au lieu d'onglet** — depuis l'étape 15 bis, en PWA installée sur iPhone, cliquer sur une image (JPG, PNG, etc.) ne l'ouvre plus directement dans un onglet inline mais passe par la feuille de partage native iOS (un tap supplémentaire pour choisir « Aperçu », « Photos » ou « Fichiers »). Les PDF continuent à s'ouvrir directement dans le viewer PDF natif iOS, comme avant. Compromis assumé : c'était soit accepter ce tap supplémentaire pour les images, soit conserver le bug iOS standalone où aucune PJ ne s'ouvrait. Comportement strictement inchangé sur Mac, Windows, Android, et Safari iOS non-installé.
 - **Service worker en HTTP iOS** — sur Safari iOS, l'enregistrement du service worker n'est possible **qu'en HTTPS** (sauf sur `localhost` direct, pas sur une IP de réseau local). En conséquence, le test du précache et du mode offline réel n'est pas faisable avant le déploiement Vercel (étape 13). Sur Android Chrome, l'enregistrement marche en HTTP local — non testé puisque la cible principale est iOS. Le shell visuel s'installe correctement sur iPhone même en HTTP (raccourci sur écran d'accueil, mode standalone OK), mais sans le SW, l'app n'est pas utilisable hors ligne. ✓ Résolu en étape 13 : SW enregistré et offline réel validés en HTTPS sur Vercel.
 - **`navigator.onLine` non simulable dans DevTools** — la case "Network → Offline" ainsi que la case "Application → Service Workers → Offline" de Chrome DevTools coupent les requêtes mais ne déclenchent **pas** l'événement JS `offline` ni ne changent `navigator.onLine`. La bannière "Hors ligne" se teste donc uniquement en conditions réelles (couper le Wi-Fi du Mac, ou mode avion sur l'iPhone). Validé OK dans les deux modes en 12F.
 - **Pas de cache des données Supabase** — choix assumé en 12D ("shell uniquement"). Hors ligne, le shell de l'app s'affiche depuis le précache mais les modules tombent en erreur (pas de Trombinoscope, pas d'Annuaire, etc.) puisque les requêtes Supabase passent par le réseau. La bannière "Hors ligne" signale clairement l'état dégradé. Pour une expérience offline plus riche (lecture seule des données déjà consultées), il faudrait passer en stratégie intermédiaire avec runtime caching côté Supabase, sujet à part qu'on n'a pas voulu mêler à la 12 (risques sur Realtime Discussion/Immobilier, sur les 401 quand la session expire, etc.).
