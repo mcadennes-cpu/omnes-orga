@@ -20,6 +20,7 @@ import {
   canEditRole,
 } from '../lib/permissions'
 import { getAvatarPalette } from '../lib/avatarColor'
+import HeaderWatermark from '../components/common/HeaderWatermark'
 
 function getInitials(prenom, nom) {
   const p = (prenom ?? '').trim().charAt(0).toUpperCase()
@@ -126,8 +127,8 @@ export default function MedecinDetail() {
   return (
     <AppLayout>
       {/* Header sticky */}
-      <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border">
-        <div className="flex items-center gap-2 px-4 py-3">
+      <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border relative overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 relative z-10">
           <button
             type="button"
             onClick={() => {
@@ -150,6 +151,7 @@ export default function MedecinDetail() {
               : fullName || 'Fiche médecin'}
           </h1>
         </div>
+        <HeaderWatermark color="canard" />
       </header>
 
       <div className="px-4 pt-6 pb-8">

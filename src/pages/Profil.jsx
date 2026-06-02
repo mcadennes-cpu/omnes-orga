@@ -7,6 +7,7 @@ import { ROLE_LABELS } from '../lib/modules'
 import AppLayout from '../components/layout/AppLayout'
 import Pill from '../components/common/Pill'
 import { getAvatarPalette } from '../lib/avatarColor'
+import HeaderWatermark from '../components/common/HeaderWatermark'
 
 function getInitials(prenom, nom) {
   const p = (prenom ?? '').trim().charAt(0).toUpperCase()
@@ -37,10 +38,11 @@ export default function Profil() {
   return (
     <AppLayout>
       {/* Header sticky — aligné sur MedecinDetail */}
-      <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border">
-        <div className="flex items-center gap-2 px-4 py-3">
+      <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border relative overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 relative z-10">
           <h1 className="flex-1 text-h1 text-marine">Profil</h1>
         </div>
+        <HeaderWatermark color="marine" />
       </header>
 
       <div className="px-4 pt-6 pb-8">

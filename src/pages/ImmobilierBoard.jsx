@@ -33,6 +33,7 @@ import EditBoardModal from '../features/immobilier/EditBoardModal';
 import ManageMembersModal from '../features/immobilier/ManageMembersModal';
 import BoardSkeleton from '../features/immobilier/BoardSkeleton';
 import EmptyBoard from '../features/immobilier/EmptyBoard';
+import HeaderWatermark from '../components/common/HeaderWatermark';
 
 export default function ImmobilierBoard() {
   const { boardId } = useParams();
@@ -157,13 +158,13 @@ export default function ImmobilierBoard() {
   return (
     <AppLayout>
       {/* Header sticky */}
-      <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border">
+      <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border relative overflow-hidden">
         {loading && !board && (
-          <div className="px-4 py-3 text-body-m text-muted">Chargement...</div>
+          <div className="px-4 py-3 text-body-m text-muted relative z-10">Chargement...</div>
         )}
 
         {error && (
-          <div className="px-4 py-3 text-body-m text-brique">
+          <div className="px-4 py-3 text-body-m text-brique relative z-10">
             Erreur : {error.message}
           </div>
         )}
@@ -171,7 +172,7 @@ export default function ImmobilierBoard() {
         {board && (
           <>
             {/* Ligne 1 : retour + titre + actions */}
-            <div className="flex items-center gap-1 px-2 py-3">
+            <div className="flex items-center gap-1 px-2 py-3 relative z-10">
               <Link
                 to="/immobilier"
                 aria-label="Retour a la liste des tableaux"
@@ -201,7 +202,7 @@ export default function ImmobilierBoard() {
 
             {/* Ligne 2 : avatars + CTA nouvelle carte */}
             <div className="flex items-center justify-between gap-3
-                            px-4 pb-3 min-h-[36px]">
+                            px-4 pb-3 min-h-[36px] relative z-10">
               <MemberAvatars members={members} max={4} />
               {canCreate && (
                 <button
@@ -219,7 +220,7 @@ export default function ImmobilierBoard() {
             </div>
 
             {/* Ligne 3 : onglets de statut */}
-            <div className="px-4 pb-3">
+            <div className="px-4 pb-3 relative z-10">
               <div className="flex gap-1 p-1 bg-fond rounded-full">
                 {[
                   { key: 'ouvertes', label: 'Ouvertes' },
@@ -257,6 +258,7 @@ export default function ImmobilierBoard() {
             </div>
           </>
         )}
+        <HeaderWatermark color="canard" verticalAlign="top" />
       </header>
 
       {/* Bandeau tableau archive */}

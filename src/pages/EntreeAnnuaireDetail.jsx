@@ -14,6 +14,7 @@ import {
   canEditEntreeAnnuaire,
   canDeleteEntreeAnnuaire,
 } from '../lib/permissions'
+import HeaderWatermark from '../components/common/HeaderWatermark'
 
 function formatDateFR(iso) {
   if (!iso) return ''
@@ -124,8 +125,8 @@ export default function EntreeAnnuaireDetail() {
   return (
     <AppLayout>
       {/* Header sticky DS */}
-      <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border">
-        <div className="flex items-center gap-2 px-4 py-3">
+      <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border relative overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 relative z-10">
           <button
             type="button"
             onClick={() => {
@@ -148,6 +149,7 @@ export default function EntreeAnnuaireDetail() {
               : entree?.nom || 'Fiche entrée'}
           </h1>
         </div>
+        <HeaderWatermark color="ocre" />
       </header>
 
       <div className="px-4 pt-6 pb-8">

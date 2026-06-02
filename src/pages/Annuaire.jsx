@@ -4,6 +4,7 @@ import { ChevronLeft, Plus, Search, X, BookOpen, ChevronRight } from 'lucide-rea
 import AppLayout from '../components/layout/AppLayout'
 import Pill from '../components/common/Pill'
 import { useEntreesAnnuaire } from '../hooks/useEntreesAnnuaire'
+import HeaderWatermark from '../components/common/HeaderWatermark'
 
 export default function Annuaire() {
   const navigate = useNavigate()
@@ -49,8 +50,8 @@ export default function Annuaire() {
     <AppLayout>
       <div className="flex flex-col">
         {/* Header sticky : chevron + titre + bouton + ocre */}
-        <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border">
-          <div className="flex items-center gap-2 px-4 py-3">
+        <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border relative overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 relative z-10">
             <button
               type="button"
               onClick={() => navigate('/')}
@@ -71,7 +72,7 @@ export default function Annuaire() {
           </div>
 
           {/* Search bar */}
-          <div className="px-4 pb-3">
+          <div className="px-4 pb-3 relative z-10">
             <div className="flex items-center gap-2.5 h-11 px-3 rounded-input bg-carte border border-border shadow-card">
               <Search size={18} strokeWidth={1.8} className="text-faint shrink-0" />
               <input
@@ -94,6 +95,7 @@ export default function Annuaire() {
               )}
             </div>
           </div>
+          <HeaderWatermark color="ocre" />
         </header>
 
         {/* Pills catégories horizontales scrollables */}

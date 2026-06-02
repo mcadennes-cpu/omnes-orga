@@ -17,6 +17,7 @@ import { useMedecins } from '../hooks/useMedecins'
 import { useRole } from '../hooks/useRole'
 import { normalizeForSearch } from '../lib/profileFormat'
 import { supabase } from '../lib/supabaseClient'
+import HeaderWatermark from '../components/common/HeaderWatermark'
 
 export default function Recherche() {
   const navigate = useNavigate()
@@ -142,7 +143,7 @@ export default function Recherche() {
 
   return (
     <AppLayout>
-      <header className="flex items-center gap-3 px-5 pt-6 pb-4">
+      <header className="flex items-center gap-3 px-5 pt-6 pb-4 relative overflow-hidden">
         <button
           type="button"
           onClick={() => navigate('/')}
@@ -154,6 +155,7 @@ export default function Recherche() {
         <h1 className="font-display font-extrabold text-2xl text-marine">
           Rechercher
         </h1>
+        <HeaderWatermark color="marine" />
       </header>
 
       <div className="px-5 pt-2 pb-8">

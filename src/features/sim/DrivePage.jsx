@@ -3,6 +3,7 @@ import {
   Folder, FileText, FileImage, FileSpreadsheet, File, MoreVertical, Inbox,
   Search, X,
 } from 'lucide-react'
+import HeaderWatermark from '../../components/common/HeaderWatermark'
 
 // Mapping extension -> icone + couleur de la palette Omnes.
 function fileTypeMeta(filename) {
@@ -20,7 +21,7 @@ function fileTypeMeta(filename) {
 function Breadcrumb({ trail, subtitle, onBack, onCrumb }) {
   return (
     <header
-      className="sticky top-0 z-10 px-4 pt-3.5 pb-3 border-b border-border"
+      className="sticky top-0 z-10 px-4 pt-3.5 pb-3 border-b border-border relative overflow-hidden"
       style={{
         background: 'rgba(245,247,249,0.92)',
         backdropFilter: 'blur(20px)',
@@ -75,6 +76,7 @@ function Breadcrumb({ trail, subtitle, onBack, onCrumb }) {
           {subtitle}
         </p>
       )}
+      <HeaderWatermark color="olive" />
     </header>
   )
 }

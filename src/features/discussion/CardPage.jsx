@@ -6,6 +6,7 @@ import CardMessage from './CardMessage'
 import CardComposer from './CardComposer'
 import CardAttachments from './CardAttachments'
 import { formatDayLabel } from '../../lib/dateFormat'
+import HeaderWatermark from '../../components/common/HeaderWatermark'
 
 /** Deux dates tombent-elles le meme jour calendaire ? */
 function sameDay(a, b) {
@@ -67,8 +68,8 @@ export default function CardPage({
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {/* Header */}
-      <header className="shrink-0 bg-fond border-b border-border">
-        <div className="flex items-start gap-1 px-2 py-3">
+      <header className="shrink-0 bg-fond border-b border-border relative overflow-hidden">
+        <div className="flex items-start gap-1 px-2 py-3 relative z-10">
           <button
             type="button"
             onClick={onBack}
@@ -93,6 +94,7 @@ export default function CardPage({
             />
           </div>
         </div>
+        <HeaderWatermark color="brique" />
       </header>
 
       {/* Zone scrollable : description repliable + pieces jointes + fil */}

@@ -10,6 +10,7 @@ import { getEventColorClasses } from '../features/evenements/eventColors'
 import { isPastEvent } from '../features/evenements/eventDate'
 import EventDateBlock from '../features/evenements/EventDateBlock'
 import EvenementFormModal from '../features/evenements/EvenementFormModal'
+import HeaderWatermark from '../components/common/HeaderWatermark'
 
 // ----------------------------------------------------------------------------
 // Sous-composants
@@ -161,8 +162,8 @@ export default function Evenements() {
     <AppLayout>
       <div className="flex flex-col">
         {/* Header sticky : titre + recherche */}
-        <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border">
-          <div className="flex items-center gap-2 px-4 py-3">
+        <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border relative overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 relative z-10">
             <button
               type="button"
               onClick={() => navigate('/')}
@@ -175,7 +176,7 @@ export default function Evenements() {
               Événements
             </h1>
           </div>
-          <div className="px-4 pb-3">
+          <div className="px-4 pb-3 relative z-10">
             <div className="relative">
               <Search
                 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint pointer-events-none"
@@ -190,6 +191,7 @@ export default function Evenements() {
               />
             </div>
           </div>
+          <HeaderWatermark color="fuchsia" />
         </header>
 
         {/* Filtre segmente + CTA */}

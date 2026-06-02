@@ -22,6 +22,7 @@ import { useImmobilier } from '../features/immobilier/useImmobilier';
 import ImmobilierBoardTile from '../features/immobilier/ImmobilierBoardTile';
 import CreateBoardModal from '../features/immobilier/CreateBoardModal';
 import { getBoardColorClasses } from '../features/immobilier/immobilierColors';
+import HeaderWatermark from '../components/common/HeaderWatermark';
 
 export default function Immobilier() {
   const { role, loading: roleLoading } = useRole();
@@ -65,8 +66,8 @@ export default function Immobilier() {
   return (
     <AppLayout>
       {/* Header sticky */}
-      <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border">
-        <div className="flex items-center gap-2 px-4 py-3">
+      <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border relative overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 relative z-10">
           <button
             type="button"
             onClick={() => navigate('/')}
@@ -93,7 +94,7 @@ export default function Immobilier() {
         </div>
 
         {/* Barre de recherche */}
-        <div className="px-4 pb-3">
+        <div className="px-4 pb-3 relative z-10">
           <div className="relative">
             <Search
               className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4
@@ -111,6 +112,7 @@ export default function Immobilier() {
             />
           </div>
         </div>
+        <HeaderWatermark color="canard" />
       </header>
 
       {/* Sous-header : compteur + filtre */}

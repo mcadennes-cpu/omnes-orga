@@ -4,6 +4,7 @@ import CardListItem from './CardListItem'
 import MemberAvatars from './MemberAvatars'
 import { getBoardColorClasses } from './boardColors'
 import { formatShortName } from '../../lib/profileFormat'
+import HeaderWatermark from '../../components/common/HeaderWatermark'
 
 const STATUS_TABS = [
   { id: 'open', label: 'Ouvertes' },
@@ -55,9 +56,9 @@ export default function BoardPage({
   return (
     <div className="flex flex-col">
       {/* Header sticky */}
-      <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border">
+      <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border relative overflow-hidden">
         {/* Ligne 1 : retour + titre + actions */}
-        <div className="flex items-center gap-1 px-2 py-3">
+        <div className="flex items-center gap-1 px-2 py-3 relative z-10">
           <button
             type="button"
             onClick={onBack}
@@ -73,7 +74,7 @@ export default function BoardPage({
         </div>
 
         {/* Ligne 2 : membres + CTA nouvelle carte */}
-        <div className="flex items-center justify-between gap-3 px-4 pb-3 min-h-[36px]">
+        <div className="flex items-center justify-between gap-3 px-4 pb-3 min-h-[36px] relative z-10">
           <MemberAvatars profiles={memberProfiles} max={4} />
           {canCreateCard && (
             <button
@@ -88,7 +89,7 @@ export default function BoardPage({
         </div>
 
         {/* Ligne 3 : onglets de statut */}
-        <div className="px-4 pb-3">
+        <div className="px-4 pb-3 relative z-10">
           <div className="flex gap-1 p-1 bg-fond rounded-full">
             {STATUS_TABS.map((tab) => {
               const active = tab.id === statusFilter
@@ -114,6 +115,7 @@ export default function BoardPage({
             })}
           </div>
         </div>
+        <HeaderWatermark color="brique" verticalAlign="top" />
       </header>
 
       {/* Bandeau tableau archive */}

@@ -6,6 +6,7 @@ import EntreeAnnuaireForm from '../components/annuaire/EntreeAnnuaireForm'
 import { supabase } from '../lib/supabaseClient'
 import { useEntreesAnnuaire } from '../hooks/useEntreesAnnuaire'
 import { useAuth } from '../hooks/useAuth'
+import HeaderWatermark from '../components/common/HeaderWatermark'
 
 export default function EntreeAnnuaireNouvelle() {
   const navigate = useNavigate()
@@ -69,8 +70,8 @@ export default function EntreeAnnuaireNouvelle() {
 
   return (
     <AppLayout>
-      <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border">
-        <div className="flex items-center gap-2 px-4 py-3">
+      <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border relative overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 relative z-10">
           <button
             type="button"
             onClick={handleCancel}
@@ -83,6 +84,7 @@ export default function EntreeAnnuaireNouvelle() {
             Nouvelle entrée
           </h1>
         </div>
+        <HeaderWatermark color="ocre" />
       </header>
 
       <div className="px-4 pt-6 pb-8">

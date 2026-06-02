@@ -28,6 +28,7 @@ import CardComposer from './CardComposer';
 import CardActionsMenu from './CardActionsMenu';
 import EditCardModal from './EditCardModal';
 import CardAttachments from './CardAttachments';
+import HeaderWatermark from '../../components/common/HeaderWatermark';
 
 export default function CardPage({ boardId, cardId }) {
   const navigate = useNavigate();
@@ -161,8 +162,8 @@ export default function CardPage({ boardId, cardId }) {
   return (
     <div className="min-h-screen flex flex-col bg-fond">
       {/* Header */}
-      <header className="shrink-0 bg-fond border-b border-border">
-        <div className="flex items-start gap-1 px-2 py-3">
+      <header className="shrink-0 bg-fond border-b border-border relative overflow-hidden">
+        <div className="flex items-start gap-1 px-2 py-3 relative z-10">
           <button
             type="button"
             onClick={() => navigate(`/immobilier/${boardId}`)}
@@ -196,6 +197,7 @@ export default function CardPage({ boardId, cardId }) {
             </button>
           )}
         </div>
+        <HeaderWatermark color="canard" />
       </header>
 
       {/* Description repliable */}

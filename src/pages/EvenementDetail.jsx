@@ -12,6 +12,7 @@ import { useRole } from '../hooks/useRole'
 import { canEditEvenement, canDeleteEvenement } from '../lib/permissions'
 import { getEventColorClasses } from '../features/evenements/eventColors'
 import { formatDateLong } from '../features/evenements/eventDate'
+import HeaderWatermark from '../components/common/HeaderWatermark'
 
 // "Prenom N." a partir de l'auteur joint ({ prenom, nom }).
 function formatAuteurCourt(auteur) {
@@ -128,7 +129,7 @@ export default function EvenementDetail() {
   return (
     <AppLayout>
       {/* Header */}
-      <header className="flex items-center gap-1 px-3 pt-5 pb-2">
+      <header className="flex items-center gap-1 px-3 pt-5 pb-2 relative overflow-hidden">
         <button
           type="button"
           onClick={() => navigate('/evenements')}
@@ -150,6 +151,7 @@ export default function EvenementDetail() {
         ) : (
           <div className="w-10 shrink-0" />
         )}
+        <HeaderWatermark color="fuchsia" />
       </header>
 
       {/* Contenu */}

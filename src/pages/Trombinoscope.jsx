@@ -8,6 +8,7 @@ import MedecinCreatedModal from '../components/trombinoscope/MedecinCreatedModal
 import { useMedecins } from '../hooks/useMedecins'
 import { useRole } from '../hooks/useRole'
 import { canCreateMedecin } from '../lib/permissions'
+import HeaderWatermark from '../components/common/HeaderWatermark'
 
 export default function Trombinoscope() {
   const navigate = useNavigate()
@@ -42,8 +43,8 @@ export default function Trombinoscope() {
     <AppLayout>
       <div className="flex flex-col">
         {/* Header sticky */}
-        <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border">
-          <div className="flex items-center gap-2 px-4 py-3">
+        <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border relative overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 relative z-10">
             <button
               type="button"
               onClick={() => navigate('/')}
@@ -66,6 +67,7 @@ export default function Trombinoscope() {
               </button>
             )}
           </div>
+          <HeaderWatermark color="canard" />
         </header>
 
         {/* Sous-header : compteur */}

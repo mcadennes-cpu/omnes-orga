@@ -17,6 +17,7 @@ import { useRole } from '../hooks/useRole';
 import { getBoardColorClasses } from '../features/discussion/boardColors';
 import { formatRelativeDate } from '../lib/dateFormat';
 import { normalizeForSearch } from '../lib/profileFormat';
+import HeaderWatermark from '../components/common/HeaderWatermark';
 
 // ----------------------------------------------------------------------------
 // Sous-composants
@@ -180,8 +181,8 @@ export default function Discussion() {
     <AppLayout>
       <div className="flex flex-col">
         {/* Header sticky */}
-        <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border">
-          <div className="flex items-center gap-2 px-4 py-3">
+        <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border relative overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 relative z-10">
             <button
               type="button"
               onClick={() => navigate('/')}
@@ -206,7 +207,7 @@ export default function Discussion() {
           </div>
 
           {/* Barre de recherche */}
-          <div className="px-4 pb-3">
+          <div className="px-4 pb-3 relative z-10">
             <div className="relative">
               <Search
                 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint pointer-events-none"
@@ -221,6 +222,7 @@ export default function Discussion() {
               />
             </div>
           </div>
+          <HeaderWatermark color="brique" />
         </header>
 
         {/* Sous-header : compteur + filtre */}
