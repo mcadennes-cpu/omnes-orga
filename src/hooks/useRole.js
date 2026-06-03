@@ -29,7 +29,7 @@ export function useRole() {
       return
     }
 
-    if (!user) {
+    if (!user?.id) {
       setProfile(null)
       setLoading(false)
       setError(null)
@@ -61,14 +61,14 @@ export function useRole() {
     return () => {
       active = false
     }
-  }, [user, authLoading, fetchProfile])
+  }, [user?.id, authLoading, fetchProfile])
 
   // Re-fetch imperatif (apres upload de photo de profil, par exemple).
   // Son propre mecanisme d'annulation via latestFetchId : si deux refetch
   // sont declenches rapidement (double-clic), seul le dernier applique son
   // resultat au state.
   const refetch = useCallback(async () => {
-    if (!user) return
+    if (!user?.id) return
     const fetchId = ++latestFetchId.current
     setLoading(true)
     setError(null)
@@ -87,7 +87,7 @@ export function useRole() {
     }
     setProfile(result.data)
     setLoading(false)
-  }, [user, fetchProfile])
+  }, [user?.id, fetchProfile])
 
   return {
     profile,

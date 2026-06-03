@@ -21,7 +21,7 @@ export function useMedecin(id) {
       return
     }
 
-    if (!user) {
+    if (!user?.id) {
       setMedecin(null)
       setLoading(false)
       setError(null)
@@ -58,7 +58,7 @@ export function useMedecin(id) {
     return () => {
       active = false
     }
-  }, [id, user, authLoading, reloadKey])
+  }, [id, user?.id, authLoading, reloadKey])
 
   return { medecin, loading, error, refetch }
 }
