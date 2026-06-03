@@ -8,6 +8,8 @@ import AppLayout from '../components/layout/AppLayout'
 import Pill from '../components/common/Pill'
 import { getAvatarPalette } from '../lib/avatarColor'
 import HeaderWatermark from '../components/common/HeaderWatermark'
+import Avatar from '../components/common/Avatar'
+import AvatarUploadModal from '../components/common/AvatarUploadModal'
 
 function getInitials(prenom, nom) {
   const p = (prenom ?? '').trim().charAt(0).toUpperCase()
@@ -17,8 +19,9 @@ function getInitials(prenom, nom) {
 
 export default function Profil() {
   const { signOut } = useAuth()
-  const { role, prenom, nom, email, loading } = useRole()
+  const { role, prenom, nom, email, profile, refetch, loading } = useRole()
   const [signingOut, setSigningOut] = useState(false)
+  const [photoModalOpen, setPhotoModalOpen] = useState(false)
 
   async function handleSignOut() {
     if (signingOut) return
@@ -50,14 +53,16 @@ export default function Profil() {
           <p className="text-center text-muted py-12">Chargement…</p>
         ) : (
           <div className="flex flex-col gap-6">
-            {/* Identité centrée : avatar initiales + nom + rôle */}
+            {/* Identité centrée : avatar + nom + rôle */}
             <div className="flex flex-col items-center gap-3 pt-2">
-              <div
-                aria-hidden="true"
-                className={`h-[108px] w-[108px] rounded-full ${avatar.bg} ${avatar.text} font-display font-extrabold text-[38px] flex items-center justify-center`}
+              <Avatar profile={profile} size={108} />
+              <button
+                type="button"
+                onClick={() => setPhotoModalOpen(true)}
+                className="text-canard text-button hover:opacity-80 transition-opacity"
               >
-                {initials}
-              </div>
+                Modifier ma photo
+              </button>
               <div className="text-center">
                 <h2 className="font-display font-extrabold text-marine text-[22px] tracking-[-0.01em] break-words">
                   {fullName || 'Mon compte'}
@@ -121,6 +126,14 @@ export default function Profil() {
           </div>
         )}
       </div>
+
+      <AvatarUploadModal
+        open={photoModalOpen}
+        onClose={() => setPhotoModalOpen(false)}
+        userId={profile?.id}
+        currentProfile={profile}
+        onSuccess={() => refetch()}
+      />
     </AppLayout>
   )
 }
