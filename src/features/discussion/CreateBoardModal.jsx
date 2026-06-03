@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Check, Search, Loader2 } from 'lucide-react';
 import { useMedecins } from '../../hooks/useMedecins';
-import { formatName, initials, normalizeForSearch } from '../../lib/profileFormat';
+import { formatName, normalizeForSearch } from '../../lib/profileFormat';
+import Avatar from '../../components/common/Avatar';
 
 // ----------------------------------------------------------------------------
 // Constantes
@@ -334,9 +335,7 @@ function MemberPicker({ currentUserId, selectedIds, onChange }) {
                 onClick={() => toggle(p.id)}
                 className="w-full px-3 py-2 flex items-center gap-3 hover:bg-carte active:bg-carte transition-colors text-left"
               >
-                <div className="w-8 h-8 rounded-full bg-canard/15 text-canard flex items-center justify-center font-semibold text-xs">
-                  {initials(p)}
-                </div>
+                <Avatar profile={p} size={32} className="flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="text-marine text-sm truncate">{formatName(p)}</div>
                 </div>

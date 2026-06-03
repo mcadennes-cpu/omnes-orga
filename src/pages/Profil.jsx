@@ -6,16 +6,9 @@ import { useRole } from '../hooks/useRole'
 import { ROLE_LABELS } from '../lib/modules'
 import AppLayout from '../components/layout/AppLayout'
 import Pill from '../components/common/Pill'
-import { getAvatarPalette } from '../lib/avatarColor'
 import HeaderWatermark from '../components/common/HeaderWatermark'
 import Avatar from '../components/common/Avatar'
 import AvatarUploadModal from '../components/common/AvatarUploadModal'
-
-function getInitials(prenom, nom) {
-  const p = (prenom ?? '').trim().charAt(0).toUpperCase()
-  const n = (nom ?? '').trim().charAt(0).toUpperCase()
-  return `${p}${n}` || '?'
-}
 
 export default function Profil() {
   const { signOut } = useAuth()
@@ -35,8 +28,6 @@ export default function Profil() {
 
   const roleLabel = role ? ROLE_LABELS[role] ?? role : null
   const fullName = [prenom, nom].filter(Boolean).join(' ').trim()
-  const initials = getInitials(prenom, nom)
-  const avatar = getAvatarPalette(fullName || null)
 
   return (
     <AppLayout>

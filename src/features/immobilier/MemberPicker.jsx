@@ -9,7 +9,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Search, Check } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
-import { normalizeForSearch, initials, formatName } from '../../lib/profileFormat';
+import { normalizeForSearch, formatName } from '../../lib/profileFormat';
+import Avatar from '../../components/common/Avatar';
 
 const EMPTY_ARRAY = [];
 
@@ -119,12 +120,8 @@ export default function MemberPicker({ currentUserId, selectedIds, onChange, exc
                               rounded-input transition-colors
                               ${isSelected ? 'bg-canard/10' : 'hover:bg-fond'}`}
                 >
-                  {/* Avatar (initiales sur fond canard) */}
-                  <div className="w-9 h-9 rounded-full bg-canard text-white
-                                  flex items-center justify-center
-                                  text-button flex-shrink-0">
-                    {initials(p)}
-                  </div>
+                  {/* Avatar : photo de profil ou initiales sur palette */}
+                  <Avatar profile={p} size={36} className="flex-shrink-0" />
 
                   {/* Nom + specialite */}
                   <div className="flex-1 min-w-0 text-left">
