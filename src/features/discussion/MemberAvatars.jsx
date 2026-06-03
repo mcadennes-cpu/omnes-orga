@@ -1,5 +1,4 @@
-import { getAvatarPalette } from '../../lib/avatarColor'
-import { initials } from '../../lib/profileFormat'
+import Avatar from '../../components/common/Avatar'
 
 /**
  * Pile d'avatars chevauches pour representer les membres d'un tableau,
@@ -10,7 +9,7 @@ import { initials } from '../../lib/profileFormat'
  * ouvre une vue dediee aux membres (releve par le parent).
  *
  * @param {Object} props
- * @param {Array<{ id: string, prenom?: string, nom?: string }>} props.profiles
+ * @param {Array<{ id: string, prenom?: string, nom?: string, photo_url?: string }>} props.profiles
  * @param {number} [props.max=4]   nombre max d'avatars avant la pastille "+N"
  * @param {'sm'|'md'} [props.size='md']
  * @param {() => void} [props.onClick] si fourni, rend la pile tappable
@@ -27,11 +26,10 @@ export default function MemberAvatars({
 
   const visible = profiles.slice(0, max)
   const overflow = profiles.length - visible.length
-
-  const sizeClasses =
-    size === 'sm'
-      ? 'w-6 h-6 text-[10px]'
-      : 'w-7 h-7 text-[11px]'
+  const avatarSize = size === 'sm' ? 24 : 28
+  // Si le wrapper est un bouton avec aria-label, les avatars internes sont
+  // decoratifs : on n'expose pas un texte alternatif redondant.
+  const showAlt = !onClick
 
   const Wrapper = onClick ? 'button' : 'div'
   const wrapperProps = onClick
@@ -43,21 +41,20 @@ export default function MemberAvatars({
       {...wrapperProps}
       className={`inline-flex items-center ${onClick ? 'active:opacity-80 transition-opacity' : ''}`}
     >
-      {visible.map((p, idx) => {
-        const palette = getAvatarPalette(`${p.prenom} ${p.nom}`)
-        return (
-          <span
-            key={p.id}
-            className={`${sizeClasses} rounded-full ${palette.bg} ${palette.text} border-2 border-white flex items-center justify-center font-semibold ${idx > 0 ? '-ml-2' : ''}`}
-            aria-hidden={onClick ? 'true' : undefined}
-          >
-            {initials(p)}
-          </span>
-        )
-      })}
+      {visible.map((p, idx) => (
+        <Avatar
+          key={p.id}
+          profile={p}
+          size={avatarSize}
+          alt={showAlt ? `${p.prenom || ''} ${p.nom || ''}`.trim() : ''}
+          className={`border-2 border-white ${idx > 0 ? '-ml-2' : ''}`}
+        />
+      ))}
       {overflow > 0 && (
         <span
-          className={`${sizeClasses} rounded-full bg-fond text-muted border-2 border-white flex items-center justify-center font-semibold -ml-2`}
+          className={`rounded-full bg-fond text-muted border-2 border-white flex items-center justify-center font-semibold -ml-2 ${
+            size === 'sm' ? 'w-6 h-6 text-[10px]' : 'w-7 h-7 text-[11px]'
+          }`}
           aria-hidden={onClick ? 'true' : undefined}
         >
           +{overflow}

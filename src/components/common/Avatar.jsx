@@ -19,9 +19,16 @@ function getInitials(prenom, nom) {
  * elle est prete. Si l'URL signee echoue ou si l'image elle-meme ne charge
  * pas, on reste sur les initiales (fail-safe silencieux).
  *
- * @param {{ profile?: { prenom?: string, nom?: string, photo_url?: string }, size: number, className?: string }} props
+ * @param {object} props
+ * @param {{ prenom?: string, nom?: string, photo_url?: string }} [props.profile]
+ * @param {number} props.size
+ * @param {string} [props.className]
+ * @param {string} [props.alt] - texte alternatif pour l'image. Par defaut vide
+ *   (avatar decoratif, accompagne d'un nom ailleurs dans le DOM). A fournir
+ *   explicitement dans les listes d'avatars sans nom visible a cote (ex:
+ *   MemberAvatars).
  */
-export default function Avatar({ profile, size, className = '' }) {
+export default function Avatar({ profile, size, className = '', alt = '' }) {
   const photoPath = profile?.photo_url || ''
   const [signedUrl, setSignedUrl] = useState(null)
   const [imgFailed, setImgFailed] = useState(false)
@@ -66,7 +73,7 @@ export default function Avatar({ profile, size, className = '' }) {
       {showImage && (
         <img
           src={signedUrl}
-          alt=""
+          alt={alt}
           className="absolute inset-0 w-full h-full object-cover"
           onError={() => setImgFailed(true)}
         />

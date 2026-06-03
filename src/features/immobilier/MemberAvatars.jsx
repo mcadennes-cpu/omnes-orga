@@ -1,11 +1,9 @@
 // src/features/immobilier/MemberAvatars.jsx
 // Pile d'avatars chevauches des membres d'un tableau.
-// Utilise le helper global getAvatarPalette pour que les couleurs soient
-// coherentes avec le Trombinoscope et les autres modules (un meme medecin
-// garde sa couleur partout dans l'app).
+// Delegue le rendu de chaque pastille au composant <Avatar> commun, qui
+// gere photo de profil OU initiales sur palette deterministe.
 
-import { getAvatarPalette } from '../../lib/avatarColor';
-import { initials } from '../../lib/profileFormat';
+import Avatar from '../../components/common/Avatar';
 
 export default function MemberAvatars({ members, max = 4 }) {
   if (!members || members.length === 0) return null;
@@ -18,17 +16,15 @@ export default function MemberAvatars({ members, max = 4 }) {
       {visible.map((m, idx) => {
         const profile = m.profile;
         if (!profile) return null;
-        const palette = getAvatarPalette(`${profile.prenom} ${profile.nom}`);
+        const fullName = `${profile.prenom || ''} ${profile.nom || ''}`.trim();
         return (
-          <span
+          <Avatar
             key={m.user_id}
-            className={`w-7 h-7 rounded-full ${palette.bg} ${palette.text}
-                        border-2 border-white flex items-center justify-center
-                        text-[11px] font-semibold ${idx > 0 ? '-ml-2' : ''}`}
-            title={`${profile.prenom || ''} ${profile.nom || ''}`.trim()}
-          >
-            {initials(profile)}
-          </span>
+            profile={profile}
+            size={28}
+            alt={fullName}
+            className={`border-2 border-white ${idx > 0 ? '-ml-2' : ''}`}
+          />
         );
       })}
       {overflow > 0 && (
