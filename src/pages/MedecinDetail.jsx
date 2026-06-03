@@ -19,14 +19,9 @@ import {
   canViewCompta,
   canEditRole,
 } from '../lib/permissions'
-import { getAvatarPalette } from '../lib/avatarColor'
 import HeaderWatermark from '../components/common/HeaderWatermark'
-
-function getInitials(prenom, nom) {
-  const p = (prenom ?? '').trim().charAt(0).toUpperCase()
-  const n = (nom ?? '').trim().charAt(0).toUpperCase()
-  return `${p}${n}` || '?'
-}
+import Avatar from '../components/common/Avatar'
+import AvatarUploadModal from '../components/common/AvatarUploadModal'
 
 export default function MedecinDetail() {
   const { id } = useParams()
@@ -40,20 +35,19 @@ export default function MedecinDetail() {
   const [submitError, setSubmitError] = useState(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [toggleActifSubmitting, setToggleActifSubmitting] = useState(false)
+  const [photoModalOpen, setPhotoModalOpen] = useState(false)
 
   const fullName = medecin
     ? [medecin.prenom, medecin.nom].filter(Boolean).join(' ').trim()
     : ''
-  const initials = medecin ? getInitials(medecin.prenom, medecin.nom) : '?'
-  const avatar = getAvatarPalette(
-    medecin ? `${medecin.prenom} ${medecin.nom}` : null
-  )
 
   const canEdit = canEditMedecin({
     role,
     currentUserId: user?.id,
     medecinId: medecin?.id,
   })
+  const isOwnFiche = user?.id === medecin?.id
+  const photoButtonLabel = isOwnFiche ? 'Modifier ma photo' : 'Modifier la photo'
   const canEditPrivileged = canEditPrivilegedFields(role)
   const canEditRoleField = canEditRole(role)
   const canToggle = canToggleActif(role)
@@ -192,19 +186,15 @@ export default function MedecinDetail() {
           <div className="flex flex-col gap-6">
             {/* Identite centree : photo + nom + role + statut */}
             <div className="flex flex-col items-center gap-3 pt-2">
-              {medecin.photo_url ? (
-                <img
-                  src={medecin.photo_url}
-                  alt={fullName}
-                  className="h-[108px] w-[108px] rounded-full object-cover"
-                />
-              ) : (
-                <div
-                  aria-hidden="true"
-                  className={`h-[108px] w-[108px] rounded-full ${avatar.bg} ${avatar.text} font-display font-extrabold text-[38px] flex items-center justify-center`}
+              <Avatar profile={medecin} size={108} />
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() => setPhotoModalOpen(true)}
+                  className="text-canard text-button hover:opacity-80 transition-opacity"
                 >
-                  {initials}
-                </div>
+                  {photoButtonLabel}
+                </button>
               )}
               <div className="text-center">
                 <h2 className="font-display font-extrabold text-marine text-[22px] tracking-[-0.01em] break-words">
@@ -351,6 +341,16 @@ export default function MedecinDetail() {
           onConfirm={handleToggleActif}
           onCancel={() => setConfirmOpen(false)}
           submitting={toggleActifSubmitting}
+        />
+      )}
+
+      {medecin && (
+        <AvatarUploadModal
+          open={photoModalOpen}
+          onClose={() => setPhotoModalOpen(false)}
+          userId={medecin.id}
+          currentProfile={medecin}
+          onSuccess={() => refetch()}
         />
       )}
     </AppLayout>
