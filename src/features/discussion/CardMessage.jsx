@@ -3,6 +3,7 @@ import { MoreHorizontal, Loader2 } from 'lucide-react'
 import { getBoardColorClasses } from './boardColors'
 import { formatTime } from '../../lib/dateFormat'
 import { formatName } from '../../lib/profileFormat'
+import Avatar from '../../components/common/Avatar'
 
 const BODY_MAX = 2000
 
@@ -20,6 +21,9 @@ const BODY_MAX = 2000
  * @param {string} [props.accentColor='brique']
  * @param {(messageId: string, body: string) => Promise} props.onEdit
  * @param {(messageId: string) => Promise} props.onDelete
+ * @param {boolean} [props.showAvatar=true] - n'a d'effet que si !isOwn. Si
+ *   false, un placeholder vide remplace l'avatar (groupement WhatsApp :
+ *   avatar uniquement sur la derniere bulle d'une serie du meme auteur).
  */
 export default function CardMessage({
   message,
@@ -28,6 +32,7 @@ export default function CardMessage({
   accentColor = 'brique',
   onEdit,
   onDelete,
+  showAvatar = true,
 }) {
   const [mode, setMode] = useState('view') // 'view' | 'menu' | 'edit' | 'confirmDelete'
   const [draft, setDraft] = useState(message.body || '')
@@ -77,8 +82,9 @@ export default function CardMessage({
   // --- Mode edition --------------------------------------------------------
   if (mode === 'edit') {
     return (
-      <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
-        <div className="w-[85%]">
+      <div className={`flex items-end gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+        {!isOwn && <div className="w-8 shrink-0" />}
+        <div className="w-[80%]">
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value.slice(0, BODY_MAX))}
@@ -114,8 +120,9 @@ export default function CardMessage({
   // --- Mode confirmation suppression ---------------------------------------
   if (mode === 'confirmDelete') {
     return (
-      <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
-        <div className="w-[85%] px-3 py-2.5 rounded-2xl bg-brique/10">
+      <div className={`flex items-end gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+        {!isOwn && <div className="w-8 shrink-0" />}
+        <div className="w-[80%] px-3 py-2.5 rounded-2xl bg-brique/10">
           <p className="text-marine text-sm font-medium">Supprimer ce message ?</p>
           {actionError && <p className="mt-1 text-brique text-xs">{actionError}</p>}
           <div className="mt-2 flex items-center justify-end gap-2">
@@ -144,8 +151,20 @@ export default function CardMessage({
 
   // --- Mode affichage (view / menu) ----------------------------------------
   return (
-    <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
-      <div className={`flex flex-col max-w-[85%] ${isOwn ? 'items-end' : 'items-start'}`}>
+    <div className={`flex items-end gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+      {!isOwn && (
+        showAvatar ? (
+          <Avatar
+            profile={author}
+            size={32}
+            alt={`${author?.prenom || ''} ${author?.nom || ''}`.trim()}
+            className="shrink-0 mb-1"
+          />
+        ) : (
+          <div className="w-8 shrink-0" />
+        )
+      )}
+      <div className={`flex flex-col max-w-[80%] ${isOwn ? 'items-end' : 'items-start'}`}>
         {!isOwn && (
           <span className="text-marine text-xs font-semibold mb-0.5 px-1">
             {formatName(author)}

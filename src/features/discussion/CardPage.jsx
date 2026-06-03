@@ -146,8 +146,15 @@ export default function CardPage({
           ) : (
             messages.map((msg, idx) => {
               const prev = messages[idx - 1]
+              const next = messages[idx + 1]
               const showSeparator =
                 !prev || !sameDay(prev.createdAt, msg.createdAt)
+              // Avatar sur la derniere bulle d'une serie : pas de suivant,
+              // OU auteur different, OU jour different (separateur apres).
+              const isLastOfGroup =
+                !next ||
+                next.authorId !== msg.authorId ||
+                !sameDay(msg.createdAt, next.createdAt)
               return (
                 <Fragment key={msg.id}>
                   {showSeparator && (
@@ -160,6 +167,7 @@ export default function CardPage({
                     accentColor={board.color}
                     onEdit={onEditMessage}
                     onDelete={onDeleteMessage}
+                    showAvatar={isLastOfGroup}
                   />
                 </Fragment>
               )

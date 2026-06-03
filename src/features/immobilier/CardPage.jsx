@@ -100,14 +100,23 @@ export default function CardPage({ boardId, cardId }) {
   const decoratedMessages = useMemo(() => {
     return messages.map((m, idx) => {
       const prev = messages[idx - 1];
+      const next = messages[idx + 1];
       const currentDay = new Date(m.created_at).toDateString();
       const prevDay = prev ? new Date(prev.created_at).toDateString() : null;
+      const nextDay = next ? new Date(next.created_at).toDateString() : null;
       const dayChanged = currentDay !== prevDay;
       const authorChanged = prev ? prev.auteur_id !== m.auteur_id : true;
+      // Avatar sur la DERNIERE bulle d'un groupe : pas de suivant,
+      // OU auteur different, OU jour different du suivant.
+      const isLastOfGroup =
+        !next ||
+        next.auteur_id !== m.auteur_id ||
+        currentDay !== nextDay;
       return {
         ...m,
         dayChanged,
         showAuthor: dayChanged || authorChanged,
+        showAvatar: isLastOfGroup,
       };
     });
   }, [messages]);
@@ -265,6 +274,7 @@ export default function CardPage({ boardId, cardId }) {
                 boardColor={board.couleur}
                 onEdit={editMessage}
                 onDelete={deleteMessage}
+                showAvatar={m.showAvatar}
               />
             </div>
           ))

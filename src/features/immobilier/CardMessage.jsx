@@ -12,6 +12,7 @@ import { MoreHorizontal, Loader2 } from 'lucide-react';
 import { getBoardColorClasses } from './immobilierColors';
 import { formatTime } from '../../lib/dateFormat';
 import { formatName } from '../../lib/profileFormat';
+import Avatar from '../../components/common/Avatar';
 
 const BODY_MAX = 2000;
 
@@ -21,6 +22,7 @@ export default function CardMessage({
   boardColor = 'canard',
   onEdit,
   onDelete,
+  showAvatar = true,
 }) {
   // 'view' | 'menu' | 'edit' | 'confirmDelete'
   const [mode, setMode] = useState('view');
@@ -84,8 +86,9 @@ export default function CardMessage({
   // --- Mode edition --------------------------------------------------------
   if (mode === 'edit') {
     return (
-      <div className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
-        <div className="w-[85%]">
+      <div className={`flex items-end gap-2 ${isMine ? 'justify-end' : 'justify-start'}`}>
+        {!isMine && <div className="w-8 shrink-0" />}
+        <div className="w-[80%]">
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value.slice(0, BODY_MAX))}
@@ -128,8 +131,9 @@ export default function CardMessage({
   // --- Mode confirmation suppression ---------------------------------------
   if (mode === 'confirmDelete') {
     return (
-      <div className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
-        <div className="w-[85%] px-3 py-2.5 rounded-2xl bg-brique/10">
+      <div className={`flex items-end gap-2 ${isMine ? 'justify-end' : 'justify-start'}`}>
+        {!isMine && <div className="w-8 shrink-0" />}
+        <div className="w-[80%] px-3 py-2.5 rounded-2xl bg-brique/10">
           <p className="text-marine text-sm font-medium">Supprimer ce message ?</p>
           {actionError && (
             <p className="mt-1 text-brique text-xs">{actionError}</p>
@@ -163,8 +167,20 @@ export default function CardMessage({
 
   // --- Mode affichage (view / menu) ----------------------------------------
   return (
-    <div className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
-      <div className={`flex flex-col max-w-[85%] ${isMine ? 'items-end' : 'items-start'}`}>
+    <div className={`flex items-end gap-2 ${isMine ? 'justify-end' : 'justify-start'}`}>
+      {!isMine && (
+        showAvatar ? (
+          <Avatar
+            profile={auteur}
+            size={32}
+            alt={`${auteur?.prenom || ''} ${auteur?.nom || ''}`.trim()}
+            className="shrink-0 mb-1"
+          />
+        ) : (
+          <div className="w-8 shrink-0" />
+        )
+      )}
+      <div className={`flex flex-col max-w-[80%] ${isMine ? 'items-end' : 'items-start'}`}>
         {!isMine && (
           <span className="text-marine text-xs font-semibold mb-0.5 px-1">
             {formatName(auteur)}
