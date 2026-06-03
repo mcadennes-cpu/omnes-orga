@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { MoreVertical, Pencil, Lock, Unlock, Trash2 } from 'lucide-react'
 
 /**
- * Menu trois-points du header d'une carte de discussion.
- * N'apparait que si l'utilisateur peut editer la carte (canEdit) :
- * auteur de la carte, createur du tableau, ou super_admin.
+ * Menu trois-points du header d'une carte de discussion. Rendu en
+ * bottom-sheet via Portal (sort du stacking context du header sticky qui
+ * piegeait l'ancien dropdown CSS).
  *
  * @param {Object} props
  * @param {'open'|'closed'} props.cardStatus
@@ -21,40 +22,56 @@ export default function CardActionsMenu({
   onDelete,
 }) {
   const [open, setOpen] = useState(false)
-  const ref = useRef(null)
 
   useEffect(() => {
     if (!open) return undefined
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return undefined
-    const handler = (e) => {
+    function onKeyDown(e) {
       if (e.key === 'Escape') setOpen(false)
     }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
+    document.addEventListener('keydown', onKeyDown)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = prev
+    }
   }, [open])
 
   if (!canEdit) return null
 
   const isOpen = cardStatus === 'open'
 
-  const runAction = (fn) => {
-    setOpen(false)
-    if (fn) fn()
+  const items = [
+    {
+      key: 'edit',
+      label: 'Modifier la carte',
+      icon: Pencil,
+      onClick: onEdit,
+    },
+    {
+      key: 'toggle',
+      label: isOpen ? 'Clore la carte' : 'Rouvrir la carte',
+      icon: isOpen ? Lock : Unlock,
+      onClick: onToggleStatus,
+    },
+    {
+      key: 'delete',
+      label: 'Supprimer la carte',
+      icon: Trash2,
+      onClick: onDelete,
+      danger: true,
+    },
+  ]
+
+  function handleBackdrop(e) {
+    if (e.target === e.currentTarget) setOpen(false)
   }
 
   return (
-    <div ref={ref} className="relative">
+    <>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen(true)}
         aria-label="Actions de la carte"
         aria-haspopup="true"
         aria-expanded={open}
@@ -63,44 +80,45 @@ export default function CardActionsMenu({
         <MoreVertical className="w-5 h-5" strokeWidth={2} />
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
-          role="menu"
-          className="absolute right-0 top-full mt-1 w-52 bg-carte rounded-card shadow-2xl border border-border py-1 z-30"
+          className="fixed inset-0 z-50 flex flex-col justify-end bg-marine/40 backdrop-blur-sm"
+          onClick={handleBackdrop}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Actions de la carte"
         >
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => runAction(onEdit)}
-            className="w-full px-3 py-2.5 flex items-center gap-2.5 text-marine text-sm hover:bg-fond active:bg-fond transition-colors"
-          >
-            <Pencil className="w-4 h-4 text-muted" strokeWidth={1.9} />
-            Modifier la carte
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => runAction(onToggleStatus)}
-            className="w-full px-3 py-2.5 flex items-center gap-2.5 text-marine text-sm hover:bg-fond active:bg-fond transition-colors"
-          >
-            {isOpen ? (
-              <Lock className="w-4 h-4 text-muted" strokeWidth={1.9} />
-            ) : (
-              <Unlock className="w-4 h-4 text-muted" strokeWidth={1.9} />
-            )}
-            {isOpen ? 'Clore la carte' : 'Rouvrir la carte'}
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => runAction(onDelete)}
-            className="w-full px-3 py-2.5 flex items-center gap-2.5 text-brique text-sm hover:bg-brique/5 active:bg-brique/5 transition-colors"
-          >
-            <Trash2 className="w-4 h-4" strokeWidth={1.9} />
-            Supprimer la carte
-          </button>
-        </div>
+          <div className="bg-carte rounded-t-2xl shadow-2xl animate-slide-up">
+            <div className="pt-3 pb-1 flex justify-center">
+              <div className="w-9 h-1 rounded-full bg-marine/18" />
+            </div>
+            <div className="px-2 py-2">
+              {items.map((it) => {
+                const Icon = it.icon
+                return (
+                  <button
+                    key={it.key}
+                    type="button"
+                    onClick={() => {
+                      setOpen(false)
+                      it.onClick?.()
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-input text-left text-body-m ${
+                      it.danger
+                        ? 'text-brique hover:bg-brique/10'
+                        : 'text-ink hover:bg-fond'
+                    }`}
+                  >
+                    <Icon size={20} aria-hidden="true" />
+                    <span>{it.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>,
+        document.body,
       )}
-    </div>
+    </>
   )
 }
