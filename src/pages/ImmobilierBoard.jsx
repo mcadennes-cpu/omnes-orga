@@ -57,6 +57,7 @@ export default function ImmobilierBoard() {
   const [actionsOpen, setActionsOpen] = useState(false);
   const [editBoardOpen, setEditBoardOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false);
   const [manageMembersOpen, setManageMembersOpen] = useState(false);
 
   const counts = useMemo(
@@ -147,11 +148,7 @@ export default function ImmobilierBoard() {
       .delete()
       .eq('board_id', board.id)
       .eq('user_id', user.id);
-    if (err) {
-      // eslint-disable-next-line no-alert
-      alert(`Erreur : ${err.message}`);
-      return;
-    }
+    if (err) throw err; // ConfirmModal affichera l'erreur
     navigate('/immobilier', { replace: true });
   }
 
@@ -333,7 +330,7 @@ export default function ImmobilierBoard() {
         onToggleArchive={handleToggleArchive}
         onManageMembers={() => setManageMembersOpen(true)}
         onDelete={() => setConfirmDeleteOpen(true)}
-        onLeave={handleLeaveBoard}
+        onLeave={() => setConfirmLeaveOpen(true)}
       />
 
       <EditBoardModal
@@ -353,6 +350,16 @@ export default function ImmobilierBoard() {
         confirmLabel="Supprimer"
         danger
         onConfirm={handleDeleteBoard}
+      />
+
+      <ConfirmModal
+        open={confirmLeaveOpen}
+        onClose={() => setConfirmLeaveOpen(false)}
+        title="Quitter ce tableau ?"
+        message="Vous perdrez l'accès à ses cartes et à ses discussions. Vous ne pourrez y revenir que si un membre vous réinvite."
+        confirmLabel="Quitter le tableau"
+        danger
+        onConfirm={handleLeaveBoard}
       />
 
       <ManageMembersModal
