@@ -147,12 +147,19 @@ Les modules non accessibles selon le rôle sont **masqués** (pas affichés, pas
 
 **Type :** Cartes (une carte par médecin du cabinet)
 
-**Contenu d'une carte (vue lecture) :**
-- Photo du médecin (ou initiales sur fond canard si pas de photo)
+**Contenu d'une carte de la liste (`/trombinoscope`) — épuré depuis l'étape 16 bis :**
+- Photo du médecin, agrandie (ou initiales sur fond canard si pas de photo)
 - Nom, prénom, spécialité
-- Téléphone (cliquable, ouvre le composeur), email
+- Téléphone cliquable (ouvre le composeur), placé à droite de l'avatar
+
+Toutes les cartes de la liste ont la même hauteur. Les jours disponibles, les notes internes et l'email ne sont plus affichés dans la liste : ils sont réservés à la fiche détail.
+
+**Contenu de la fiche détail (`/trombinoscope/:id`, vue lecture) :**
+- Photo (108 px), nom, prénom, spécialité
+- Téléphone (cliquable) et email, plus un bouton « Ajouter à mes contacts » (vCard, étape 16 bis)
 - Jours disponibles (visible aux non-remplaçants uniquement)
 - Notes internes (visibles aux non-remplaçants uniquement)
+- Coordonnées bancaires (RIB), si le rôle l'autorise, avec un bouton « copier » par ligne (étape 16 bis)
 
 **Droits :**
 | Action | super_admin | associe_gerant | associe | remplacant |
@@ -209,7 +216,7 @@ Le workflow alternatif via dashboard Supabase reste possible mais devient second
 #### Routing du module
 
 - `/trombinoscope` — liste des médecins actifs (cartes cliquables).
-- `/trombinoscope/:id` — fiche détail. Affiche en lecture par défaut ; bouton "Modifier" passe en mode édition (toggle sur la même page, pas de nouvelle route). Bouton "Désactiver / Réactiver" visible pour super_admin.
+- `/trombinoscope/:id` — fiche détail. Affiche en lecture par défaut ; bouton "Modifier" passe en mode édition (toggle sur la même page, pas de nouvelle route). Bouton "Désactiver / Réactiver" visible pour super_admin. Depuis l'étape 16 bis, le rôle du médecin n'est **pas** affiché sur cette fiche (il n'apparaît que sur la page Profil) ; seul le badge « Désactivé » subsiste comme indicateur de statut.
 
 #### Coordonnées bancaires (RIB) — étape 11
 
@@ -737,7 +744,7 @@ Les 5 helpers de module (`cabinetStorage.js`, `simStorage.js`, `evenementStorage
 
 `src/components/common/LogoOmnes.jsx` (introduit en étape 15 ter) affiche le mark Omnès Médecins teinté dans n'importe quelle couleur du DS, sans dépendre d'une bibliothèque d'icônes ni d'un SVG. Technique : un seul PNG noir opaque (`public/watermark-mask.png`, ~16 ko) est utilisé en `mask-image` CSS, colorisé via `background-color`. Une seule image, n couleurs. Props : `color` (clé DS ou valeur CSS libre), `width`, `height`, `opacity`, `className`, `style`. Le composant inclut les préfixes `-webkit-mask-*` requis pour Safari/iOS (PWA).
 
-`src/components/common/HeaderWatermark.jsx` (introduit en étape 15 ter) est un wrapper de `LogoOmnes` qui positionne le logo en filigrane dans un header sticky. Le composant est en `position: absolute` à droite, `pointer-events-none`, `select-none` ; il ne capte ni clics ni sélection. Props : `color`, `size` (`sm` / `md` / `lg`), `opacity` (défaut 0.18), `offsetRight` (défaut -10 px pour effet « déborde »), `verticalAlign` (`center` par défaut / `top` pour les headers multi-lignes type BoardPage). Le header parent doit avoir `relative overflow-hidden`, et les éventuels `<div>` enfants doivent avoir `relative z-10` (pattern défensif d'empilement pour que les boutons restent au-dessus du watermark).
+`src/components/common/HeaderWatermark.jsx` (introduit en étape 15 ter) est un wrapper de `LogoOmnes` qui positionne le logo en filigrane dans un header sticky. Le composant est en `position: absolute` à droite, `pointer-events-none`, `select-none` ; il ne capte ni clics ni sélection. Props : `color`, `size` (`sm` / `md` / `lg`), `opacity` (défaut 0.18), `offsetRight` (défaut -10 px pour effet « déborde »), `verticalAlign` (`center` par défaut / `top` pour les headers multi-lignes type BoardPage). Le header parent doit avoir `relative overflow-hidden`, et les éventuels `<div>` enfants doivent avoir `relative z-10` (pattern défensif d'empilement pour que les boutons restent au-dessus du watermark). Depuis l'étape 15 quater, une prop booléenne `fill` fait que le logo épouse toute la hauteur du header (largeur dérivée du ratio via `aspect-ratio`), `offsetRight` servant alors à le recentrer : c'est le réglage `fill offsetRight={64}` désormais utilisé sur tous les headers de l'app. Par ailleurs, `LogoOmnes` est aussi employé en direct comme filigrane de fond derrière les messages dans les vues carte de Discussion et Immobilier, et comme 2e signature en bas à gauche de la Home.
 
 Distinction d'usage entre les deux composants :
 - `HeaderWatermark` : filigrane d'arrière-plan dans le header des pages module et utilitaires (Trombinoscope, Annuaire, Cabinet pratique, Discussion, Événements, SIM, Immobilier, Profil, Recherche).
@@ -1135,6 +1142,17 @@ Le module Discussion est désormais complet (étapes 7A à 7D).
    - `AppLayout.jsx` : retrait de `<Filigrane />` (cercle + triangle plein écran) et de la prop `showFiligrane` désormais inutile. Le composant `src/components/layout/Filigrane.jsx` reste en place car utilisé sur les 3 pages publiques d'authentification (`Login`, `MotDePasseOublie`, `NouveauMotDePasse`) qui gardent leur identité visuelle actuelle (filigrane cercle + triangle conservé, étape 12 bis).
    - Total : 22 fichiers touchés (3 nouveaux + 19 modifiés). Aucune migration SQL, aucun changement de signature publique des composants existants, aucun impact sur les permissions ou la sécurité.
 
+15 quater. ✓ **Étape 15 quater — FAITE** — Filigranes : mode `fill`, fonds de chat, 2e logo Home
+
+Suite de la 15 ter. Trois ajustements visuels autour du filigrane Omnès, sans migration SQL ni changement de sécurité.
+
+- **Nouveau mode `fill` du composant `HeaderWatermark`** : en plus du mode « taille fixe » (sm/md/lg + centrage vertical ou haut), le composant accepte une prop booléenne `fill`. En mode `fill`, le filigrane épouse **toute la hauteur du header** (`top: 0; bottom: 0`) et sa largeur se déduit du ratio du masque (430×172 ≈ 2.5) via `aspect-ratio`. La prop `offsetRight` sert alors à décaler le logo vers le centre pour qu'il ne passe plus sous le bouton « + » (ou le menu « ⋮ »). Les defaults sont inchangés : le mode `fill` est opt-in, aucune régression sur les usages non convertis.
+- **Headers passés en `fill offsetRight={64}`** : réglage commun à tous les headers de l'app, qui homogénéise le rendu quelle que soit la hauteur du header (1, 2 ou 3 lignes). Pages concernées : Trombinoscope, Annuaire, Cabinet pratique (`DrivePage`), SIM (`DrivePage`), Discussion (liste + vue tableau `BoardPage` + vue carte `CardPage`), Événements (liste + détail `EvenementDetail`), Immobilier (liste + vue tableau `ImmobilierBoard` + vue carte `CardPage`). Le `verticalAlign="top"` des vues tableau a été retiré (inutile en `fill`). Sur `EvenementDetail`, le header a été restructuré (contenu enveloppé dans un `<div relative z-10>`) pour que le logo, désormais plus grand, reste derrière le titre.
+- **Filigrane de fond dans le chat** (Discussion + Immobilier, vues carte) : un `LogoOmnes` discret (couleur du module, opacité 0.05) est posé **en fond derrière les messages**, fixe et centré, les bulles défilant par-dessus (effet « fond d'écran »). Technique : la zone de messages est enveloppée dans un conteneur `relative bg-carte overflow-hidden` qui ne défile pas ; le logo y est en `absolute` centré à `z-0` ; la zone de scroll repasse par-dessus en `absolute inset-0 z-10`, transparente, pour laisser voir le filigrane. Effet de bord assumé sur Immobilier : borner ainsi la zone de messages fige aussi le header et la description (seules les bulles défilent désormais) — jugé préférable (plus « appli »).
+- **2e logo sur la Home** : en plus du grand logo en haut à droite (dans `HomeHeader`), un second `LogoOmnes` (marine, 320×128, opacité 0.07) est posé **en bas à gauche** de la page (`bottom: 0`, `left: -100`), en `zIndex: -1` pour rester derrière la grille de modules tout en restant au-dessus du `bg-fond`. Orienté normalement (pas en miroir).
+
+Bilan : le composant `HeaderWatermark` enrichi, une douzaine de pages et composants modifiés, et `Home.jsx`. Aucune migration SQL, aucun impact sur les permissions ou la sécurité.
+
 16. ✓ **Étape 16 — FAITE** (sous-étapes 16A → 16E) — Photos de profil
     - 16A : Fondations Storage — bucket privé `avatars` (500 Ko max, MIME jpeg/png/webp), 4 storage policies sur `storage.objects` (lecture ouverte authentifiés, écriture sur son propre user_id OU super_admin/associe_gerant, via `split_part(name, '.', 1) = auth.uid()::text`). Path flat : un fichier par user, le remplacement écrase. SQL versionné dans `docs/sql/16A-1-avatars-bucket.sql` et `docs/sql/16A-2-avatars-storage-policies.sql`.
     - 16B : Helpers techniques transverses dans `src/lib/` : `avatarStorage.js` (uploadAvatar / deleteAvatar / getAvatarSignedUrl), `avatarCache.js` (Map en mémoire TTL 1h, URL signée 2h, coalescence des Promises pour éviter les requêtes concurrentes redondantes), `imageCompress.js` (compression canvas API native vers JPEG carré 512×512, qualité 0.85 dégradable par paliers de 0.10 jusqu'à 0.55 minimum, validation du crop fourni par `react-easy-crop` ou crop centré par défaut). Installation de `react-easy-crop@5.5.0` (compatible React 19).
@@ -1147,6 +1165,20 @@ Le module Discussion est désormais complet (étapes 7A à 7D).
       - 16E-3 : `MemberAvatars` Discussion + Immobilier — petits avatars chevauchés (taille 24-28px), avec `<Avatar>` en interne + bordure blanche pour le chevauchement. Au passage, ajout d'une prop `alt` à `<Avatar>` pour les listes d'avatars sans nom visible.
       - 16E-4 : `CardMessage` Discussion + Immobilier — avatars latéraux 32×32 à gauche des bulles des AUTRES uniquement (pas mes propres bulles, pattern WhatsApp), avec **groupement WhatsApp** : avatar visible uniquement sur le DERNIER message d'une série consécutive du même auteur. Placeholder `w-8 shrink-0` réservé pour les autres bulles du groupe pour préserver l'alignement vertical. Nécessite un calcul de `isLastOfGroup` côté parent (`CardPage`) qui regarde si le message suivant a un auteur différent ou un jour différent. Enrichissement de la jointure profile dans `useCard.js` Immobilier pour ramener `photo_url`.
       - 16E-5 : Nettoyage transverse — retrait de `getAvatarPalette` et `getInitials` désormais inutilisés dans Profil. Refacto de `MemberPicker.jsx` Immobilier (qui affichait tous les avatars en canard uni avant). Mise à jour de la doc projet.
+
+16 bis. ✓ **Étape 16 bis — FAITE** — Retouches UI/UX Trombinoscope + Immobilier
+
+Passe de finitions sur deux modules, sans migration SQL ni changement de permissions/RLS. Cinq modifs indépendantes.
+
+- **Cartes de la liste Trombinoscope uniformisées** (`MedecinCard.jsx`). La carte ne montre plus que l'essentiel : avatar (agrandi 60 → 72 px), nom, spécialité, téléphone — le téléphone est remonté à droite de l'avatar (sous le nom et la spécialité) au lieu d'être en pleine largeur en dessous. Les jours disponibles et les notes internes ne sont plus affichés dans la liste (ils restent sur la fiche détail). Astuce de mise en page : l'avatar à 72 px étant plus haut que le bloc texte, c'est lui qui pilote la hauteur de la carte → toutes les cartes ont la même hauteur (~100 px) quel que soit leur contenu. Les props `canViewNotes` / `canViewSchedule` ne sont plus utilisées par le composant (le parent `Trombinoscope.jsx` les passe encore, silencieusement ignorées — nettoyage parent possible plus tard). Aucune régression de visibilité : ces champs ne sont plus affichés à personne sur la liste ; le filtrage remplaçant reste porté par la fiche détail.
+
+- **Rôle masqué sur la fiche détail** (`MedecinDetail.jsx`). La pastille de rôle (`super_admin` / `associe_gerant` / `associe` / `remplacant`) n'est plus affichée sur `/trombinoscope/:id`. Le rôle n'apparaît désormais **que** sur la page Profil (fiche de l'utilisateur lui-même, cf. étape 11D). Objectif : un remplaçant ne doit pas pouvoir voir le rôle (associé, gérant…) des autres médecins. Le badge « Désactivé » (qui est un statut, pas un rôle) est conservé. Le menu déroulant « rôle » du formulaire d'édition (attribution des rôles par le super_admin) est inchangé. Import `ROLE_LABELS` et calcul `roleLabel` retirés (code devenu mort).
+
+- **Bouton « Ajouter à mes contacts » sur la fiche détail** (nouveau helper `src/lib/vcard.js` + `MedecinDetail.jsx`). Génère une vCard 3.0 (nom, prénom, téléphone, email, spécialité en `TITLE`) et déclenche son téléchargement (`.vcf`). Sur mobile, l'ouverture du fichier propose l'ajout au répertoire natif du téléphone — pratique pour les nouveaux remplaçants. Aucune dépendance externe (construction de chaîne + `Blob` natif). La ligne « Ajouter à mes contacts » est intégrée dans la carte Contact, sous l'email. Comportement iOS : en PWA installée (standalone), le `.vcf` peut passer par la feuille de partage native (un tap supplémentaire), comme les pièces jointes depuis l'étape 15 bis ; en Safari classique et sur Android, l'ajout est direct. Pas de contrôle de permission : la vCard n'utilise que des champs déjà visibles de tous (nom, téléphone, email).
+
+- **Boutons « copier » sur le RIB** (`MedecinCompta.jsx`). En lecture, chaque ligne renseignée du RIB (IBAN, BIC, Titulaire) porte une petite icône de copie. Au clic, `navigator.clipboard.writeText` copie la valeur (l'IBAN est copié **sans les espaces**, format le plus fiable à coller dans une appli bancaire) et l'icône passe en coche olive pendant 2 s. Objectif métier : faciliter l'ajout d'un bénéficiaire pour payer un remplaçant par virement. L'API presse-papiers exige un contexte sécurisé (HTTPS ou `localhost`) ; en contexte non sécurisé (IP locale en HTTP), l'action échoue silencieusement. Disponible aussi en lecture seule pour l'associé, pas réservé à l'édition super_admin.
+
+- **Confirmation avant de quitter un tableau Immobilier** (`ImmobilierBoard.jsx`). L'action « Quitter le tableau » du menu « ⋮ » ouvre désormais une `ConfirmModal` (titre « Quitter ce tableau ? », message avertissant que l'accès aux cartes et aux discussions sera perdu sauf réinvitation) au lieu d'un départ immédiat. La fonction `handleLeaveBoard` est alignée sur `handleDeleteBoard` : elle `throw` l'erreur (affichée dans la modale) au lieu d'un `alert()` natif. Le garde-fou « le dernier propriétaire ne peut pas quitter » est inchangé. Note : les nouveaux textes UI sont accentués alors que les chaînes pré-existantes du module Immobilier ne le sont pas (dette d'accents propre à ce module, à traiter dans une passe dédiée).
 
 17. **Étape 17** — Notifications push Firebase FCM (à faire après que la PWA fonctionne).
 
