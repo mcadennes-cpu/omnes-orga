@@ -10,10 +10,11 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, Search, MessageSquare, Building2 } from 'lucide-react'
+import { ChevronLeft, Search, MessageSquare, Building2, BookOpen } from 'lucide-react'
 import AppLayout from '../components/layout/AppLayout'
 import MedecinCard from '../components/trombinoscope/MedecinCard'
 import { useMedecins } from '../hooks/useMedecins'
+import { useEntreesAnnuaire } from '../hooks/useEntreesAnnuaire'
 import { useRole } from '../hooks/useRole'
 import { normalizeForSearch } from '../lib/profileFormat'
 import { supabase } from '../lib/supabaseClient'
@@ -22,6 +23,7 @@ import HeaderWatermark from '../components/common/HeaderWatermark'
 export default function Recherche() {
   const navigate = useNavigate()
   const { medecins, loading: medecinsLoading, error: medecinsError } = useMedecins()
+  const { entrees: annuaireEntrees, loading: annuaireLoading, error: annuaireError } = useEntreesAnnuaire()
   const { role } = useRole()
   const [query, setQuery] = useState('')
 
@@ -89,6 +91,19 @@ export default function Recherche() {
     })
   }, [trimmed, medecins])
 
+  // Filtrage Annuaire : memes champs que la recherche locale de la page
+  // Annuaire (nom, categorie, note), mais avec normalizeForSearch pour
+  // rester insensible aux accents comme le reste de la recherche globale.
+  const filteredAnnuaire = useMemo(() => {
+    if (trimmed === '') return []
+    return annuaireEntrees.filter((e) => {
+      const text = normalizeForSearch(
+        `${e.nom ?? ''} ${e.categorie ?? ''} ${e.note ?? ''}`
+      )
+      return text.includes(trimmed)
+    })
+  }, [trimmed, annuaireEntrees])
+
   // Filtrage Discussion
   // Note : Discussion utilise des noms anglais (title/status/archived)
   // alors qu'Immobilier utilise le francais (titre/statut/archive).
@@ -134,12 +149,13 @@ export default function Recherche() {
 
   const totalResults =
     filteredMedecins.length +
+    filteredAnnuaire.length +
     filteredDiscussionBoards.length +
     filteredDiscussionCards.length +
     filteredImmobilierBoards.length +
     filteredImmobilierCards.length
 
-  const loading = medecinsLoading || boardsLoading
+  const loading = medecinsLoading || boardsLoading || annuaireLoading
 
   return (
     <AppLayout>
@@ -186,6 +202,12 @@ export default function Recherche() {
             </p>
           )}
 
+          {!loading && annuaireError && (
+            <p className="text-center text-brique py-4">
+              Impossible de charger l'annuaire.
+            </p>
+          )}
+
           {!loading && trimmed === '' && (
             <p className="text-center text-muted py-8">
               Tapez quelques lettres pour lancer la recherche.
@@ -221,6 +243,38 @@ export default function Recherche() {
                       canViewNotes={canViewNotes}
                       canViewSchedule={canViewSchedule}
                     />
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Section Annuaire */}
+          {!loading && filteredAnnuaire.length > 0 && (
+            <section>
+              <h2 className="font-display font-extrabold text-marine text-lg mb-3 flex items-center gap-2">
+                <BookOpen size={18} className="text-ocre-fonce" aria-hidden="true" />
+                Annuaire
+                <span className="text-muted text-sm font-normal">
+                  ({filteredAnnuaire.length})
+                </span>
+              </h2>
+              <div className="space-y-2">
+                {filteredAnnuaire.map((e) => (
+                  <button
+                    key={e.id}
+                    type="button"
+                    onClick={() => navigate(`/annuaire/${e.id}`)}
+                    className="w-full text-left bg-carte rounded-card shadow-card border border-border p-3 hover:shadow-button transition-shadow"
+                  >
+                    <p className="text-body-l text-ink font-medium">{e.nom}</p>
+                    {(e.categorie || e.telephone) && (
+                      <p className="text-caption text-muted mt-0.5">
+                        {e.categorie}
+                        {e.categorie && e.telephone ? ' · ' : ''}
+                        {e.telephone}
+                      </p>
+                    )}
                   </button>
                 ))}
               </div>
