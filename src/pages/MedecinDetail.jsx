@@ -10,7 +10,6 @@ import { supabase } from '../lib/supabaseClient'
 import { useMedecin } from '../hooks/useMedecin'
 import { useRole } from '../hooks/useRole'
 import { useAuth } from '../hooks/useAuth'
-import { ROLE_LABELS } from '../lib/modules'
 import {
   canEditMedecin,
   canEditPrivilegedFields,
@@ -116,8 +115,6 @@ export default function MedecinDetail() {
     if (!toggleError) refetch()
   }
 
-  const roleLabel = medecin?.role ? ROLE_LABELS[medecin.role] ?? medecin.role : null
-
   return (
     <AppLayout>
       {/* Header sticky */}
@@ -206,18 +203,13 @@ export default function MedecinDetail() {
                   </p>
                 )}
               </div>
-              <div className="flex items-center gap-1.5 flex-wrap justify-center">
-                {roleLabel && (
-                  <Pill color="canard" variant="soft" size="sm">
-                    {roleLabel}
-                  </Pill>
-                )}
-                {!medecin.actif && (
+              {!medecin.actif && (
+                <div className="flex items-center gap-1.5 flex-wrap justify-center">
                   <Pill color="brique" variant="soft" size="sm">
                     Désactivé
                   </Pill>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
             {/* Section Contact */}
