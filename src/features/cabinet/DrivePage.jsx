@@ -69,7 +69,7 @@ function Breadcrumb({ trail, onBack, onCrumb }) {
           })}
         </nav>
       </div>
-      <HeaderWatermark color="marine" />
+      <HeaderWatermark color="marine" fill offsetRight={64} />
     </header>
   )
 }

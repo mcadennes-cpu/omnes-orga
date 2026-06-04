@@ -191,7 +191,7 @@ export default function Evenements() {
               />
             </div>
           </div>
-          <HeaderWatermark color="fuchsia" />
+          <HeaderWatermark color="fuchsia" fill offsetRight={64} />
         </header>
 
         {/* Filtre segmente + CTA */}

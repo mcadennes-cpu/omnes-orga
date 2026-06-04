@@ -258,7 +258,7 @@ export default function ImmobilierBoard() {
             </div>
           </>
         )}
-        <HeaderWatermark color="canard" verticalAlign="top" />
+        <HeaderWatermark color="canard" fill offsetRight={64} />
       </header>
 
       {/* Bandeau tableau archive */}

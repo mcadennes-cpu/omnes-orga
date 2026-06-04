@@ -67,7 +67,7 @@ export default function Trombinoscope() {
               </button>
             )}
           </div>
-          <HeaderWatermark color="canard" />
+          <HeaderWatermark color="canard" fill offsetRight={64} />
         </header>
 
         {/* Sous-header : compteur */}

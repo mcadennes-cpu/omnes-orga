@@ -112,7 +112,7 @@ export default function Immobilier() {
             />
           </div>
         </div>
-        <HeaderWatermark color="canard" />
+        <HeaderWatermark color="canard" fill offsetRight={64} />
       </header>
 
       {/* Sous-header : compteur + filtre */}

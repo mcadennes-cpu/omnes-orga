@@ -5,6 +5,7 @@ import AppLayout from '../components/layout/AppLayout'
 import HomeHeader from '../components/home/HomeHeader'
 import ModuleTile from '../components/home/ModuleTile'
 import ActivityList from '../components/home/ActivityList'
+import LogoOmnes from '../components/common/LogoOmnes'
 
 export default function Home() {
   const navigate = useNavigate()
@@ -67,6 +68,19 @@ export default function Home() {
         ))}
       </div>
       <ActivityList />
+
+      {/* 2e filigrane Omnes : meme logo que HomeHeader, en bas a gauche
+          (oriente normalement, pas en miroir). left negatif pour deborder
+          a gauche ; zIndex -1 pour rester derriere la grille (mais
+          au-dessus du bg-fond). */}
+      <LogoOmnes
+        color="marine"
+        width={320}
+        height={128}
+        opacity={0.07}
+        className="absolute pointer-events-none select-none"
+        style={{ bottom: 0, left: -100, zIndex: -1 }}
+      />
     </AppLayout>
   )
 }

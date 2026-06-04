@@ -115,7 +115,7 @@ export default function BoardPage({
             })}
           </div>
         </div>
-        <HeaderWatermark color="brique" verticalAlign="top" />
+        <HeaderWatermark color="brique" fill offsetRight={64} />
       </header>
 
       {/* Bandeau tableau archive */}

@@ -95,7 +95,7 @@ export default function Annuaire() {
               )}
             </div>
           </div>
-          <HeaderWatermark color="ocre" />
+          <HeaderWatermark color="ocre" fill offsetRight={64} />
         </header>
 
         {/* Pills catégories horizontales scrollables */}

@@ -29,6 +29,7 @@ import CardActionsMenu from './CardActionsMenu';
 import EditCardModal from './EditCardModal';
 import CardAttachments from './CardAttachments';
 import HeaderWatermark from '../../components/common/HeaderWatermark';
+import LogoOmnes from '../../components/common/LogoOmnes';
 
 export default function CardPage({ boardId, cardId }) {
   const navigate = useNavigate();
@@ -206,7 +207,7 @@ export default function CardPage({ boardId, cardId }) {
             </button>
           )}
         </div>
-        <HeaderWatermark color="canard" />
+        <HeaderWatermark color="canard" fill offsetRight={64} />
       </header>
 
       {/* Description repliable */}
@@ -244,7 +245,25 @@ export default function CardPage({ boardId, cardId }) {
       />
 
       {/* Fil de messages */}
-      <main className="flex-1 overflow-y-auto px-3 py-3 bg-carte">
+      {/* Conteneur fige (ne defile pas) : porte le filigrane de fond. */}
+      <div className="flex-1 relative min-h-0 bg-carte overflow-hidden">
+        {/* Filigrane de fond, centre et fixe : les bulles defilent par-dessus. */}
+        <LogoOmnes
+          color="canard"
+          width={280}
+          height={112}
+          opacity={0.05}
+          className="pointer-events-none select-none"
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 0,
+          }}
+        />
+        {/* Zone qui defile, transparente pour laisser voir le filigrane. */}
+        <main className="absolute inset-0 overflow-y-auto px-3 py-3 z-10">
         {decoratedMessages.length === 0 ? (
           <div className="text-center mt-12">
             <p className="text-body-m text-muted">
@@ -281,6 +300,7 @@ export default function CardPage({ boardId, cardId }) {
         )}
         <div ref={messagesEndRef} />
       </main>
+      </div>
 
       {/* Composer */}
       <CardComposer

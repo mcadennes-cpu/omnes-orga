@@ -1,42 +1,36 @@
 // src/components/common/HeaderWatermark.jsx
 //
-// Affiche le LogoOmnes en filigrane dans un header sticky : positionne
-// en absolute a droite, centre verticalement, opacite faible, taille
-// adaptee. C'est l'utilisation principale du logo dans l'app.
+// Affiche le LogoOmnes en filigrane dans un header sticky.
 //
-// Usage :
-//   <header className="sticky top-0 relative ...">
-//     <button>Retour</button>
-//     <h1>Cabinet pratique</h1>
-//     <HeaderWatermark color="marine" />
-//   </header>
+// Deux modes :
+//  - normal (defaut) : taille fixe (sm/md/lg), centre vertical ou top.
+//  - fill : le filigrane epouse TOUTE la hauteur du header (top+bottom
+//    a 0), largeur derivee du ratio du masque via aspect-ratio. Sert
+//    aux headers de hauteur variable (avec barre de recherche, etc.).
 //
-// Important : le HEADER PARENT doit avoir 'relative' (ou 'absolute' /
-// 'fixed') pour que ce composant se positionne par rapport a lui. Sinon
-// il se positionnera par rapport a l'element positionne le plus proche
-// (potentiellement le viewport entier).
+// Le HEADER PARENT doit avoir 'relative' (ou absolute/fixed) pour que
+// ce composant se positionne par rapport a lui.
 
 import LogoOmnes from './LogoOmnes'
 
-// Tailles preconfigurees pour les filigranes de header.
-// Le PNG masque ayant un ratio width:height de 2.5 environ (430x172),
-// on conserve ce ratio pour eviter toute deformation.
 const SIZES = {
   sm: { width: 110, height: 44 },
   md: { width: 150, height: 60 },
   lg: { width: 200, height: 80 },
 }
 
+// Ratio du PNG masque (430x172 ~ 2.5). Sert au mode fill pour deriver
+// la largeur a partir de la hauteur du header.
+const MASK_RATIO = '430 / 172'
+
 /**
- * @param {object} props
- * @param {string} props.color    Cle DS ('marine', 'canard', ...) ou
- *                                couleur CSS libre. Defaut : 'marine'.
- * @param {string} props.size     'sm' | 'md' | 'lg'. Defaut : 'md'.
- * @param {number} props.opacity  0 a 1. Defaut : 0.10 (filigrane subtil).
- * @param {number} props.offsetRight  Decalage en pixels depuis le bord
- *                                    droit. Defaut : -10 (legerement
- *                                    coupe pour effet "deborde").
- * @param {string} props.className   Classes additionnelles si besoin.
+ * @param {string}  color         Cle DS ou couleur CSS libre. Defaut 'marine'.
+ * @param {string}  size          'sm' | 'md' | 'lg' (mode normal). Defaut 'md'.
+ * @param {number}  opacity       0 a 1. Defaut 0.18.
+ * @param {number}  offsetRight   Decalage en px depuis le bord droit. Defaut -10.
+ * @param {string}  verticalAlign 'center' | 'top' (mode normal). Defaut 'center'.
+ * @param {boolean} fill          Si true, le logo remplit la hauteur du header.
+ * @param {string}  className     Classes additionnelles.
  */
 export default function HeaderWatermark({
   color = 'marine',
@@ -44,9 +38,31 @@ export default function HeaderWatermark({
   opacity = 0.18,
   offsetRight = -10,
   verticalAlign = 'center',
+  fill = false,
   className = '',
 }) {
   const dimensions = SIZES[size] || SIZES.md
+
+  // Mode fill : epouse toute la hauteur du header, largeur via le ratio
+  // du masque. offsetRight decale vers le centre pour degager le "+".
+  if (fill) {
+    return (
+      <LogoOmnes
+        color={color}
+        opacity={opacity}
+        className={`pointer-events-none select-none ${className}`}
+        style={{
+          position: 'absolute',
+          top: 0,
+          bottom: 0,
+          right: offsetRight,
+          width: 'auto',
+          height: 'auto',
+          aspectRatio: MASK_RATIO,
+        }}
+      />
+    )
+  }
 
   return (
     <LogoOmnes
@@ -57,11 +73,7 @@ export default function HeaderWatermark({
       className={`pointer-events-none select-none ${className}`}
       style={
         verticalAlign === 'top'
-          ? {
-              position: 'absolute',
-              right: offsetRight,
-              top: 8,
-            }
+          ? { position: 'absolute', right: offsetRight, top: 8 }
           : {
               position: 'absolute',
               right: offsetRight,

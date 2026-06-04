@@ -222,7 +222,7 @@ export default function Discussion() {
               />
             </div>
           </div>
-          <HeaderWatermark color="brique" />
+          <HeaderWatermark color="brique" fill offsetRight={64} />
         </header>
 
         {/* Sous-header : compteur + filtre */}

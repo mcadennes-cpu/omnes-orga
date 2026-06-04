@@ -76,7 +76,7 @@ function Breadcrumb({ trail, subtitle, onBack, onCrumb }) {
           {subtitle}
         </p>
       )}
-      <HeaderWatermark color="olive" />
+      <HeaderWatermark color="olive" fill offsetRight={64} />
     </header>
   )
 }

@@ -129,29 +129,31 @@ export default function EvenementDetail() {
   return (
     <AppLayout>
       {/* Header */}
-      <header className="flex items-center gap-1 px-3 pt-5 pb-2 relative overflow-hidden">
-        <button
-          type="button"
-          onClick={() => navigate('/evenements')}
-          aria-label="Retour aux événements"
-          className="w-10 h-10 flex items-center justify-center rounded-full text-marine hover:bg-marine/5 active:bg-marine/10 transition-colors shrink-0"
-        >
-          <ChevronLeft className="w-6 h-6" strokeWidth={2} />
-        </button>
-        <h1 className="flex-1 min-w-0 text-center font-display font-extrabold text-marine text-[16px] truncate px-1">
-          {loading ? 'Chargement…' : evenement?.titre || 'Événement'}
-        </h1>
-        {!loading && evenement ? (
-          <ActionsMenu
-            canEdit={canEdit}
-            canDelete={canDelete}
-            onEdit={() => setEditOpen(true)}
-            onDelete={() => setConfirmOpen(true)}
-          />
-        ) : (
-          <div className="w-10 shrink-0" />
-        )}
-        <HeaderWatermark color="fuchsia" />
+      <header className="px-3 pt-5 pb-2 relative overflow-hidden">
+        <div className="flex items-center gap-1 relative z-10">
+          <button
+            type="button"
+            onClick={() => navigate('/evenements')}
+            aria-label="Retour aux événements"
+            className="w-10 h-10 flex items-center justify-center rounded-full text-marine hover:bg-marine/5 active:bg-marine/10 transition-colors shrink-0"
+          >
+            <ChevronLeft className="w-6 h-6" strokeWidth={2} />
+          </button>
+          <h1 className="flex-1 min-w-0 text-center font-display font-extrabold text-marine text-[16px] truncate px-1">
+            {loading ? 'Chargement…' : evenement?.titre || 'Événement'}
+          </h1>
+          {!loading && evenement ? (
+            <ActionsMenu
+              canEdit={canEdit}
+              canDelete={canDelete}
+              onEdit={() => setEditOpen(true)}
+              onDelete={() => setConfirmOpen(true)}
+            />
+          ) : (
+            <div className="w-10 shrink-0" />
+          )}
+        </div>
+        <HeaderWatermark color="fuchsia" fill offsetRight={64} />
       </header>
 
       {/* Contenu */}
