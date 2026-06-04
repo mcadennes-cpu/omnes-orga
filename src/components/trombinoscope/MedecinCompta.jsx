@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Landmark, Pencil, Trash2 } from 'lucide-react'
+import { Landmark, Pencil, Trash2, Copy, Check } from 'lucide-react'
 import ConfirmDialog from '../common/ConfirmDialog'
 import { supabase } from '../../lib/supabaseClient'
 import { useProfilCompta } from '../../hooks/useProfilCompta'
@@ -160,9 +160,9 @@ export default function MedecinCompta({ medecinId, role }) {
         <div className="bg-carte border border-border rounded-card shadow-card overflow-hidden">
           {hasRib ? (
             <div className="divide-y divide-border">
-              <RibRow label="IBAN" value={compta.iban ? formatIbanDisplay(compta.iban) : '—'} mono />
-              <RibRow label="BIC" value={compta.bic || '—'} mono />
-              <RibRow label="Titulaire du compte" value={compta.nom_titulaire_compte || '—'} />
+              <RibRow label="IBAN" value={compta.iban ? formatIbanDisplay(compta.iban) : '—'} mono copyText={compta.iban || null} />
+              <RibRow label="BIC" value={compta.bic || '—'} mono copyText={compta.bic || null} />
+              <RibRow label="Titulaire du compte" value={compta.nom_titulaire_compte || '—'} copyText={compta.nom_titulaire_compte || null} />
             </div>
           ) : (
             <div className="px-4 py-4 flex items-center gap-3">
@@ -283,17 +283,48 @@ export default function MedecinCompta({ medecinId, role }) {
 // Sous-composants locaux
 // ----------------------------------------------------------------------------
 
-function RibRow({ label, value, mono = false }) {
+function RibRow({ label, value, mono = false, copyText = null }) {
+  const [copied, setCopied] = useState(false)
+
+  async function handleCopy() {
+    if (!copyText) return
+    try {
+      await navigator.clipboard.writeText(copyText)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Presse-papiers indisponible (contexte non securise) : on ignore.
+    }
+  }
+
   return (
-    <div className="px-4 py-3.5">
-      <p className="text-field-label">{label}</p>
-      <p
-        className={`text-body-l font-medium text-marine mt-0.5 break-all ${
-          mono ? 'font-mono tracking-tight' : ''
-        }`}
-      >
-        {value}
-      </p>
+    <div className="px-4 py-3.5 flex items-start gap-3">
+      <div className="min-w-0 flex-1">
+        <p className="text-field-label">{label}</p>
+        <p
+          className={`text-body-l font-medium text-marine mt-0.5 break-all ${
+            mono ? 'font-mono tracking-tight' : ''
+          }`}
+        >
+          {value}
+        </p>
+      </div>
+      {copyText && (
+        <button
+          type="button"
+          onClick={handleCopy}
+          aria-label={copied ? `${label} copié` : `Copier ${label}`}
+          className={`h-9 w-9 rounded-pill flex items-center justify-center shrink-0 transition-colors ${
+            copied ? 'bg-olive/10 text-olive' : 'bg-canard/10 text-canard'
+          }`}
+        >
+          {copied ? (
+            <Check size={16} strokeWidth={2.2} />
+          ) : (
+            <Copy size={16} strokeWidth={1.8} />
+          )}
+        </button>
+      )}
     </div>
   )
 }
