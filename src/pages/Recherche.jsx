@@ -185,7 +185,7 @@ export default function Recherche() {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Rechercher un médecin, un tableau, une carte…"
+            placeholder="Rechercher un médecin, une entrée, un tableau…"
             aria-label="Rechercher"
             className="w-full h-12 pl-11 pr-4 rounded-input bg-white border border-border text-marine placeholder:text-faint focus:outline-none focus:ring-2 focus:ring-canard"
           />

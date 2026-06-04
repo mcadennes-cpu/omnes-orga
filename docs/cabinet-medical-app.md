@@ -688,7 +688,7 @@ La navigation utilise **react-router-dom v6**. `main.jsx` enveloppe l'applicatio
 | `/` | protégée | `Home` |
 | `/trombinoscope` | protégée | `Trombinoscope` |
 | `/trombinoscope/:id` | protégée | `MedecinDetail` (lecture + édition) |
-| `/recherche` | protégée | `Recherche` (filtre Trombinoscope, vouée à s'étendre aux autres modules) |
+| `/recherche` | protégée | `Recherche` (recherche globale : Médecins, Annuaire, Discussion, Immobilier) |
 | `/profil` | protégée | `Profil` (infos compte + déconnexion ; sera enrichi à l'étape 11) |
 | `*` | — | redirect vers `/` |
 
