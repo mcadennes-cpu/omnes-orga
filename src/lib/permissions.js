@@ -137,6 +137,28 @@ export function canEditMessage({ userId, message }) {
   return message?.author_id === userId
 }
 
+/**
+ * Peut creer / editer / cloturer / supprimer le sondage d'une carte.
+ * Meme regle que canEditCard (auteur de la carte, createur du tableau,
+ * ou super_admin) : un sondage est du contenu de carte. Expose separement
+ * pour la clarte des intentions cote UI.
+ *
+ * @param {{ userId: string, role: string, card: { created_by: string }, board: { created_by: string } }} ctx
+ */
+export function canManagePoll({ userId, role, card, board }) {
+  return canEditCard({ userId, role, card, board })
+}
+
+/**
+ * Peut voter a un sondage. Tout membre du tableau, remplacant compris.
+ * La condition "membre" est portee par la RLS et par le fait d'etre sur
+ * la carte ; la condition "sondage votable" (ouvert + carte ouverte) est
+ * geree par l'etat, pas par ce helper. Meme logique que canRespondToSondage.
+ */
+export function canVotePoll(role) {
+  return Boolean(role)
+}
+
 // ----------------------------------------------------------------------------
 // Module Evenements
 // ----------------------------------------------------------------------------

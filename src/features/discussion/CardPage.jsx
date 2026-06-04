@@ -5,6 +5,7 @@ import CardActionsMenu from './CardActionsMenu'
 import CardMessage from './CardMessage'
 import CardComposer from './CardComposer'
 import CardAttachments from './CardAttachments'
+import PollSection from './PollSection'
 import { formatDayLabel } from '../../lib/dateFormat'
 import HeaderWatermark from '../../components/common/HeaderWatermark'
 import LogoOmnes from '../../components/common/LogoOmnes'
@@ -118,7 +119,7 @@ export default function CardPage({
         />
         {/* Zone qui defile, transparente pour laisser voir le filigrane. */}
         <div className="absolute inset-0 overflow-y-auto z-10">
-        <div className="px-4 pt-3 pb-3 border-b border-border">
+        <div className="px-4 pt-3 pb-3 border-b border-border bg-carte">
           {card.description ? (
             <>
               <button
@@ -147,6 +148,15 @@ export default function CardPage({
             <p className="text-faint text-sm italic">Aucune description.</p>
           )}
         </div>
+
+        <PollSection
+          cardId={card.id}
+          userId={userId}
+          canManage={canEditCard}
+          cardClosed={isClosed}
+          accentColor={board.color}
+          profilesById={profilesById}
+        />
 
         <CardAttachments
           attachments={attachments}

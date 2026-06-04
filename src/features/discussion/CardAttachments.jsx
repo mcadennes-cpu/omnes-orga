@@ -53,7 +53,7 @@ export default function CardAttachments({
   }
 
   return (
-    <section className="px-4 py-3 border-b border-border">
+    <section className="px-4 py-3 border-b border-border bg-carte">
       <span className="text-muted text-xs uppercase tracking-wider font-semibold">
         Pièces jointes{attachments.length > 0 ? ` (${attachments.length})` : ''}
       </span>

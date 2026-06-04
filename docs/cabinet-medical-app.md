@@ -337,6 +337,67 @@ Pas de chat dans ce module.
 
 **Notifications push (Firebase FCM) :** reportées à l'étape 14 (module dédié notifications). Le module Discussion est livré sans push ; les utilisateurs voient les nouveaux messages au prochain chargement ou via Realtime s'ils ont la carte ouverte.
 
+#### Sondage par carte (étape 16 ter)
+
+Chaque carte de Discussion peut porter **un sondage** (un seul par carte), pour trancher une décision par un vote en complément du fil de discussion. Options **personnalisées**, **choix unique** par personne, **vote nominatif** (on voit qui a voté quoi).
+
+**Tables (Supabase)** — noms anglais (alignés sur le reste du module Discussion), pas de `updated_at` (convention du module, qui privilégie des timestamps spécifiques) :
+
+```
+discussion_polls            -- le sondage, rattache a une carte
+  id          uuid  PK
+  card_id     uuid  FK discussion_cards(id) ON DELETE CASCADE, UNIQUE  -- 1 sondage par carte
+  question    text
+  closed      boolean  defaut false   -- cloturable independamment de la carte
+  created_by  uuid  FK profiles(id) ON DELETE RESTRICT
+  created_at
+
+discussion_poll_options     -- les choix proposes
+  id          uuid  PK
+  poll_id     uuid  FK discussion_polls(id) ON DELETE CASCADE
+  label       text
+  position    int   defaut 0   -- ordre d'affichage
+  created_at
+
+discussion_poll_votes       -- les votes (1 par personne)
+  id          uuid  PK
+  poll_id     uuid  FK discussion_polls(id) ON DELETE CASCADE
+  option_id   uuid  FK discussion_poll_options(id) ON DELETE CASCADE
+  user_id     uuid  FK profiles(id) ON DELETE CASCADE
+  created_at
+  UNIQUE (poll_id, user_id)   -- une seule reponse -> permet l'upsert (changer d'avis)
+```
+
+**Fonctions `SECURITY DEFINER` (étape 16 ter)** — sur le modèle de `is_board_member`, pour éviter les récursions de policy : `can_manage_discussion_card(card_id)` (auteur de la carte / owner du tableau / super_admin), `is_discussion_poll_member(poll_id)` (membre du tableau parent), `can_manage_discussion_poll(poll_id)` (même règle que can_manage_discussion_card mais keyée par sondage), `is_discussion_poll_votable(poll_id)` (membre ET sondage ouvert ET carte ouverte).
+
+**RLS (12 policies)** : lecture des 3 tables réservée aux membres du tableau parent (résolue via la carte, comme pour `discussion_messages`). Création / édition / clôture / suppression du sondage et de ses options : auteur de la carte, owner du tableau ou super_admin (même règle que pour éditer la carte ; les options ne sont modifiables que tant que le sondage est ouvert). Vote (INSERT / UPDATE) : chacun pour soi, uniquement si le sondage est ouvert ET la carte ouverte, et si l'option appartient bien au sondage (garde-fou d'intégrité). Retrait de son propre vote (DELETE) : son propre vote uniquement (le verrou « carte close » est porté côté UI, comme pour les pièces jointes). SQL versionné `docs/sql/16ter-1-discussion-polls.sql`.
+
+**Droits :**
+
+| Action | super_admin | associe_gerant | associe | remplacant |
+|---|:---:|:---:|:---:|:---:|
+| Voir le sondage / voter / changer / retirer son vote | ✓ | ✓ | si invité | si invité |
+| Créer / clôturer / rouvrir / supprimer le sondage | créateur de la carte, owner du tableau, ou super_admin |
+
+**Comportement & UI :**
+- Section « Sondage » dans la vue carte, entre la description et les pièces jointes. Composant `PollSection` **autonome** : il consomme son propre hook `usePoll` (petit écart au pattern conteneur/présentationnel, assumé pour éviter de faire transiter une douzaine de props à travers `CardPage`).
+- Création via la modale bottom-sheet `CreatePollModal` (question + 2 à 10 options, calquée sur `EditCardModal`).
+- Chaque option affiche une barre de résultat teintée de la couleur du tableau, le décompte, le pourcentage et les **noms des votants**. Mon vote est surligné (coche `CheckCircle2`).
+- Vote en **optimistic UI** (s'affiche avant la confirmation serveur, restauré en cas d'échec). Changement de vote = upsert sur `(poll_id, user_id)` ; retrait via « Retirer mon vote ».
+- Gestion (clôturer / rouvrir / supprimer) visible seulement pour ceux qui peuvent gérer la carte. Suppression confirmée via `ConfirmModal`.
+- Sondage clos **ou** carte close → sondage en lecture seule.
+- Filigrane : la section sondage (comme la description et les pièces jointes) reçoit un fond `bg-carte` opaque, pour que le filigrane de fond de la vue carte ne transparaisse plus que derrière le fil de messages.
+
+**Helpers de permissions** (`src/lib/permissions.js`) : `canManagePoll` (miroir de `canEditCard`) et `canVotePoll` (tout rôle authentifié, comme `canRespondToSondage`). En pratique, le conteneur réutilise directement le booléen `userCanEditCard` déjà calculé pour la carte.
+
+**Fichiers ajoutés :** `src/features/discussion/usePoll.js`, `PollSection.jsx`, `CreatePollModal.jsx` ; SQL `docs/sql/16ter-1-discussion-polls.sql`. **Modifiés :** `CardPage.jsx` (montage de `PollSection` + fond opaque sur la description), `CardAttachments.jsx` (fond opaque), `permissions.js` (2 helpers).
+
+**Limitations connues (V1) :**
+- **Pas de Realtime** sur le sondage : un autre utilisateur voit les votes au rechargement de la carte (même choix que le sondage Événements).
+- Créer un sondage ou voter **ne met pas à jour `last_activity_at`** de la carte : pas de remontée de la carte ni de point « non-lu » (même limitation que les pièces jointes).
+- **Question et options non modifiables après création** : le hook expose `updatePoll` mais il n'est pas câblé, et les options sont figées car elles portent des votes. Pour corriger une coquille, supprimer puis recréer le sondage.
+- **Vote nominatif assumé** : tous les membres du tableau voient qui a voté quoi.
+
 **Cohérence visuelle :** mêmes patterns que les modules existants (header sticky, recherche en haut de liste, modales bottom-sheet via React Portal, menu trois-points pour actions). Avatars = initiales sur fond coloré, rotation déterministe parmi 6 couleurs (même hash que dans Annuaire). Densité de liste hardcodée à 68 px (comfortable) en V1.
 
 ---
@@ -1180,6 +1241,12 @@ Passe de finitions sur deux modules, sans migration SQL ni changement de permiss
 
 - **Confirmation avant de quitter un tableau Immobilier** (`ImmobilierBoard.jsx`). L'action « Quitter le tableau » du menu « ⋮ » ouvre désormais une `ConfirmModal` (titre « Quitter ce tableau ? », message avertissant que l'accès aux cartes et aux discussions sera perdu sauf réinvitation) au lieu d'un départ immédiat. La fonction `handleLeaveBoard` est alignée sur `handleDeleteBoard` : elle `throw` l'erreur (affichée dans la modale) au lieu d'un `alert()` natif. Le garde-fou « le dernier propriétaire ne peut pas quitter » est inchangé. Note : les nouveaux textes UI sont accentués alors que les chaînes pré-existantes du module Immobilier ne le sont pas (dette d'accents propre à ce module, à traiter dans une passe dédiée).
 
+16 ter. ✓ **Étape 16 ter — FAITE** — Sondage / vote dans Discussion (phases A → D)
+   - A : Schéma SQL — 3 tables `discussion_polls` / `discussion_poll_options` / `discussion_poll_votes` (noms anglais, pas de `updated_at`), 4 fonctions `SECURITY DEFINER` (`can_manage_discussion_card`, `is_discussion_poll_member`, `can_manage_discussion_poll`, `is_discussion_poll_votable`), RLS (12 policies), 3 index. SQL versionné `docs/sql/16ter-1-discussion-polls.sql`.
+   - B : Helpers de permissions `canManagePoll` (miroir de `canEditCard`) + `canVotePoll` dans `permissions.js` ; hook `usePoll(cardId, userId)` dans `src/features/discussion/` (chargement sondage + options + votes, mutations de gestion et de vote, optimistic UI sur le vote, pas de Realtime).
+   - C : UI — `CreatePollModal` (question + 2 à 10 options, bottom-sheet calqué sur `EditCardModal`) et `PollSection` autonome (affichage, vote nominatif avec barres et noms des votants, gestion clôturer / rouvrir / supprimer, états verrouillés), montée dans `CardPage` entre la description et les pièces jointes. Correctif filigrane (fond `bg-carte` opaque sur description / sondage / pièces jointes).
+   - D : Tests multi-rôles + mise à jour de la documentation (ce bloc).
+
 17. **Étape 17** — Notifications push Firebase FCM (à faire après que la PWA fonctionne).
 
 ---
@@ -1202,6 +1269,7 @@ Passe de finitions sur deux modules, sans migration SQL ni changement de permiss
 - **Meta tag `apple-mobile-web-app-capable` déprécié** — un warning console signale que cette balise est dépréciée au profit de `mobile-web-app-capable`. À traiter dans une passe d'hygiène ultérieure, sans impact fonctionnel.
 - **Inconsistance du nom auteur dans Discussion CardMessage** — sur Immobilier, quand un auteur envoie plusieurs messages consécutifs, son nom n'est affiché qu'au-dessus du premier message du groupe (`showAuthor` est false pour les suivants). Sur Discussion, le nom est répété au-dessus de chaque bulle des autres, quel que soit le groupement. Cohérent avec l'inconsistance plus large de nommage entre les deux modules (cf. limitation "Cohérence du nommage Discussion"). À harmoniser en passe ultérieure si pertinent.
 - **Cache d'URL signée non partagé entre fenêtres** — le cache `avatarCache` est en mémoire, donc spécifique à l'onglet courant. Un hard refresh (F5) vide le cache et regénère toutes les URL signées au prochain affichage. Pas un problème pratique (généralement transparent côté utilisateur), juste à savoir si on cherche à mesurer les coûts Supabase.
+- **Sondage Discussion sans temps réel ni édition (V1)** — depuis l'étape 16 ter, chaque carte de Discussion peut porter un sondage à options personnalisées (choix unique, vote nominatif). Limites assumées en V1 : pas de Realtime (votes vus au rechargement de la carte), pas de remontée `last_activity_at` (créer ou voter n'allume pas le point « non-lu », comme les pièces jointes), question et options non modifiables après création (supprimer / recréer pour corriger). Le nommage anglais des 3 tables `discussion_polls*` s'ajoute à la dette de nommage du module Discussion (renommage prévu avec le reste en 12 ter).
 
 ---
 
