@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ChevronLeft, Phone, Mail, Calendar, Pencil, ShieldOff, ShieldCheck } from 'lucide-react'
+import { ChevronLeft, Phone, Mail, Calendar, Pencil, ShieldOff, ShieldCheck, UserPlus } from 'lucide-react'
 import AppLayout from '../components/layout/AppLayout'
 import MedecinForm from '../components/trombinoscope/MedecinForm'
 import MedecinCompta from '../components/trombinoscope/MedecinCompta'
 import ConfirmDialog from '../components/common/ConfirmDialog'
 import Pill from '../components/common/Pill'
 import { supabase } from '../lib/supabaseClient'
+import { downloadVCard } from '../lib/vcard'
 import { useMedecin } from '../hooks/useMedecin'
 import { useRole } from '../hooks/useRole'
 import { useAuth } from '../hooks/useAuth'
@@ -236,6 +237,26 @@ export default function MedecinDetail() {
                     href={`mailto:${medecin.email}`}
                     multiline
                   />
+                )}
+                {(medecin.telephone || medecin.email) && (
+                  <>
+                    <div className="h-px bg-border ml-[62px]" />
+                    <button
+                      type="button"
+                      onClick={() => downloadVCard(medecin)}
+                      className="w-full flex items-center gap-3.5 px-4 py-3.5 text-left"
+                    >
+                      <span
+                        className="h-9 w-9 rounded-pill flex items-center justify-center shrink-0"
+                        style={{ backgroundColor: 'rgba(42,143,168,0.10)' }}
+                      >
+                        <UserPlus size={18} strokeWidth={1.8} className="text-canard" />
+                      </span>
+                      <span className="text-body-l font-medium text-canard">
+                        Ajouter à mes contacts
+                      </span>
+                    </button>
+                  </>
                 )}
               </div>
             </Section>
