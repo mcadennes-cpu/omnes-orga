@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Sparkles, Trash2, BookOpen } from 'lucide-react'
+import { formatPhoneFr } from '../../lib/phoneFormat'
 
 function toStringValue(v) {
   return v === null || v === undefined ? '' : String(v)
@@ -152,7 +153,7 @@ export default function EntreeAnnuaireForm({
             id="entree-telephone"
             type="tel"
             value={telephone}
-            onChange={(e) => setTelephone(e.target.value)}
+            onChange={(e) => setTelephone(formatPhoneFr(e.target.value))}
             disabled={submitting}
             placeholder="05 XX XX XX XX"
           />

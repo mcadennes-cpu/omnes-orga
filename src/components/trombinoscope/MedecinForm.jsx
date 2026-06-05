@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import { ROLES, ROLE_LABELS } from '../../lib/modules'
+import { formatPhoneFr } from '../../lib/phoneFormat'
 
 function toStringValue(v) {
   return v === null || v === undefined ? '' : String(v)
@@ -114,7 +115,7 @@ export default function MedecinForm({
             id="medecin-telephone"
             type="tel"
             value={telephone}
-            onChange={(e) => setTelephone(e.target.value)}
+            onChange={(e) => setTelephone(formatPhoneFr(e.target.value))}
             disabled={submitting}
             placeholder="06 XX XX XX XX"
           />
