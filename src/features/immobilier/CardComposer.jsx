@@ -24,7 +24,7 @@ export default function CardComposer({
 
   if (cardClosed) {
     return (
-      <div className="px-4 py-3 bg-fond border-t border-border">
+      <div className="px-4 py-3 bg-fond border-t border-border" style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}>
         <p className="text-muted text-xs text-center">
           Cette carte est close — les messages sont en lecture seule.
         </p>
@@ -64,13 +64,13 @@ export default function CardComposer({
   }
 
   return (
-    <div className="px-3 py-2.5 bg-carte border-t border-border flex items-end gap-2">
+    <div className="px-3 py-2.5 bg-carte border-t border-border flex items-end gap-2" style={{ paddingBottom: 'calc(10px + env(safe-area-inset-bottom))' }}>
       <textarea
         ref={textareaRef}
         value={text}
         onChange={handleChange}
         rows={1}
-        placeholder="Ecrire un message..."
+        placeholder="Écrire un message…"
         className="flex-1 px-3 py-2 rounded-2xl bg-fond border border-border
                    text-marine text-sm placeholder:text-faint
                    focus:outline-none focus:ring-2 focus:ring-canard/30

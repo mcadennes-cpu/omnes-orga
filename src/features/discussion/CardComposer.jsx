@@ -23,7 +23,7 @@ export default function CardComposer({ accentColor = 'brique', disabled = false,
 
   if (disabled) {
     return (
-      <div className="px-4 py-3 bg-fond border-t border-border">
+      <div className="px-4 py-3 bg-fond border-t border-border" style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}>
         <p className="text-muted text-xs text-center">
           Cette carte est close — les messages sont en lecture seule.
         </p>
@@ -57,7 +57,7 @@ export default function CardComposer({ accentColor = 'brique', disabled = false,
   }
 
   return (
-    <div className="px-3 py-2.5 bg-carte border-t border-border flex items-end gap-2">
+    <div className="px-3 py-2.5 bg-carte border-t border-border flex items-end gap-2" style={{ paddingBottom: 'calc(10px + env(safe-area-inset-bottom))' }}>
       <textarea
         ref={textareaRef}
         value={value}
