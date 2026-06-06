@@ -7,12 +7,19 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      // On ecrit nous-memes le service worker (src/sw.js) au lieu de le laisser
+      // generer par Workbox : c'est ce qui permettra d'y greffer FCM en 17C.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
+
       registerType: 'autoUpdate',
 
       devOptions: {
         enabled: true,
-        // Sert la navigateFallback en dev aussi.
-        // Sans ça on ne peut pas tester la page offline en local.
+        // type: 'module' indispensable : notre src/sw.js utilise des imports ES.
+        type: 'module',
+        // Sert la navigateFallback en dev aussi (test de la page offline en local).
         navigateFallback: 'index.html',
       },
 
@@ -72,57 +79,12 @@ export default defineConfig({
         ],
       },
 
-      workbox: {
+      // En strategie injectManifest, le bloc "workbox" (generateSW) est remplace par
+      // "injectManifest". On n'y garde QUE les options de build du precache : la liste
+      // des fichiers a precacher. Tout le comportement runtime (fallback SPA, cache des
+      // polices, skipWaiting...) est desormais code dans src/sw.js.
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2}'],
-
-        // Quand l'utilisateur navigue vers une URL non précachée (ex. /trombinoscope/abc
-        // en SPA après refresh), on lui sert index.html en fallback (comportement SPA standard).
-        navigateFallback: 'index.html',
-
-        // Liste des URLs qui doivent BYPASS le navigateFallback :
-        // - tout ce qui ressemble à une API (commence par /api)
-        // - les requêtes vers Supabase
-        // - les routes nécessitant un téléchargement direct (icônes, manifest)
-        navigateFallbackDenylist: [
-          /^\/api/,
-          /supabase\.co/,
-          /\.(?:png|ico|svg|webmanifest)$/,
-        ],
-
-        // Stratégies runtime : on définit ici comment traiter les requêtes
-        // qui ne sont PAS dans le précache.
-        runtimeCaching: [
-          // Polices Google : cache long (elles ne changent jamais).
-          {
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\//,
-            handler: 'StaleWhileRevalidate',
-            options: {
-              cacheName: 'google-fonts-stylesheets',
-            },
-          },
-          {
-            urlPattern: /^https:\/\/fonts\.gstatic\.com\//,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'google-fonts-webfonts',
-              expiration: {
-                maxEntries: 30,
-                maxAgeSeconds: 60 * 60 * 24 * 365, // 1 an
-              },
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
-            },
-          },
-          // ⚠️ AUCUNE règle de runtimeCaching pour Supabase :
-          // toutes les requêtes vers *.supabase.co passent par le réseau et
-          // ne sont jamais mises en cache. C'est la stratégie "shell uniquement"
-          // qu'on a choisie. Hors-ligne, ces requêtes échoueront (erreur réseau
-          // standard, l'app React peut afficher son propre état d'erreur).
-        ],
-
-        skipWaiting: true,
-        clientsClaim: true,
       },
     }),
   ],
