@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Smartphone, ChevronRight, User, Mail, BadgeCheck, LogOut } from 'lucide-react'
+import { Smartphone, ChevronRight, User, Mail, BadgeCheck, LogOut, Bell, Check } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useRole } from '../hooks/useRole'
+import { useNotifications } from '../hooks/useNotifications'
 import { ROLE_LABELS } from '../lib/modules'
 import AppLayout from '../components/layout/AppLayout'
 import Pill from '../components/common/Pill'
@@ -104,6 +105,9 @@ export default function Profil() {
               </Link>
             </section>
 
+            {/* Section Notifications */}
+            <NotificationsSection />
+
             {/* Déconnexion */}
             <button
               type="button"
@@ -154,5 +158,68 @@ function InfoRow({ icon: Icon, label, value, multiline = false }) {
         </p>
       </div>
     </div>
+  )
+}
+
+// ----------------------------------------------------------------------------
+// Sous-composant local : NotificationsSection
+// Active les notifications push (geste utilisateur requis sur iOS) et affiche
+// l'etat courant (non supporte / a activer / activees / bloquees).
+// ----------------------------------------------------------------------------
+
+function NotificationsSection() {
+  const { supported, permission, enabling, error, enableNotifications } = useNotifications()
+
+  // Detection en cours : on n'affiche rien pour eviter un flash.
+  if (supported === null) return null
+
+  let statusText
+  if (!supported) {
+    statusText =
+      "Indisponible sur cet appareil. Sur iPhone, installez d'abord l'application sur votre écran d'accueil."
+  } else if (permission === 'granted') {
+    statusText = 'Activées sur cet appareil.'
+  } else if (permission === 'denied') {
+    statusText =
+      'Bloquées. Réactivez-les dans les réglages de votre navigateur ou de votre téléphone.'
+  } else {
+    statusText = 'Soyez prévenu des nouveaux messages et tableaux.'
+  }
+
+  return (
+    <section>
+      <p className="text-field-label mb-2 px-1">Notifications</p>
+      <div className="bg-carte border border-border rounded-card shadow-card px-4 py-3.5">
+        <div className="flex items-center gap-3.5">
+          <span
+            className="h-9 w-9 rounded-pill flex items-center justify-center shrink-0"
+            style={{ backgroundColor: 'rgba(42,143,168,0.10)' }}
+          >
+            <Bell size={18} strokeWidth={1.8} className="text-canard" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-body-l font-medium text-marine">Notifications push</p>
+            <p className="text-caption text-muted mt-0.5">{statusText}</p>
+          </div>
+          {supported && permission === 'granted' && (
+            <Check size={20} strokeWidth={2.2} className="text-olive shrink-0" />
+          )}
+        </div>
+
+        {supported && permission === 'default' && (
+          <button
+            type="button"
+            onClick={enableNotifications}
+            disabled={enabling}
+            className="mt-3 h-12 w-full rounded-input bg-marine text-white text-button shadow-button flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <Bell size={16} strokeWidth={2} />
+            {enabling ? 'Activation…' : 'Activer les notifications'}
+          </button>
+        )}
+
+        {error && <p className="mt-3 text-caption text-brique">{error}</p>}
+      </div>
+    </section>
   )
 }
