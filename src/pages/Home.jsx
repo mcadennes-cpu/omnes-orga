@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { useRole } from '../hooks/useRole'
+import { useMonActivite } from '../hooks/useMonActivite'
 import { getVisibleModules } from '../lib/modules'
 import AppLayout from '../components/layout/AppLayout'
 import HomeHeader from '../components/home/HomeHeader'
@@ -10,6 +11,7 @@ import LogoOmnes from '../components/common/LogoOmnes'
 export default function Home() {
   const navigate = useNavigate()
   const { role, prenom, loading } = useRole()
+  const { items, parModule, loading: activiteLoading } = useMonActivite()
 
   if (loading) {
     return (
@@ -51,7 +53,32 @@ export default function Home() {
     alert(`Module "${moduleKey}" à venir`)
   }
 
+  // Clic sur une ligne du feed "Ce qui m'attend" -> on ouvre la carte
+  // (Discussion / Immobilier) ou l'evenement concerne.
+  function handleActiviteClick(item) {
+    if (item.module === 'evenements') {
+      navigate(`/evenements/${item.evenement_id}`)
+      return
+    }
+    if (item.module === 'immobilier') {
+      navigate(`/immobilier/${item.board_id}/${item.card_id}`)
+      return
+    }
+    // discussion : message ou sondage -> la carte qui porte le fil / le sondage
+    navigate(`/discussion/${item.board_id}/${item.card_id}`)
+  }
+
   const visibleModules = getVisibleModules(role)
+
+  // Pastille de non-lus par module. total = nb de choses distinctes a traiter
+  // (cartes avec du nouveau + sondages en attente). Les modules absents de
+  // cette map (Trombinoscope, Annuaire, Cabinet, SIM) n'ont pas de pastille :
+  // badges[key] vaut undefined -> ModuleTile n'affiche rien.
+  const badges = {
+    discussion: parModule.discussion.total,
+    immobilier: parModule.immobilier.total,
+    evenements: parModule.evenements.total,
+  }
 
   return (
     <AppLayout>
@@ -63,11 +90,16 @@ export default function Home() {
             label={m.label}
             icon={m.icon}
             color={m.color}
+            badge={badges[m.key]}
             onClick={() => handleModuleClick(m.key)}
           />
         ))}
       </div>
-      <ActivityList />
+      <ActivityList
+        items={items}
+        loading={activiteLoading}
+        onSelect={handleActiviteClick}
+      />
 
       {/* 2e filigrane Omnes : meme logo que HomeHeader, en bas a gauche
           (oriente normalement, pas en miroir). left negatif pour deborder
