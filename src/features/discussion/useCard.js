@@ -250,6 +250,17 @@ export function useCard(cardId) {
     }
   }, [cardId, fetchMessages, fetchCard, fetchAttachments])
 
+  // Refetch quand l'app revient au premier plan (tap sur une notification,
+  // retour depuis l'arriere-plan). Sur iOS, l'app est gelee en arriere-plan
+  // et le Realtime peut manquer des messages : on recharge a la revisibilite.
+  useEffect(() => {
+    function onVisibilityChange() {
+      if (document.visibilityState === 'visible') refetch()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [refetch])
+
   // -------------------------------------------------------------------------
   // 7. Marquage lu : last_read_at suit le dernier message visible
   // -------------------------------------------------------------------------

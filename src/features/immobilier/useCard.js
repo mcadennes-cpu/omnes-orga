@@ -134,6 +134,17 @@ export function useCard(cardId) {
     };
   }, [cardId, reloadKey, refetch]);
 
+  // Refetch quand l'app revient au premier plan (tap notification, retour
+  // d'arriere-plan). Sur iOS, le Realtime peut manquer des messages pendant
+  // que l'app est gelee : on recharge a la revisibilite.
+  useEffect(() => {
+    function onVisibilityChange() {
+      if (document.visibilityState === 'visible') refetch();
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, [refetch]);
+
   // ----- Marquage lu -----
   // Appelle apres le 1er chargement pour mettre a jour :
   // - immobilier_card_reads (compteur numerique par carte)
