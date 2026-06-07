@@ -1277,6 +1277,22 @@ Décisions :
 Fichiers ajoutés : `docs/sql/18A-1-home-activite-rpc.sql`, `src/hooks/useMonActivite.js`.
 Fichiers modifiés : `src/pages/Home.jsx` (branche `useMonActivite`, pastilles, navigation du feed), `src/components/home/ActivityList.jsx` (placeholder → feed réel). `ModuleTile.jsx` inchangé (prop `badge` déjà présente).
 
+   - ✓ **Sous-étape 18D — Pastille d'icône (App Badge) sur la PWA installée.** Affiche le nombre d'éléments « en attente » directement sur l'icône de l'app à l'écran d'accueil (façon Mail / WhatsApp), via l'API Badging (`navigator.setAppBadge` / `clearAppBadge`). Supportée sur iOS/iPadOS 16.4+ pour une PWA **installée**, dès lors que la permission notifications est accordée (étape 17). Le nombre affiché = total « en attente » du compte, **identique** à `items.length` de `get_mon_activite` (donc cohérent avec les pastilles de tuiles et la section « En attente »).
+
+     - **Phase 1 — app au premier plan.** Un effet dans `useMonActivite` pose la pastille (`setAppBadge(items.length)`, ou `clearAppBadge()` si 0) à chaque mise à jour des données. Couvre l'ouverture de l'app et le retour au premier plan (l'effet `visibilitychange` du hook recharge les données). Feature-detection `'setAppBadge' in navigator` → no-op silencieux sur les plateformes non supportées.
+
+     - **Phase 2 — app fermée, à la réception d'un push.** Pour que la pastille bouge même app fermée, c'est le service worker qui la pose à la réception du push :
+       - **Fonction SQL `get_activite_count(p_user_id uuid)`** (`docs/sql/18B-1-get-activite-count.sql`) : version paramétrée (par user) de `get_mon_activite`, qui renvoie juste le compteur. `SECURITY DEFINER`, `search_path` figé, `execute` accordé à `service_role` **uniquement** (elle est appelée par l'Edge Function ; l'app n'appelle jamais cette fonction — elle utilise `get_mon_activite`, scopée à `auth.uid()`). Même logique de périmètre que `get_mon_activite`.
+       - **Edge Function `send-notification`** : pour chaque destinataire, calcule son compteur via la RPC `get_activite_count` et l'injecte dans le payload `data` sous la clé `badge` (en **chaîne**, car les valeurs `data` FCM doivent être des chaînes). Effet de bord utile : **tout** push recale la pastille sur la valeur exacte du destinataire.
+       - **Service worker `src/sw.js`** : la pastille est posée dans un **vrai listener `push`** (`self.addEventListener('push', …)`) enveloppé dans `event.waitUntil(...)`. **Piège iOS résolu ici** : `setAppBadge` appelé à l'intérieur du callback `onBackgroundMessage` de FCM n'est **pas** appliqué par Safari/iOS (bug firebase-js-sdk #8416). On conserve donc `onBackgroundMessage` uniquement pour afficher la notification (`showNotification`, exigé par WebKit pour chaque push), et on pose la pastille séparément dans le listener `push`. Aucun doublon de notification (le listener `push` n'affiche rien).
+
+     **Décisions :**
+     - Compteur = nombre de « choses en attente » (cartes avec du nouveau + sondages), identique partout (tuiles, section « En attente », pastille d'icône). Conséquence : 3 messages dans la même carte = « 1 » (une carte avec du nouveau), pas « 3 » — choix de cohérence assumé plutôt qu'un décompte au message près façon WhatsApp strict.
+     - Le compteur est calculé **par destinataire au moment du push** (après insertion du message), donc la pastille reste exacte.
+
+     **Fichier ajouté :** `docs/sql/18B-1-get-activite-count.sql`.
+     **Fichiers modifiés :** `src/hooks/useMonActivite.js` (effet App Badge — Phase 1), `supabase/functions/send-notification/index.ts` (compteur par destinataire + champ `badge` dans le payload), `src/sw.js` (listener `push` qui pose la pastille).
+
 ---
 
 ## Limitations connues
@@ -1303,6 +1319,8 @@ Fichiers modifiés : `src/pages/Home.jsx` (branche `useMonActivite`, pastilles, 
 - **Feed « En attente » : tri mixte des événements** — les lignes sont triées par `ref_at` décroissant. Pour les événements, `ref_at = date_debut` (futur), donc un événement à venir peut remonter au-dessus d'un message récent. Sémantiques de tri volontairement mélangées en V1 (activité récente vs date d'échéance). Ajustable en un point unique dans `useMonActivite` (tri des événements à part, ou sous-section dédiée) si l'usage le justifie.
 - **Pas de Realtime sur le socle « non-lus »** — les pastilles et la section « En attente » se rafraîchissent au chargement de la Home et au retour au premier plan (`visibilitychange`), pas en direct. Cohérent avec le reste de l'app (le détail temps réel vit dans les vues carte). Un message reçu pendant qu'on regarde la Home n'apparaît qu'au prochain retour sur l'onglet/app.
 - **« À voter » limité à Discussion + présence événements** — seuls les sondages Discussion et les sondages de présence des événements remontent dans « En attente ». Immobilier n'ayant pas de système de sondage, il n'y contribue que par ses messages non lus.
+- **Pastille d'icône (App Badge) : conditions et limites** — la pastille n'apparaît que sur la PWA **installée** (écran d'accueil) avec la permission notifications accordée ; jamais dans un onglet Safari. Sur iOS, `setAppBadge` ne fonctionne **pas** depuis le callback `onBackgroundMessage` de FCM (bug firebase-js-sdk #8416), d'où la pose dans un listener `push` brut (cf. 18D). À chaque mise à jour du service worker, iOS exige une **fermeture complète + réouverture** de l'app pour activer la nouvelle version : tant que l'ancien SW tourne, la pastille via push ne s'applique pas. Le compteur reflète un nombre de « choses en attente » (cartes / sondages), pas un décompte de messages. La pastille hérite aussi de la limite « un seul appareil par utilisateur » (un seul `fcm_token`).
+- **Duplication de la logique de périmètre « en attente »** — `get_mon_activite` (18A) et `get_activite_count` (18D) répliquent les 4 mêmes sources et filtres (messages non lus Discussion/Immobilier, sondages Discussion, sondages de présence des événements à venir). À garder synchronisées si le périmètre évolue un jour.
 
 ---
 
