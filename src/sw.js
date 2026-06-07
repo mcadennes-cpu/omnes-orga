@@ -56,22 +56,42 @@ registerRoute(
   })
 )
 
-// --- Pastille (App Badge) : pose le compteur recu dans le push (18B) ---
-// Le payload "data" porte un champ "badge" (chaine) calcule cote serveur par
-// l'Edge Function send-notification. On l'applique meme app fermee. Feature
-// detection : sur les plateformes sans Badging API, no-op silencieux.
+// --- Pastille (App Badge) : applique le compteur recu dans le push (18B) ---
+// Renvoie une Promise pour pouvoir etre awaitee dans event.waitUntil().
+// Feature detection : sur les plateformes sans Badging API, no-op silencieux.
 function appliquerBadge(rawBadge) {
-  if (!self.navigator || !('setAppBadge' in self.navigator)) return
+  if (!self.navigator || !('setAppBadge' in self.navigator)) return Promise.resolve()
   const count = Number(rawBadge)
   if (Number.isFinite(count) && count > 0) {
-    self.navigator.setAppBadge(count).catch(() => {})
-  } else {
-    // 0 ou valeur absente -> on efface la pastille
-    if ('clearAppBadge' in self.navigator) {
-      self.navigator.clearAppBadge().catch(() => {})
-    }
+    return self.navigator.setAppBadge(count).catch(() => {})
   }
+  if ('clearAppBadge' in self.navigator) {
+    return self.navigator.clearAppBadge().catch(() => {})
+  }
+  return Promise.resolve()
 }
+
+// --- Pastille via l'evenement push BRUT ---
+// IMPORTANT iOS : setAppBadge appele DANS le callback onBackgroundMessage de FCM
+// n'est pas applique par Safari/iOS (bug connu firebase-js-sdk #8416). On pose
+// donc la pastille ici, dans un vrai listener "push", enveloppe dans
+// event.waitUntil() pour que iOS garde le SW vivant jusqu'a la mise a jour.
+// La notification, elle, reste affichee par onBackgroundMessage ci-dessous
+// (pas de doublon : ce listener-ci n'affiche aucune notification).
+self.addEventListener('push', (event) => {
+  if (!event.data) return
+  let payload = {}
+  try {
+    payload = event.data.json()
+  } catch {
+    return
+  }
+  // FCM "data-only" : les champs sont sous payload.data (fallback sur payload).
+  const data = payload.data || payload
+  if (data && 'badge' in data) {
+    event.waitUntil(appliquerBadge(data.badge))
+  }
+})
 
 // --- FCM : notifications push en arriere-plan (etape 17C) ---
 // Meme config que src/lib/firebase.js. Valeurs non sensibles (cote client).
@@ -89,14 +109,11 @@ try {
   // Declenche quand un message arrive alors que l'app est en arriere-plan ou fermee.
   // On envoie des messages "data-only" depuis le serveur (17D) et on construit
   // nous-memes la notification ici : controle total, pas de doublon.
+  // NB : la pastille n'est PAS posee ici (cf. listener "push" plus haut) -- iOS
+  // ne l'applique pas depuis ce callback.
   onBackgroundMessage(messaging, (payload) => {
     const data = payload.data || {}
     const title = data.title || 'Omnes Orga'
-
-    // Pastille de l'icone (WhatsApp-style) : se met a jour pile a la reception,
-    // meme app fermee.
-    appliquerBadge(data.badge)
-
     self.registration.showNotification(title, {
       body: data.body || '',
       icon: '/pwa-192x192.png',
