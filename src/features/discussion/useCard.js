@@ -6,6 +6,7 @@ import {
   validateAttachmentFile,
 } from './discussionStorage'
 import { notifyUsers } from '../../lib/notify'
+import { refreshAppBadge } from '../../lib/appBadge'
 
 /**
  * Hook de la vue d'une carte de discussion (etapes 7C + 7D).
@@ -277,6 +278,9 @@ export function useCard(cardId) {
           },
           { onConflict: 'card_id,user_id' }
         )
+      // Recalcule la pastille de l'icone apres le marquage lu : sinon elle
+      // ne se mettait a jour qu'au retour sur la Home.
+      refreshAppBadge()
     } catch (err) {
       // Non bloquant : un echec de marquage n'empeche pas de lire la carte.
       console.error('[useCard] markCardRead error:', err)

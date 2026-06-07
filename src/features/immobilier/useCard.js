@@ -13,6 +13,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { deleteAttachment } from './immobilierStorage';
 import { notifyUsers } from '../../lib/notify';
+import { refreshAppBadge } from '../../lib/appBadge';
 
 export function useCard(cardId) {
   const [card, setCard] = useState(null);
@@ -168,6 +169,8 @@ export function useCard(cardId) {
     await supabase.rpc('mark_immobilier_board_read', {
       p_board_id: card.board_id,
     });
+    // Recalcule la pastille de l'icone apres le marquage lu.
+    refreshAppBadge();
   }, [card]);
 
   // ----- Changement de statut de la carte (ouvert <-> clos) -----
