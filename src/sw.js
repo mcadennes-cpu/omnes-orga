@@ -125,16 +125,29 @@ try {
   console.error('[sw] Init FCM echouee', err)
 }
 
-// --- Clic sur une notification : focaliser une fenetre ouverte, sinon en ouvrir une ---
+// --- Clic sur une notification : naviguer vers la carte cible puis focaliser ---
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   const targetUrl = event.notification.data?.url || '/'
+  const targetHref = new URL(targetUrl, self.location.origin).href
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
-        if ('focus' in client) return client.focus()
+        // Fenetre deja ouverte : la faire naviguer vers la carte cible PUIS
+        // la mettre au premier plan. Avant, on faisait focus() sans naviguer,
+        // donc on restait la ou on etait (souvent la Home).
+        if ('focus' in client) {
+          if ('navigate' in client) {
+            return client
+              .navigate(targetHref)
+              .then((navigated) => (navigated || client).focus())
+              .catch(() => client.focus())
+          }
+          return client.focus()
+        }
       }
-      if (self.clients.openWindow) return self.clients.openWindow(targetUrl)
+      // App fermee : on ouvre directement la bonne URL.
+      if (self.clients.openWindow) return self.clients.openWindow(targetHref)
     })
   )
 })
