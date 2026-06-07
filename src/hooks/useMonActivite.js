@@ -109,6 +109,24 @@ export function useMonActivite() {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [refetch])
 
+  // Pastille (badge) sur l'icone de l'app installee. Sur iOS 16.4+, l'API
+  // Badging marche pour une PWA ajoutee a l'ecran d'accueil des lors que la
+  // permission notifications est accordee (etape 17). On reflete le nombre de
+  // lignes "En attente" ; 0 efface la pastille. Feature-detection pour les
+  // navigateurs qui ne supportent pas l'API (no-op silencieux).
+  // NB : ne se met a jour que quand ce hook est monte (Home) ou au retour au
+  // premier plan. La maj quand l'app est FERMEE (sur push) sera geree cote
+  // service worker -> phase suivante.
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !('setAppBadge' in navigator)) return
+    const count = items.length
+    if (count > 0) {
+      navigator.setAppBadge(count).catch(() => {})
+    } else {
+      navigator.clearAppBadge?.().catch(() => {})
+    }
+  }, [items])
+
   // parModule : { discussion: {nonLus, sondages, cartes, total}, immobilier: {...}, evenements: {...} }
   const parModule = useMemo(() => agregerParModule(items), [items])
 
