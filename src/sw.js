@@ -125,7 +125,10 @@ try {
   console.error('[sw] Init FCM echouee', err)
 }
 
-// --- Clic sur une notification : naviguer vers la carte cible puis focaliser ---
+// --- Clic sur une notification ---
+// App ouverte (premier plan ou arriere-plan) : on lui envoie un message
+// NAVIGATE (le routeur navigue, sans rechargement, fiable sur iOS) puis on la
+// focalise. App fermee : on l'ouvre directement sur la bonne URL.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   const targetUrl = event.notification.data?.url || '/'
@@ -133,20 +136,11 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
-        // Fenetre deja ouverte : la faire naviguer vers la carte cible PUIS
-        // la mettre au premier plan. Avant, on faisait focus() sans naviguer,
-        // donc on restait la ou on etait (souvent la Home).
         if ('focus' in client) {
-          if ('navigate' in client) {
-            return client
-              .navigate(targetHref)
-              .then((navigated) => (navigated || client).focus())
-              .catch(() => client.focus())
-          }
+          client.postMessage({ type: 'NAVIGATE', url: targetUrl })
           return client.focus()
         }
       }
-      // App fermee : on ouvre directement la bonne URL.
       if (self.clients.openWindow) return self.clients.openWindow(targetHref)
     })
   )

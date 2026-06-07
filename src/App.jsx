@@ -1,4 +1,5 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
 import MotDePasseOublie from './pages/MotDePasseOublie'
@@ -25,36 +26,59 @@ import ImmobilierBoard from './pages/ImmobilierBoard'
 import ImmobilierCard from './pages/ImmobilierCard'
 import Installer from './pages/Installer'
 
+// Ecoute les messages envoyes par le service worker (clic sur une
+// notification) et navigue via le routeur, sans rechargement. Plus fiable sur
+// iOS que client.navigate() appele depuis le service worker. Doit etre monte
+// a l'interieur du Router (il utilise useNavigate).
+function ServiceWorkerNavigation() {
+  const navigate = useNavigate()
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return undefined
+    function onMessage(event) {
+      const data = event.data
+      if (data && data.type === 'NAVIGATE' && typeof data.url === 'string') {
+        navigate(data.url)
+      }
+    }
+    navigator.serviceWorker.addEventListener('message', onMessage)
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage)
+  }, [navigate])
+  return null
+}
+
 export default function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/mot-de-passe-oublie" element={<MotDePasseOublie />} />
-      <Route path="/nouveau-mot-de-passe" element={<NouveauMotDePasse />} />
-      <Route element={<ProtectedRoute />}>
-        <Route path="/" element={<Home />} />
-        <Route path="/trombinoscope" element={<Trombinoscope />} />
-        <Route path="/trombinoscope/:id" element={<MedecinDetail />} />
-        <Route path="/annuaire" element={<Annuaire />} />
-        <Route path="/annuaire/nouveau" element={<EntreeAnnuaireNouvelle />} />
-        <Route path="/annuaire/:id" element={<EntreeAnnuaireDetail />} />
-        <Route path="/recherche" element={<Recherche />} />
-        <Route path="/profil" element={<Profil />} />
-        <Route path="/cabinet" element={<Cabinet />} />
-        <Route path="/cabinet/:id" element={<CabinetFolder />} />
-        <Route path="/discussion" element={<Discussion />} />
-        <Route path="/discussion/:boardId" element={<DiscussionBoard />} />
-        <Route path="/discussion/:boardId/:cardId" element={<DiscussionCard />} />
-        <Route path="/evenements" element={<Evenements />} />
-        <Route path="/evenements/:id" element={<EvenementDetail />} />
-        <Route path="/sim" element={<Sim />} />
-        <Route path="/sim/:id" element={<SimFolder />} />
-        <Route path="/immobilier" element={<Immobilier />} />
-        <Route path="/immobilier/:boardId" element={<ImmobilierBoard />} />
-        <Route path="/immobilier/:boardId/:cardId" element={<ImmobilierCard />} />
-        <Route path="/installer" element={<Installer />} />
-      </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <>
+      <ServiceWorkerNavigation />
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/mot-de-passe-oublie" element={<MotDePasseOublie />} />
+        <Route path="/nouveau-mot-de-passe" element={<NouveauMotDePasse />} />
+        <Route element={<ProtectedRoute />}>
+          <Route path="/" element={<Home />} />
+          <Route path="/trombinoscope" element={<Trombinoscope />} />
+          <Route path="/trombinoscope/:id" element={<MedecinDetail />} />
+          <Route path="/annuaire" element={<Annuaire />} />
+          <Route path="/annuaire/nouveau" element={<EntreeAnnuaireNouvelle />} />
+          <Route path="/annuaire/:id" element={<EntreeAnnuaireDetail />} />
+          <Route path="/recherche" element={<Recherche />} />
+          <Route path="/profil" element={<Profil />} />
+          <Route path="/cabinet" element={<Cabinet />} />
+          <Route path="/cabinet/:id" element={<CabinetFolder />} />
+          <Route path="/discussion" element={<Discussion />} />
+          <Route path="/discussion/:boardId" element={<DiscussionBoard />} />
+          <Route path="/discussion/:boardId/:cardId" element={<DiscussionCard />} />
+          <Route path="/evenements" element={<Evenements />} />
+          <Route path="/evenements/:id" element={<EvenementDetail />} />
+          <Route path="/sim" element={<Sim />} />
+          <Route path="/sim/:id" element={<SimFolder />} />
+          <Route path="/immobilier" element={<Immobilier />} />
+          <Route path="/immobilier/:boardId" element={<ImmobilierBoard />} />
+          <Route path="/immobilier/:boardId/:cardId" element={<ImmobilierCard />} />
+          <Route path="/installer" element={<Installer />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   )
 }
