@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
+import { notifyUsers } from '../../lib/notify'
 
 /**
  * Hook du sondage d'une carte de discussion (etape 16 ter).
@@ -159,6 +160,34 @@ export function usePoll(cardId, userId) {
       }
 
       await load()
+
+      // Notifie les autres membres du tableau qu'un sondage a ete cree.
+      // Fire-and-forget : ne bloque pas, n'echoue jamais bruyamment.
+      try {
+        const { data: cardRow } = await supabase
+          .from('discussion_cards')
+          .select('board_id, board:discussion_boards(title)')
+          .eq('id', cardId)
+          .maybeSingle()
+        const boardId = cardRow?.board_id
+        if (boardId) {
+          const { data: members } = await supabase
+            .from('discussion_board_members')
+            .select('user_id')
+            .eq('board_id', boardId)
+          const recipients = (members || [])
+            .map((m) => m.user_id)
+            .filter((uid) => uid && uid !== userId)
+          notifyUsers({
+            userIds: recipients,
+            title: cardRow?.board?.title || 'Discussion',
+            body: `Nouveau sondage : ${q}`.slice(0, 140),
+            url: `/discussion/${boardId}/${cardId}`,
+          })
+        }
+      } catch (err) {
+        console.error('[usePoll] notify sondage error:', err)
+      }
     },
     [userId, cardId, load]
   )

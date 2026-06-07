@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../hooks/useAuth'
+import { notifyUsers } from '../../lib/notify'
 
 /**
  * Liste des evenements du cabinet, enrichie pour l'affichage des cartes :
@@ -137,6 +138,30 @@ export function useEvenements() {
 
       if (insertError) throw insertError
       refetch()
+
+      // Si l'evenement porte un sondage de presence, notifier le cabinet
+      // (tous les comptes actifs sauf le createur) : c'est "en attente" pour
+      // tout le monde. Fire-and-forget.
+      if (values.sondage_actif && data?.id) {
+        try {
+          const { data: profs } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('actif', true)
+          const recipients = (profs || [])
+            .map((p) => p.id)
+            .filter((uid) => uid && uid !== user.id)
+          notifyUsers({
+            userIds: recipients,
+            title: 'Sondage de présence',
+            body: `${values.titre} : merci de répondre`.slice(0, 140),
+            url: `/evenements/${data.id}`,
+          })
+        } catch (err) {
+          console.error('[useEvenements] notify sondage error:', err)
+        }
+      }
+
       return data
     },
     [user, refetch],
