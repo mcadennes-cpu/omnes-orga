@@ -2,6 +2,7 @@
 // Service worker maison (strategie injectManifest).
 // 1) Precache du shell + fallback SPA + cache des polices (etape 17B).
 // 2) Reception des notifications push FCM en arriere-plan (etape 17C).
+// 3) Pose de la pastille (App Badge) a la reception d'un push (etape 18B).
 
 import { precacheAndRoute, createHandlerBoundToURL, cleanupOutdatedCaches } from 'workbox-precaching'
 import { registerRoute, NavigationRoute } from 'workbox-routing'
@@ -55,6 +56,23 @@ registerRoute(
   })
 )
 
+// --- Pastille (App Badge) : pose le compteur recu dans le push (18B) ---
+// Le payload "data" porte un champ "badge" (chaine) calcule cote serveur par
+// l'Edge Function send-notification. On l'applique meme app fermee. Feature
+// detection : sur les plateformes sans Badging API, no-op silencieux.
+function appliquerBadge(rawBadge) {
+  if (!self.navigator || !('setAppBadge' in self.navigator)) return
+  const count = Number(rawBadge)
+  if (Number.isFinite(count) && count > 0) {
+    self.navigator.setAppBadge(count).catch(() => {})
+  } else {
+    // 0 ou valeur absente -> on efface la pastille
+    if ('clearAppBadge' in self.navigator) {
+      self.navigator.clearAppBadge().catch(() => {})
+    }
+  }
+}
+
 // --- FCM : notifications push en arriere-plan (etape 17C) ---
 // Meme config que src/lib/firebase.js. Valeurs non sensibles (cote client).
 // On enveloppe l'init dans un try/catch : si FCM echoue dans un environnement
@@ -74,6 +92,11 @@ try {
   onBackgroundMessage(messaging, (payload) => {
     const data = payload.data || {}
     const title = data.title || 'Omnes Orga'
+
+    // Pastille de l'icone (WhatsApp-style) : se met a jour pile a la reception,
+    // meme app fermee.
+    appliquerBadge(data.badge)
+
     self.registration.showNotification(title, {
       body: data.body || '',
       icon: '/pwa-192x192.png',

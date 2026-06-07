@@ -7,7 +7,9 @@
 //   2. Valide les entrees (userIds, title, body, url)
 //   3. Recupere les fcm_token des destinataires (via SERVICE_ROLE_KEY)
 //   4. Fabrique un access_token Google a partir du compte de service (JWT signe -> OAuth2)
-//   5. Envoie a chaque token un message "data-only" via FCM HTTP v1
+//   5. Pour chaque destinataire : calcule son nombre d'elements "en attente"
+//      (RPC get_activite_count) et envoie un message "data-only" via FCM HTTP v1
+//      en y glissant ce compteur (champ "badge") -> pastille de l'icone (18B)
 //   6. Retourne { success, sent, failed, recipients }
 //
 // Securite :
@@ -121,13 +123,14 @@ async function getGoogleAccessToken(
 
 /**
  * Envoie un message "data-only" a un token FCM via l'API HTTP v1.
+ * Les valeurs de "data" doivent etre des chaines (badge inclus).
  * Retourne true si FCM a accepte le message.
  */
 async function sendToToken(
   accessToken: string,
   projectId: string,
   token: string,
-  payload: { title: string; body: string; url: string },
+  payload: { title: string; body: string; url: string; badge: string },
 ): Promise<boolean> {
   const res = await fetch(
     `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
@@ -144,6 +147,7 @@ async function sendToToken(
             title: payload.title,
             body: payload.body,
             url: payload.url,
+            badge: payload.badge,
           },
           webpush: { headers: { Urgency: "high" } },
         },
@@ -240,11 +244,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return errorResponse("Lecture des destinataires impossible.", 500);
   }
 
-  const tokens = (profiles ?? [])
-    .map((p) => p.fcm_token as string)
-    .filter((t) => typeof t === "string" && t.length > 0);
+  // On garde le couple (id, token) : le compteur de pastille se calcule par
+  // utilisateur, donc on ne peut pas se contenter d'une liste de tokens.
+  const recipients = (profiles ?? [])
+    .map((p) => ({ id: p.id as string, token: p.fcm_token as string }))
+    .filter((r) => typeof r.token === "string" && r.token.length > 0);
 
-  if (tokens.length === 0) {
+  if (recipients.length === 0) {
     return jsonResponse(
       { success: true, sent: 0, failed: 0, recipients: 0 },
       200,
@@ -268,15 +274,30 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return errorResponse("Authentification FCM impossible.", 502);
   }
 
-  // ---------- 6. Envoi a chaque token ----------
+  // ---------- 6. Envoi a chaque destinataire (avec sa pastille) ----------
   let sent = 0;
   let failed = 0;
-  for (const token of tokens) {
+  for (const r of recipients) {
+    // Compteur "en attente" de CE destinataire, apres l'action qui a declenche
+    // la notif (le message vient d'etre insere). On le passe en "badge" pour
+    // que le service worker pose la pastille pile a la reception. Un echec de
+    // calcul ne doit pas bloquer l'envoi -> on retombe sur 0 (pas de pastille).
+    let badgeCount = 0;
+    const { data: countData, error: countError } = await supabaseAdmin.rpc(
+      "get_activite_count",
+      { p_user_id: r.id },
+    );
+    if (countError) {
+      console.error("Erreur get_activite_count :", countError);
+    } else if (typeof countData === "number") {
+      badgeCount = countData;
+    }
+
     const ok = await sendToToken(
       accessToken,
       serviceAccount.project_id,
-      token,
-      { title, body: messageBody, url },
+      r.token,
+      { title, body: messageBody, url, badge: String(badgeCount) },
     );
     if (ok) sent++;
     else failed++;
@@ -284,7 +305,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   // ---------- 7. Succes ----------
   return jsonResponse(
-    { success: true, sent, failed, recipients: tokens.length },
+    { success: true, sent, failed, recipients: recipients.length },
     200,
   );
 });
