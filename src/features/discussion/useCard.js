@@ -5,6 +5,7 @@ import {
   removeAttachmentFile,
   validateAttachmentFile,
 } from './discussionStorage'
+import { notifyUsers } from '../../lib/notify'
 
 /**
  * Hook de la vue d'une carte de discussion (etapes 7C + 7D).
@@ -281,10 +282,29 @@ export function useCard(cardId) {
   // 8. Mutations sur les messages
   // -------------------------------------------------------------------------
 
-  /**
-   * Poste un message dans le fil de la carte.
-   * @param {string} body - texte du message
-   */
+  // Notifie les autres membres du tableau qu'un message a ete poste.
+  // Fire-and-forget : ne bloque pas l'envoi, n'echoue jamais bruyamment.
+  const notifyOtherMembers = useCallback(async (messageText) => {
+    if (!board?.id || !userId) return
+    try {
+      const { data: members } = await supabase
+        .from('discussion_board_members')
+        .select('user_id')
+        .eq('board_id', board.id)
+      const recipients = (members || [])
+        .map((m) => m.user_id)
+        .filter((uid) => uid && uid !== userId)
+      notifyUsers({
+        userIds: recipients,
+        title: board.title || 'Discussion',
+        body: messageText.slice(0, 140),
+        url: `/discussion/${board.id}/${cardId}`,
+      })
+    } catch (err) {
+      console.error('[useCard] notifyOtherMembers error:', err)
+    }
+  }, [board?.id, board?.title, userId, cardId])
+
   const sendMessage = useCallback(async (body) => {
     if (!userId) throw new Error('Utilisateur non connecte')
     if (!cardId) throw new Error('Carte introuvable')
@@ -297,7 +317,10 @@ export function useCard(cardId) {
 
     if (insertError) throw insertError
     await fetchMessages()
-  }, [userId, cardId, fetchMessages])
+
+    // Notifier les autres membres (apres l'envoi reussi).
+    notifyOtherMembers(trimmed)
+  }, [userId, cardId, fetchMessages, notifyOtherMembers])
 
   /**
    * Modifie le texte d'un message. La RLS n'autorise que son auteur.

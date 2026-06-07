@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import { notifyUsers } from '../../lib/notify';
 
 /**
  * Hook principal du module Discussion.
@@ -177,6 +178,16 @@ export function useDiscussion() {
       // Rollback : supprimer le board orphelin
       await supabase.from('discussion_boards').delete().eq('id', board.id);
       throw membersError;
+    }
+
+    // Notifier les invites (fire-and-forget).
+    if (uniqueMemberIds.length > 0) {
+      notifyUsers({
+        userIds: uniqueMemberIds,
+        title: trimmedTitle,
+        body: 'Vous avez été invité à ce tableau.',
+        url: `/discussion/${board.id}`,
+      });
     }
 
     await fetchBoards();

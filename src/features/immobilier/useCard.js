@@ -12,6 +12,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { deleteAttachment } from './immobilierStorage';
+import { notifyUsers } from '../../lib/notify';
 
 export function useCard(cardId) {
   const [card, setCard] = useState(null);
@@ -182,6 +183,30 @@ export function useCard(cardId) {
   }, [card]);
 
   // ----- Envoi / edition / suppression de message -----
+
+  // Notifie les autres membres du tableau qu'un message a ete poste.
+  // Fire-and-forget : ne bloque pas l'envoi, n'echoue jamais bruyamment.
+  const notifyOtherMembers = useCallback(async (messageText, authorId) => {
+    if (!card?.board_id) return;
+    try {
+      const { data: members } = await supabase
+        .from('immobilier_board_members')
+        .select('user_id')
+        .eq('board_id', card.board_id);
+      const recipients = (members || [])
+        .map((m) => m.user_id)
+        .filter((uid) => uid && uid !== authorId);
+      notifyUsers({
+        userIds: recipients,
+        title: board?.titre || 'Immobilier',
+        body: messageText.slice(0, 140),
+        url: `/immobilier/${card.board_id}/${card.id}`,
+      });
+    } catch (err) {
+      console.error('[useCard] notifyOtherMembers error:', err);
+    }
+  }, [card, board]);
+
   const sendMessage = useCallback(
     async (contenu) => {
       if (!card || !contenu?.trim()) return { error: new Error('Contenu vide') };
@@ -196,9 +221,13 @@ export function useCard(cardId) {
           auteur_id: user.id,
           contenu: contenu.trim(),
         });
+      if (!err) {
+        // Notifier les autres membres (apres l'insertion reussie).
+        notifyOtherMembers(contenu.trim(), user.id);
+      }
       return { error: err, id };
     },
-    [card]
+    [card, notifyOtherMembers]
   );
 
   const editMessage = useCallback(async (messageId, nouveauContenu) => {

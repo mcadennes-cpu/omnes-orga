@@ -17,6 +17,7 @@ import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../hooks/useAuth';
+import { notifyUsers } from '../../lib/notify';
 import ColorPicker from './ColorPicker';
 import MemberPicker from './MemberPicker';
 import { IMMOBILIER_ACCENT } from './immobilierColors';
@@ -103,6 +104,16 @@ export default function CreateBoardModal({ open, onClose, onCreated }) {
           .insert(members);
 
         if (errMembers) throw errMembers;
+      }
+
+      // Notifier les invites (fire-and-forget).
+      if (memberIds.length > 0) {
+        notifyUsers({
+          userIds: memberIds,
+          title: titre.trim(),
+          body: 'Vous avez été invité à ce tableau.',
+          url: `/immobilier/${boardId}`,
+        });
       }
 
       // Succes : on referme et on previent le parent
