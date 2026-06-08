@@ -14,10 +14,12 @@ function getInitials(prenom, nom) {
  * `profile.photo_url` est defini (URL signee recuperee via cache memoire),
  * sinon des initiales sur fond colore (palette deterministe sur le nom).
  *
- * Pendant le chargement de l'URL signee on affiche les initiales : pas de
- * spinner, pas de carre blanc. L'image vient se poser par-dessus quand
- * elle est prete. Si l'URL signee echoue ou si l'image elle-meme ne charge
- * pas, on reste sur les initiales (fail-safe silencieux).
+ * La pastille d'initiales reste affichee tant que la photo n'est pas
+ * ENTIEREMENT chargee (gate sur `onLoad`) : plus de demi-rendu "haut photo,
+ * bas pastille" quand le telechargement stagne. L'image charge en fond
+ * (opacity 0) puis vient se poser d'un coup une fois prete. Si l'URL signee
+ * echoue ou si l'image elle-meme ne charge pas (`onError`), on reste sur les
+ * initiales (fail-safe silencieux).
  *
  * @param {object} props
  * @param {{ prenom?: string, nom?: string, photo_url?: string }} [props.profile]
@@ -32,10 +34,12 @@ export default function Avatar({ profile, size, className = '', alt = '' }) {
   const photoPath = profile?.photo_url || ''
   const [signedUrl, setSignedUrl] = useState(null)
   const [imgFailed, setImgFailed] = useState(false)
+  const [imgLoaded, setImgLoaded] = useState(false)
 
   useEffect(() => {
     setSignedUrl(null)
     setImgFailed(false)
+    setImgLoaded(false)
     if (!photoPath) return
 
     let cancelled = false
@@ -64,6 +68,8 @@ export default function Avatar({ profile, size, className = '', alt = '' }) {
       className={`relative rounded-full overflow-hidden ${className}`}
       style={{ width: size, height: size }}
     >
+      {/* Pastille initiales : toujours rendue, reste visible tant que la
+          photo n'est pas entierement chargee (imgLoaded). */}
       <div
         className={`absolute inset-0 flex items-center justify-center font-display font-extrabold ${palette.bg} ${palette.text}`}
         style={{ fontSize: `${fontSize}px` }}
@@ -74,7 +80,11 @@ export default function Avatar({ profile, size, className = '', alt = '' }) {
         <img
           src={signedUrl}
           alt={alt}
-          className="absolute inset-0 w-full h-full object-cover"
+          loading="lazy"
+          decoding="async"
+          className="absolute inset-0 w-full h-full object-cover transition-opacity duration-200"
+          style={{ opacity: imgLoaded ? 1 : 0 }}
+          onLoad={() => setImgLoaded(true)}
           onError={() => setImgFailed(true)}
         />
       )}
