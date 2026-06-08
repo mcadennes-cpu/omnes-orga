@@ -41,6 +41,7 @@ export async function uploadAvatar(userId, blob, extension) {
     .upload(storagePath, blob, {
       contentType,
       upsert: true,
+      cacheControl: '31536000',
     })
 
   if (error) throw error
@@ -60,25 +61,14 @@ export async function deleteAvatar(photoPath) {
 }
 
 /**
- * Genere une URL signee pour afficher un avatar. Duree par defaut : 2 heures,
- * alignee sur la duree de cache cote client (cf. avatarCache).
+ * Helper synchrone : renvoie l'URL publique d'un avatar (bucket public).
+ * Pas d'appel reseau, pas d'expiration. Utile quand on veut une URL stable
+ * cote rendu sans passer par le cache d'URLs signees.
  *
- * @param {string} photoPath
- * @param {number} [expiresInSec=7200]
- * @returns {Promise<{ signedUrl: string, expiresAt: number }>} - expiresAt en ms epoch
+ * @param {string} path
+ * @returns {string|null}
  */
-export async function getAvatarSignedUrl(photoPath, expiresInSec = 7200) {
-  if (!photoPath) throw new Error('getAvatarSignedUrl: photoPath requis')
-
-  const { data, error } = await supabase.storage
-    .from(BUCKET)
-    .createSignedUrl(photoPath, expiresInSec)
-
-  if (error) throw error
-  if (!data?.signedUrl) throw new Error('URL signee vide')
-
-  return {
-    signedUrl: data.signedUrl,
-    expiresAt: Date.now() + expiresInSec * 1000,
-  }
+export function getAvatarPublicUrl(path) {
+  if (!path) return null
+  return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl
 }

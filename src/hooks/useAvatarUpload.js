@@ -2,13 +2,14 @@ import { useCallback, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { compressToSquareJpeg } from '../lib/imageCompress'
 import { uploadAvatar, deleteAvatar } from '../lib/avatarStorage'
-import { invalidateAvatarUrl } from '../lib/avatarCache'
 
 /**
  * Hook orchestrant l'upload et la suppression de la photo de profil.
  *
  * Le hook ne contient aucune logique UI : compression, upload Storage,
- * mise a jour de profiles.photo_url et invalidation du cache d'URL signees.
+ * mise a jour de profiles.photo_url. Le rafraichissement cote affichage
+ * est porte par le bump de profiles.updated_at (utilise par <Avatar>
+ * comme cache-buster `?v=updated_at` sur l'URL publique).
  * L'appelant fournit `currentPhotoPath` (lu typiquement depuis
  * useRole().photo_url) pour eviter une requete supplementaire.
  *
@@ -24,9 +25,9 @@ export function useAvatarUpload() {
   const [error, setError] = useState(null)
 
   /**
-   * Pipeline complet : compress -> upload Storage -> UPDATE profiles ->
-   * invalidation du cache. Si une etape echoue, l'erreur est stockee dans
-   * `error` puis re-throw pour que l'appelant puisse aussi reagir.
+   * Pipeline complet : compress -> upload Storage -> UPDATE profiles.
+   * Si une etape echoue, l'erreur est stockee dans `error` puis re-throw
+   * pour que l'appelant puisse aussi reagir.
    */
   const uploadPhoto = useCallback(async ({
     userId,
@@ -45,21 +46,23 @@ export function useAvatarUpload() {
       const blob = await compressToSquareJpeg(source, cropArea)
       const { storagePath } = await uploadAvatar(userId, blob, 'jpg')
 
+      // Bump explicite de updated_at : sert de cache-buster `?v=updated_at`
+      // sur l'URL publique cote <Avatar>. Robuste qu'il y ait ou non un
+      // trigger SQL `new.updated_at = now()` : si trigger, il ecrase notre
+      // valeur ; sinon, notre valeur s'applique. La RLS
+      // profiles_update_own_safe_fields autorise photo_url et updated_at.
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ photo_url: storagePath })
+        .update({ photo_url: storagePath, updated_at: new Date().toISOString() })
         .eq('id', userId)
 
       if (updateError) {
         // Etat incoherent : le blob est dans Storage mais photo_url ne pointe
-        // pas dessus. Pas de fuite (bucket prive, RLS), juste un orphelin.
+        // pas dessus. Juste un orphelin dans le bucket avatars.
         // L'utilisateur verra l'erreur et pourra retenter.
         console.warn('useAvatarUpload: UPDATE profiles a echoue apres upload Storage', updateError)
         throw updateError
       }
-
-      if (currentPhotoPath) invalidateAvatarUrl(currentPhotoPath)
-      invalidateAvatarUrl(storagePath)
 
       onSuccess?.({ photoPath: storagePath })
     } catch (err) {
@@ -71,9 +74,9 @@ export function useAvatarUpload() {
   }, [])
 
   /**
-   * Suppression : delete Storage (best-effort) -> UPDATE profiles ->
-   * invalidation. Le delete Storage est tolerant : un fichier orphelin
-   * n'est pas critique (bucket prive). Seul l'UPDATE BD est bloquant.
+   * Suppression : delete Storage (best-effort) -> UPDATE profiles.
+   * Le delete Storage est tolerant : un fichier orphelin n'est pas critique.
+   * Seul l'UPDATE BD est bloquant.
    */
   const deletePhoto = useCallback(async ({
     userId,
@@ -99,8 +102,6 @@ export function useAvatarUpload() {
         .eq('id', userId)
 
       if (updateError) throw updateError
-
-      invalidateAvatarUrl(currentPhotoPath)
 
       onSuccess?.({ photoPath: null })
     } catch (err) {

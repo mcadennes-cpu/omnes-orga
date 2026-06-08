@@ -73,7 +73,7 @@ export function useCard(cardId) {
             contenu,
             edited,
             created_at,
-            auteur:profiles!auteur_id (id, prenom, nom, photo_url)
+            auteur:profiles!auteur_id (id, prenom, nom, photo_url, updated_at)
           `)
           .eq('card_id', cardId)
           .order('created_at', { ascending: true }),

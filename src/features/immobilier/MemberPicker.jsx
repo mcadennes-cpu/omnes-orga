@@ -27,7 +27,7 @@ export default function MemberPicker({ currentUserId, selectedIds, onChange, exc
       setLoading(true);
       const { data, error: err } = await supabase
         .from('profiles')
-        .select('id, prenom, nom, specialite, photo_url, role')
+        .select('id, prenom, nom, specialite, photo_url, role, updated_at')
         .eq('actif', true)
         .in('role', ['super_admin', 'associe_gerant', 'associe'])
         .order('nom', { ascending: true });

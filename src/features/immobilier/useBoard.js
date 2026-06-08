@@ -51,7 +51,7 @@ export function useBoard(boardId) {
             user_id,
             role_in_board,
             last_read_at,
-            profile:profiles!user_id (id, prenom, nom, specialite, photo_url)
+            profile:profiles!user_id (id, prenom, nom, specialite, photo_url, updated_at)
           `)
           .eq('board_id', boardId),
         supabase
@@ -106,7 +106,7 @@ export function useBoard(boardId) {
           contenu,
           auteur_id,
           created_at,
-          auteur:profiles!auteur_id (id, prenom, nom)
+          auteur:profiles!auteur_id (id, prenom, nom, updated_at)
         `)
         .in('card_id', cardIds)
         .order('created_at', { ascending: false });
