@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabaseClient'
-import { openOrDownload, isPreviewable as isPreviewableShared } from '../../lib/storageOpen'
+import { openOrDownload, isPreviewable as isPreviewableShared, createSignedImageUrl } from '../../lib/storageOpen'
 
 const BUCKET = 'discussion-attachments'
 
@@ -122,6 +122,15 @@ export async function openAttachment(storagePath, filename, mimeType) {
     filename,
     mimeType,
   })
+}
+
+/**
+ * Genere une URL signee pour afficher une image (piece jointe) directement
+ * dans l'app via la visionneuse integree. Bucket prive -> URL signee requise.
+ */
+export async function getAttachmentImageUrl(storagePath) {
+  if (!storagePath) throw new Error('getAttachmentImageUrl: storagePath requis')
+  return createSignedImageUrl({ supabase, bucket: BUCKET, storagePath })
 }
 
 /**

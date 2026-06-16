@@ -1,12 +1,19 @@
 import { useRef, useState } from 'react'
 import { Plus, Loader2 } from 'lucide-react'
 import AttachmentChip from './AttachmentChip'
-import { ACCEPTED_EXTENSIONS } from './discussionStorage'
+import { ACCEPTED_EXTENSIONS, getAttachmentImageUrl, downloadAttachment } from './discussionStorage'
+import { isImage } from '../../lib/storageOpen'
+import ImageViewerModal from '../../components/common/ImageViewerModal'
 
 /**
  * Section "Pieces jointes" de la vue carte, sous la description.
  * Affiche la liste des pieces jointes ; si la carte est ouverte (canManage),
  * propose l'ajout de fichiers et la suppression de ses propres pieces jointes.
+ *
+ * Clic sur une piece jointe : si c'est une image, on l'affiche dans la
+ * visionneuse integree (reste dans l'app, fonctionne sur iOS PWA et Android) ;
+ * sinon, on garde le comportement existant via onOpen (preview onglet ou
+ * telechargement).
  *
  * @param {Object} props
  * @param {Array} props.attachments  pieces jointes (cf. useCard)
@@ -28,8 +35,38 @@ export default function CardAttachments({
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState(null)
 
+  // Visionneuse d'image integree
+  const [viewer, setViewer] = useState({ open: false, src: null, attachment: null })
+
   // Carte close et aucune piece jointe : rien a montrer.
   if (attachments.length === 0 && !canManage) return null
+
+  const handleOpen = async (attachment) => {
+    // Image -> visionneuse integree. Le chargement de l'URL signee est
+    // asynchrone, sans impact (on ne fait pas window.open).
+    if (isImage(attachment.mimeType)) {
+      setViewer({ open: true, src: null, attachment })
+      try {
+        const url = await getAttachmentImageUrl(attachment.storagePath)
+        setViewer((v) => (v.attachment === attachment ? { ...v, src: url } : v))
+      } catch (err) {
+        console.error('[CardAttachments] image url error:', err)
+        // Repli sur le comportement classique si l'URL ne peut etre generee.
+        setViewer({ open: false, src: null, attachment: null })
+        onOpen(attachment)
+      }
+      return
+    }
+    // Autre type : comportement existant.
+    onOpen(attachment)
+  }
+
+  const closeViewer = () => setViewer({ open: false, src: null, attachment: null })
+
+  const handleDownloadFromViewer = () => {
+    const a = viewer.attachment
+    if (a) downloadAttachment(a.storagePath, a.filename)
+  }
 
   const handleFilesSelected = async (e) => {
     const files = Array.from(e.target.files || [])
@@ -65,7 +102,7 @@ export default function CardAttachments({
               key={a.id}
               attachment={a}
               canDelete={canManage && a.uploadedBy === userId}
-              onOpen={onOpen}
+              onOpen={handleOpen}
               onDelete={onDelete}
             />
           ))}
@@ -103,6 +140,14 @@ export default function CardAttachments({
       {uploadError && (
         <p className="mt-2 text-brique text-xs whitespace-pre-line">{uploadError}</p>
       )}
+
+      <ImageViewerModal
+        open={viewer.open}
+        src={viewer.src}
+        alt={viewer.attachment?.filename || ''}
+        onClose={closeViewer}
+        onDownload={handleDownloadFromViewer}
+      />
     </section>
   )
 }
