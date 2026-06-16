@@ -28,6 +28,34 @@ export function isPreviewable(mimeType) {
 }
 
 /**
+ * Indique si ce type de fichier est une image (affichable inline dans un
+ * <img>). Sert a router les images vers la visionneuse integree plutot que
+ * vers l'ouverture externe, qui se comporte mal en PWA iOS et sur Android.
+ */
+export function isImage(mimeType) {
+  return Boolean(mimeType) && mimeType.startsWith('image/')
+}
+
+/**
+ * Genere une URL signee temporaire pour un fichier d'un bucket prive.
+ * Utilisee par la visionneuse d'image : on pose l'URL comme src d'un <img>,
+ * ce qui affiche la photo DANS l'app, sans ouverture externe.
+ *
+ * @returns {Promise<string>} l'URL signee
+ */
+export async function createSignedImageUrl({ supabase, bucket, storagePath, expiresIn = 300 }) {
+  if (!supabase) throw new Error('createSignedImageUrl: supabase requis')
+  if (!bucket) throw new Error('createSignedImageUrl: bucket requis')
+  if (!storagePath) throw new Error('createSignedImageUrl: storagePath requis')
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .createSignedUrl(storagePath, expiresIn)
+  if (error) throw error
+  if (!data?.signedUrl) throw new Error('URL signee invalide')
+  return data.signedUrl
+}
+
+/**
  * Indique si l'application tourne en mode PWA installee (ajoutee a l'ecran
  * d'accueil, lancee comme une app native).
  *

@@ -4,7 +4,7 @@
 // Calque sur discussionStorage.js et cabinetStorage.js.
 
 import { supabase } from '../../lib/supabaseClient';
-import { openOrDownload } from '../../lib/storageOpen';
+import { openOrDownload, createSignedImageUrl } from '../../lib/storageOpen';
 
 const BUCKET = 'immobilier-attachments';
 const MAX_BYTES = 25 * 1024 * 1024; // 25 Mo
@@ -134,6 +134,36 @@ export async function openAttachment(attachment) {
     filename: attachment.nom,
     mimeType: attachment.mime_type,
   });
+}
+
+// Genere une URL signee pour afficher une image (piece jointe) directement
+// dans l'app via la visionneuse integree. Bucket prive -> URL signee requise.
+// La cle Storage = l'id de la piece jointe (pattern flat UUID).
+export async function getAttachmentImageUrl(attachment) {
+  if (!attachment?.id) throw new Error('getAttachmentImageUrl: attachment.id requis');
+  return createSignedImageUrl({ supabase, bucket: BUCKET, storagePath: attachment.id });
+}
+
+// Force le telechargement Blob d'une piece jointe (nom original preserve).
+// Sert de repli dans la visionneuse si une image ne s'affiche pas dans un
+// <img> (ex : HEIC non rendu par certains navigateurs).
+export async function downloadAttachment(attachment) {
+  if (!attachment?.id) throw new Error('downloadAttachment: attachment.id requis');
+  const { data, error } = await supabase.storage.from(BUCKET).download(attachment.id);
+  if (error) throw error;
+  if (!data) throw new Error('Fichier vide');
+  const blobUrl = URL.createObjectURL(data);
+  try {
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = attachment.nom || attachment.id;
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+  }
 }
 
 // Helper pour formater une taille en Ko/Mo lisible

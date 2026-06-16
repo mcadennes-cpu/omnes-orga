@@ -1,7 +1,9 @@
 // src/features/immobilier/AttachmentChip.jsx
 // Chip horizontale d'une piece jointe.
 // - Icone (selon type) + nom (tronque) + taille
-// - Clic sur la chip : ouvre la piece jointe (preview ou download selon type)
+// - Clic sur la chip : image -> visionneuse integree (reste dans l'app) ;
+//   autre type -> preview/telechargement via openAttachment (comportement
+//   existant)
 // - Bouton croix dedie si l'utilisateur en est l'auteur (et carte ouverte)
 //
 // Note : la chip n'est pas un <button> mais un <div role="button"> pour
@@ -18,10 +20,14 @@ import {
 } from 'lucide-react';
 import {
   openAttachment,
+  getAttachmentImageUrl,
+  downloadAttachment,
   formatBytes,
   fileTypeCategory,
 } from './immobilierStorage';
+import { isImage } from '../../lib/storageOpen';
 import ConfirmModal from '../../components/ConfirmModal';
+import ImageViewerModal from '../../components/common/ImageViewerModal';
 
 const ICON_BY_CATEGORY = {
   image: ImageIcon,
@@ -40,13 +46,31 @@ export default function AttachmentChip({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [viewer, setViewer] = useState({ open: false, src: null });
 
   const Icon = ICON_BY_CATEGORY[fileTypeCategory(attachment.mime_type)] || Paperclip;
 
   async function handleOpen() {
     if (busy) return;
-    setBusy(true);
     setError(null);
+
+    // Image : affichage dans la visionneuse integree (reste dans l'app,
+    // fonctionne sur iOS PWA installee et sur Android). Le chargement de
+    // l'URL signee est asynchrone, sans impact (on ne fait pas window.open).
+    if (isImage(attachment.mime_type)) {
+      setViewer({ open: true, src: null });
+      try {
+        const url = await getAttachmentImageUrl(attachment);
+        setViewer((v) => (v.open ? { ...v, src: url } : v));
+      } catch (err) {
+        setViewer({ open: false, src: null });
+        setError(err);
+      }
+      return;
+    }
+
+    // Autre type : comportement existant.
+    setBusy(true);
     try {
       await openAttachment(attachment);
     } catch (err) {
@@ -135,6 +159,13 @@ export default function AttachmentChip({
         cancelLabel="Annuler"
         danger
         onConfirm={handleConfirmDelete}
+      />
+      <ImageViewerModal
+        open={viewer.open}
+        src={viewer.src}
+        alt={attachment.nom}
+        onClose={() => setViewer({ open: false, src: null })}
+        onDownload={() => downloadAttachment(attachment)}
       />
     </div>
   );
