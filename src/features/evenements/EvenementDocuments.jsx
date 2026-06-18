@@ -4,7 +4,9 @@ import ConfirmDialog from '../../components/common/ConfirmDialog'
 import { useEvenementFichiers } from './useEvenementFichiers'
 import EvenementUploadModal from './EvenementUploadModal'
 import { getFileTypeMeta, formatTaille } from './fileType'
-import { openEvenementFile } from './evenementStorage'
+import { openEvenementFile, getEvenementImageUrl, downloadEvenementFile } from './evenementStorage'
+import ImageViewerModal from '../../components/common/ImageViewerModal'
+import { useImageViewer } from '../../hooks/useImageViewer'
 
 // ----------------------------------------------------------------------------
 // Sous-composant : une ligne de fichier
@@ -66,6 +68,14 @@ export default function EvenementDocuments({ evenementId, canEdit }) {
   const [fichierASupprimer, setFichierASupprimer] = useState(null)
   const [deleting, setDeleting] = useState(false)
 
+  // Visionneuse d'image integree : une image s'affiche dans l'app ; les autres
+  // types gardent le comportement existant (openEvenementFile).
+  const { openFile, viewerProps } = useImageViewer({
+    getImageUrl: getEvenementImageUrl,
+    fallbackOpen: openEvenementFile,
+    downloadFile: downloadEvenementFile,
+  })
+
   // Rien a afficher : aucun document et pas de droit d'ajout.
   if (!loading && !error && fichiers.length === 0 && !canEdit) {
     return null
@@ -73,7 +83,7 @@ export default function EvenementDocuments({ evenementId, canEdit }) {
 
   async function handleOpen(fichier) {
     try {
-      await openEvenementFile(fichier.id, fichier.nom, fichier.mime_type)
+      await openFile(fichier.id, fichier.nom, fichier.mime_type)
     } catch (err) {
       console.error('[EvenementDocuments] open error:', err)
     }
@@ -165,6 +175,8 @@ export default function EvenementDocuments({ evenementId, canEdit }) {
         onCancel={() => setFichierASupprimer(null)}
         submitting={deleting}
       />
+
+      <ImageViewerModal {...viewerProps} />
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabaseClient'
-import { openOrDownload } from '../../lib/storageOpen'
+import { openOrDownload, createSignedImageUrl } from '../../lib/storageOpen'
 
 const BUCKET = 'cabinet-pratique'
 
@@ -24,6 +24,16 @@ export async function openCabinetFile(id, nom, mimeType) {
     filename: nom,
     mimeType,
   })
+}
+
+/**
+ * Genere une URL signee pour afficher une image (fichier du cabinet)
+ * directement dans l'app via la visionneuse integree. Bucket prive -> URL
+ * signee requise. La cle Storage = l'id du fichier (= nom du blob).
+ */
+export async function getCabinetImageUrl(id) {
+  if (!id) throw new Error('getCabinetImageUrl: id requis')
+  return createSignedImageUrl({ supabase, bucket: BUCKET, storagePath: id })
 }
 
 /**

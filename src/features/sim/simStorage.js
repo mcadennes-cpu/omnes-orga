@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabaseClient'
-import { openOrDownload } from '../../lib/storageOpen'
+import { openOrDownload, createSignedImageUrl } from '../../lib/storageOpen'
 
 const BUCKET = 'sim'
 
@@ -24,6 +24,15 @@ export async function openSimFile(id, nom, mimeType) {
     filename: nom,
     mimeType,
   })
+}
+
+/**
+ * Genere une URL signee pour afficher une image (fichier SIM) directement
+ * dans l'app via la visionneuse integree. Bucket prive -> URL signee requise.
+ */
+export async function getSimImageUrl(id) {
+  if (!id) throw new Error('getSimImageUrl: id requis')
+  return createSignedImageUrl({ supabase, bucket: BUCKET, storagePath: id })
 }
 
 /**

@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabaseClient'
-import { openOrDownload } from '../../lib/storageOpen'
+import { openOrDownload, createSignedImageUrl } from '../../lib/storageOpen'
 
 const BUCKET = 'evenements'
 
@@ -24,6 +24,16 @@ export async function openEvenementFile(id, nom, mimeType) {
     filename: nom,
     mimeType,
   })
+}
+
+/**
+ * Genere une URL signee pour afficher une image (document d'evenement)
+ * directement dans l'app via la visionneuse integree. Bucket prive -> URL
+ * signee requise.
+ */
+export async function getEvenementImageUrl(id) {
+  if (!id) throw new Error('getEvenementImageUrl: id requis')
+  return createSignedImageUrl({ supabase, bucket: BUCKET, storagePath: id })
 }
 
 /**

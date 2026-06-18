@@ -4,6 +4,9 @@ import {
   Search, X,
 } from 'lucide-react'
 import HeaderWatermark from '../../components/common/HeaderWatermark'
+import ImageViewerModal from '../../components/common/ImageViewerModal'
+import { useImageViewer } from '../../hooks/useImageViewer'
+import { getSimImageUrl } from './simStorage'
 
 // Mapping extension -> icone + couleur de la palette Omnes.
 function fileTypeMeta(filename) {
@@ -336,6 +339,14 @@ export default function DrivePage({
   onUpload,
   onNewFolder,
 }) {
+  // Visionneuse d'image integree : une image s'affiche dans l'app ; les autres
+  // types gardent le comportement existant (onOpenFile).
+  const { openFile, viewerProps } = useImageViewer({
+    getImageUrl: getSimImageUrl,
+    fallbackOpen: onOpenFile,
+    downloadFile: onDownloadFile,
+  })
+
   const isEmpty = !isSearching && folders.length === 0 && files.length === 0
   const noResults = isSearching && folders.length === 0 && files.length === 0
 
@@ -385,7 +396,7 @@ export default function DrivePage({
                         {...f}
                         canMenu={f.canMenu}
                         showMeta={!compact || isSearching}
-                        onOpen={() => onOpenFile && onOpenFile(f.id, f.name, f.mimeType)}
+                        onOpen={() => openFile(f.id, f.name, f.mimeType)}
                         onDownload={() => onDownloadFile && onDownloadFile(f.id, f.name)}
                         onMenu={() => onMenuFile && onMenuFile(f.id, f.name, f.mimeType, f.auteurId)}
                       />
@@ -398,6 +409,7 @@ export default function DrivePage({
         </>
       )}
 
+      <ImageViewerModal {...viewerProps} />
       <div className="h-6" />
     </>
   )
