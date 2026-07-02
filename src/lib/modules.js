@@ -13,6 +13,7 @@ export const ROLES = {
   ASSOCIE_GERANT: 'associe_gerant',
   ASSOCIE: 'associe',
   REMPLACANT: 'remplacant',
+  POSTE_BUREAU: 'poste_bureau',
 }
 
 export const ROLE_LABELS = {
@@ -20,6 +21,7 @@ export const ROLE_LABELS = {
   associe_gerant: 'Associé gérant',
   associe: 'Associé',
   remplacant: 'Remplaçant',
+  poste_bureau: 'Poste bureau',
 }
 
 export const MODULES = [
@@ -28,21 +30,21 @@ export const MODULES = [
     label: 'Trombinoscope',
     icon: Users,
     color: 'canard',
-    allowedRoles: ['super_admin', 'associe_gerant', 'associe', 'remplacant'],
+    allowedRoles: ['super_admin', 'associe_gerant', 'associe', 'remplacant', 'poste_bureau'],
   },
   {
     key: 'annuaire',
     label: 'Annuaire',
     icon: BookOpen,
     color: 'ocre',
-    allowedRoles: ['super_admin', 'associe_gerant', 'associe', 'remplacant'],
+    allowedRoles: ['super_admin', 'associe_gerant', 'associe', 'remplacant', 'poste_bureau'],
   },
   {
     key: 'cabinet_pratique',
     label: 'Cabinet pratique',
     icon: Building2,
     color: 'marine',
-    allowedRoles: ['super_admin', 'associe_gerant', 'associe', 'remplacant'],
+    allowedRoles: ['super_admin', 'associe_gerant', 'associe', 'remplacant', 'poste_bureau'],
   },
   {
     key: 'discussion',

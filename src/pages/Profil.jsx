@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useRole } from '../hooks/useRole'
 import { useNotifications } from '../hooks/useNotifications'
 import { ROLE_LABELS } from '../lib/modules'
+import { isPosteBureau } from '../lib/permissions'
 import AppLayout from '../components/layout/AppLayout'
 import Pill from '../components/common/Pill'
 import HeaderWatermark from '../components/common/HeaderWatermark'
@@ -29,6 +30,7 @@ export default function Profil() {
 
   const roleLabel = role ? ROLE_LABELS[role] ?? role : null
   const fullName = [prenom, nom].filter(Boolean).join(' ').trim()
+  const posteBureau = isPosteBureau(role)
 
   return (
     <AppLayout>
@@ -106,18 +108,20 @@ export default function Profil() {
             </section>
 
             {/* Section Notifications */}
-            <NotificationsSection />
+            {!posteBureau && <NotificationsSection />}
 
             {/* Déconnexion */}
-            <button
-              type="button"
-              onClick={handleSignOut}
-              disabled={signingOut}
-              className="h-12 w-full rounded-input bg-carte border border-border text-brique text-button flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <LogOut size={16} strokeWidth={2} />
-              {signingOut ? 'Déconnexion…' : 'Se déconnecter'}
-            </button>
+            {!posteBureau && (
+              <button
+                type="button"
+                onClick={handleSignOut}
+                disabled={signingOut}
+                className="h-12 w-full rounded-input bg-carte border border-border text-brique text-button flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <LogOut size={16} strokeWidth={2} />
+                {signingOut ? 'Déconnexion…' : 'Se déconnecter'}
+              </button>
+            )}
           </div>
         )}
       </div>

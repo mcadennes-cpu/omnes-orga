@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useRole } from '../hooks/useRole'
 import { useMonActivite } from '../hooks/useMonActivite'
 import { getVisibleModules } from '../lib/modules'
+import { isPosteBureau } from '../lib/permissions'
 import AppLayout from '../components/layout/AppLayout'
 import HomeHeader from '../components/home/HomeHeader'
 import ModuleTile from '../components/home/ModuleTile'
@@ -69,6 +70,7 @@ export default function Home() {
   }
 
   const visibleModules = getVisibleModules(role)
+  const posteBureau = isPosteBureau(role)
 
   // Pastille de non-lus par module. total = nb de choses distinctes a traiter
   // (cartes avec du nouveau + sondages en attente). Les modules absents de
@@ -82,24 +84,28 @@ export default function Home() {
 
   return (
     <AppLayout>
-      <HomeHeader prenom={prenom} />
-      <div className="grid grid-cols-3 gap-3 px-5">
-        {visibleModules.map((m) => (
-          <ModuleTile
-            key={m.key}
-            label={m.label}
-            icon={m.icon}
-            color={m.color}
-            badge={badges[m.key]}
-            onClick={() => handleModuleClick(m.key)}
+      <div className="max-w-md mx-auto w-full px-5">
+        <HomeHeader prenom={posteBureau ? '' : prenom} />
+        <div className="grid grid-cols-3 gap-3">
+          {visibleModules.map((m) => (
+            <ModuleTile
+              key={m.key}
+              label={m.label}
+              icon={m.icon}
+              color={m.color}
+              badge={badges[m.key]}
+              onClick={() => handleModuleClick(m.key)}
+            />
+          ))}
+        </div>
+        {!posteBureau && (
+          <ActivityList
+            items={items}
+            loading={activiteLoading}
+            onSelect={handleActiviteClick}
           />
-        ))}
+        )}
       </div>
-      <ActivityList
-        items={items}
-        loading={activiteLoading}
-        onSelect={handleActiviteClick}
-      />
 
       {/* 2e filigrane Omnes : meme logo que HomeHeader, en bas a gauche
           (oriente normalement, pas en miroir). left negatif pour deborder

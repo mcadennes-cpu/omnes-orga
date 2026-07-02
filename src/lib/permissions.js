@@ -17,7 +17,17 @@ export function canEditRole(role) {
   return role === ROLES.SUPER_ADMIN
 }
 export function canViewSensitiveFields(role) {
-  return Boolean(role) && role !== ROLES.REMPLACANT
+  return Boolean(role) && (
+    role === ROLES.SUPER_ADMIN ||
+    role === ROLES.ASSOCIE_GERANT ||
+    role === ROLES.ASSOCIE
+  )
+}
+
+// true si le role est "poste bureau" : compte partage (borne de consultation),
+// sans identite individuelle, en lecture seule sur les modules autorises.
+export function isPosteBureau(role) {
+  return role === ROLES.POSTE_BUREAU
 }
 export function canEditEntreeAnnuaire({ role, currentUserId, auteurId }) {
   if (!role) return false

@@ -14,7 +14,7 @@ export default function HomeHeader({ prenom }) {
   const dateLabel = formatDateFr()
   const greeting = prenom ? `Bonjour ${prenom}` : 'Bonjour'
   return (
-    <header className="px-5 pt-8 pb-5 relative">
+    <header className="pt-8 pb-5 relative">
       {/* Logo en absolute : couvre presque tout le bloc texte en fond */}
       <LogoOmnes
         color="marine"

@@ -35,6 +35,9 @@ export function useMedecins() {
       .from('profiles')
       .select('*')
       .eq('actif', true)
+      // Le poste bureau est un compte borne partage (pas une fiche medecin) :
+      // il ne doit jamais apparaitre dans le Trombinoscope.
+      .neq('role', 'poste_bureau')
       .order('nom', { ascending: true })
       .order('prenom', { ascending: true })
       .then(({ data, error: queryError }) => {
