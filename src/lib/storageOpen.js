@@ -56,6 +56,20 @@ export async function createSignedImageUrl({ supabase, bucket, storagePath, expi
 }
 
 /**
+ * Detecte iOS / iPadOS via l'user-agent. Inclut le cas de l'iPad recent qui
+ * se declare comme un Mac (UA "Macintosh" + ecran tactile) — meme logique
+ * que detectPlatform() dans useInstallPrompt.js, pour rester coherent.
+ */
+export function isIos() {
+  if (typeof window === 'undefined') return false
+  const ua = window.navigator.userAgent.toLowerCase()
+  const isIOS = /iphone|ipad|ipod/.test(ua)
+  const isIPadDesktop =
+    ua.includes('macintosh') && navigator.maxTouchPoints > 1
+  return isIOS || isIPadDesktop
+}
+
+/**
  * Indique si l'application tourne en mode PWA installee (ajoutee a l'ecran
  * d'accueil, lancee comme une app native).
  *
@@ -71,6 +85,16 @@ export function isStandaloneMode() {
     window.matchMedia('(display-mode: standalone)').matches
   const iosStandalone = window.navigator && window.navigator.standalone === true
   return Boolean(matchMediaStandalone || iosStandalone)
+}
+
+/**
+ * Indique si on est en PWA installee sur iOS/iPadOS specifiquement (pas
+ * n'importe quelle PWA standalone). Sert a cibler le contournement du
+ * blocage window.open() de Safari/WebKit iOS, qui ne concerne pas les PWA
+ * desktop (Mac/PC), ou window.open() fonctionne normalement.
+ */
+export function isIosStandalone() {
+  return isIos() && isStandaloneMode()
 }
 
 /**
@@ -149,9 +173,11 @@ export async function openOrDownload({
   }
 
   // Cas 2 : previewable mais on est en PWA installee -> telecharger pour
-  // contourner le bloqueur de window.open / <a target="_blank"> d'iOS
-  // standalone. Le fichier s'ouvrira via la feuille de partage native.
-  if (isStandaloneMode()) {
+  // contourner le bloqueur de window.open / <a target="_blank"> apres un
+  // await, specifique a Safari/WebKit en PWA iOS. Ne s'applique pas aux PWA
+  // desktop (Mac/PC), ou window.open() fonctionne normalement apres un await.
+  // Le fichier s'ouvrira via la feuille de partage native iOS.
+  if (isIosStandalone()) {
     return downloadBlob({ supabase, bucket, storagePath, filename })
   }
 
