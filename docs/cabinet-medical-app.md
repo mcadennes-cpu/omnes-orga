@@ -710,15 +710,15 @@ Permissions dans `src/lib/permissions.js` : `canAccessImmobilier`, `canCreateImm
 
 ## Matrice des accès — vue globale
 
-| Module | super_admin | associe_gerant | associe | remplacant |
-|---|:---:|:---:|:---:|:---:|
-| Trombinoscope | ✓ édition complète | ✓ édition complète | ✓ lecture + édition de soi | ✓ lecture restreinte + édition de soi |
-| Annuaire | ✓ | ✓ | ✓ | ✓ |
-| Cabinet pratique | ✓ édition | ✓ édition | ✓ lecture | ✓ lecture |
-| Discussion | ✓ | ✓ | si invité | si invité |
-| Événements | ✓ édition complète | ✓ édition complète | ✓ création + édition de soi | ✓ lecture + sondage |
-| SIM | ✓ | ✓ | invisible | invisible |
-| Immobilier | ✓ création + gestion complète | ✓ création + gestion complète | ✓ si invité (cartes + chat) | — invisible |
+| Module | super_admin | associe_gerant | associe | remplacant | poste_bureau |
+|---|:---:|:---:|:---:|:---:|:---:|
+| Trombinoscope | ✓ édition complète | ✓ édition complète | ✓ lecture + édition de soi | ✓ lecture restreinte + édition de soi | ✓ lecture restreinte (sans champs sensibles ni RIB) |
+| Annuaire | ✓ | ✓ | ✓ | ✓ | ✓ lecture + création |
+| Cabinet pratique | ✓ édition | ✓ édition | ✓ lecture | ✓ lecture | ✓ lecture |
+| Discussion | ✓ | ✓ | si invité | si invité | invisible |
+| Événements | ✓ édition complète | ✓ édition complète | ✓ création + édition de soi | ✓ lecture + sondage | invisible |
+| SIM | ✓ | ✓ | invisible | invisible | invisible |
+| Immobilier | ✓ création + gestion complète | ✓ création + gestion complète | ✓ si invité (cartes + chat) | — invisible | invisible |
 
 ---
 
@@ -1330,6 +1330,19 @@ Décisions :
 
 Fichiers ajoutés : `src/components/common/ImageViewerModal.jsx`, `src/hooks/useImageViewer.js`.
 Fichiers modifiés : `src/lib/storageOpen.js` ; Immobilier `immobilierStorage.js` + `AttachmentChip.jsx` ; Discussion `discussionStorage.js` + `CardAttachments.jsx` ; Cabinet `cabinetStorage.js` + `DrivePage.jsx` ; SIM `simStorage.js` + `DrivePage.jsx` ; Événements `evenementStorage.js` + `EvenementDocuments.jsx`. Aucune migration SQL, aucun changement de permissions/RLS.
+
+---
+
+20. ✓ **Étape 20 — FAITE** (sous-étapes 20A → 20E) — Rôle poste_bureau (borne desktop) + responsive Home
+
+   - **20A :** Ajout de la valeur `poste_bureau` à l'enum `user_role` (`docs/sql/20A-1-add-poste-bureau-enum.sql`, lancé seul hors transaction). Audit des 6 fonctions `SECURITY DEFINER` raisonnant par rôle (`is_super_admin`, `can_read_compta`, `is_sim_member`, `can_create_discussion_board`, `is_immobilier_member`, `can_create_immobilier_board`) : toutes en liste blanche, `poste_bureau` exclu automatiquement de SIM, RIB, création de tableaux Discussion/Immobilier et appartenance Immobilier. Aucun patch de fonction requis.
+   - **20B :** `modules.js` — `ROLES.POSTE_BUREAU`, label « Poste bureau », ajouté à `allowedRoles` de trombinoscope / annuaire / cabinet_pratique uniquement. `permissions.js` — `canViewSensitiveFields` passée en liste blanche explicite (exclut désormais poste_bureau comme le remplaçant), ajout du helper `isPosteBureau`. `useMedecins.js` — `.neq('role', 'poste_bureau')` pour ne pas afficher le compte borne comme une fiche. MemberPickers déjà safe (liste blanche de rôles à l'invitation).
+   - **20C :** borne UI — masquage du bouton Déconnexion et de la section Notifications (`Profil.jsx`), masquage de la section « En attente » (`Home.jsx`), tous conditionnés à `isPosteBureau(role)`.
+   - **20D :** compte borne créé via dashboard Supabase (auth + UPDATE `profiles` role/prenom/nom, `actif = true`). Responsive Home : contenu borné dans une colonne centrée `max-w-md mx-auto` (aspect bouton retrouvé sur desktop), header « Bonjour » sans prénom pour le poste bureau. Pages module inchangées.
+
+Note d'exploitation : compte partagé, session persistante (localStorage). Bouton déconnexion masqué volontairement ; pour délogger un poste, vider les données de site depuis le navigateur (opération d'admin). Création d'autres comptes bureau : dashboard Supabase puis UPDATE du rôle (l'Edge Function `create-medecin` n'accepte pas `poste_bureau` — non patchée, besoin ponctuel).
+
+Limitation connue : autoriser le poste bureau à écrire dans l'Annuaire est une exception assumée à « borne = lecture seule » (module sans donnée sensible). Les entrées créées depuis un poste bureau ont pour auteur le compte partagé.
 
 ---
 
