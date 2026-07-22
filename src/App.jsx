@@ -27,6 +27,7 @@ import ImmobilierCard from './pages/ImmobilierCard'
 import Installer from './pages/Installer'
 import CodesAcces from './pages/CodesAcces'
 import LieuNouveau from './pages/LieuNouveau'
+import LieuDetail from './pages/LieuDetail'
 
 // Ecoute les messages envoyes par le service worker (clic sur une
 // notification) et navigue via le routeur, sans rechargement. Plus fiable sur
@@ -80,6 +81,7 @@ export default function App() {
           <Route path="/installer" element={<Installer />} />
           <Route path="/codes" element={<CodesAcces />} />
           <Route path="/codes/nouveau" element={<LieuNouveau />} />
+          <Route path="/codes/:id" element={<LieuDetail />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

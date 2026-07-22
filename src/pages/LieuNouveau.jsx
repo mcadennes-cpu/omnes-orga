@@ -67,10 +67,9 @@ export default function LieuNouveau() {
       return
     }
 
-    // Retour a la liste pour l'instant ; en 21C (fiche lieu), on redirigera
-    // vers /codes/{id} pour ajouter les codes dans la foulee.
-    void data
-    navigate('/codes')
+    // Redirection vers la fiche fraichement creee : on y ajoute les codes
+    // dans la foulee.
+    navigate(`/codes/${data.id}`)
   }
 
   // Garde de page : lecture seule (remplacant) ou role exclu -> retour liste.
