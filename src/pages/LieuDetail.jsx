@@ -8,14 +8,19 @@ import {
   User,
   Calendar,
   Plus,
+  Pencil,
   KeyRound,
 } from 'lucide-react'
 import AppLayout from '../components/layout/AppLayout'
 import Pill from '../components/common/Pill'
 import Avatar from '../components/common/Avatar'
+import ConfirmDialog from '../components/common/ConfirmDialog'
 import CodeRow from '../components/codes/CodeRow'
 import CodeAccesFormModal from '../components/codes/CodeAccesFormModal'
+import LieuForm from '../components/codes/LieuForm'
+import { supabase } from '../lib/supabaseClient'
 import { useLieu } from '../hooks/useLieu'
+import { useLieux } from '../hooks/useLieux'
 import { useRole } from '../hooks/useRole'
 import { useAuth } from '../hooks/useAuth'
 import { canWriteCodes } from '../lib/permissions'
@@ -50,13 +55,30 @@ export default function LieuDetail() {
   const { user } = useAuth()
   const { role } = useRole()
   const { lieu, loading, error, refetch } = useLieu(id)
+  const { lieux: allLieux } = useLieux()
 
+  // Mode d'affichage : fiche ('view') ou formulaire d'edition du lieu ('edit').
+  const [mode, setMode] = useState('view')
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState(null)
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false)
   // Groupes de collegues deplies (replies par defaut).
   const [expandedIds, setExpandedIds] = useState(() => new Set())
   // Modale code : { open, code } — code null = creation.
   const [modal, setModal] = useState({ open: false, code: null })
 
   const canWrite = canWriteCodes(role)
+
+  // Categories existantes pour l'auto-complete du formulaire d'edition.
+  const existingCategories = useMemo(() => {
+    const set = new Set(
+      allLieux
+        .map((l) => l.categorie)
+        .filter((c) => c && c.trim() !== '')
+    )
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'fr'))
+  }, [allLieux])
 
   // Partition des codes en 3 groupes : communs / les miens / par collegue.
   const { communs, miens, collegues } = useMemo(() => {
@@ -92,6 +114,48 @@ export default function LieuDetail() {
     })
   }
 
+  function handleCancelEdit() {
+    setMode('view')
+    setSubmitError(null)
+  }
+
+  async function handleSubmitEdit(values) {
+    if (!lieu?.id) return
+    setSubmitting(true)
+    setSubmitError(null)
+    const { error: updateError } = await supabase
+      .from('lieux')
+      .update(values)
+      .eq('id', lieu.id)
+    setSubmitting(false)
+    if (updateError) {
+      setSubmitError(
+        updateError.message
+          ? `Erreur : ${updateError.message}`
+          : "Impossible d'enregistrer les modifications."
+      )
+      return
+    }
+    refetch()
+    setMode('view')
+  }
+
+  async function handleDeleteLieu() {
+    if (!lieu?.id) return
+    setDeleteSubmitting(true)
+    // La FK codes_acces.lieu_id est en ON DELETE CASCADE : supprimer le lieu
+    // supprime tous ses codes en meme temps (cf. 21A-1).
+    const { error: deleteError } = await supabase
+      .from('lieux')
+      .delete()
+      .eq('id', lieu.id)
+    setDeleteSubmitting(false)
+    setConfirmDeleteOpen(false)
+    if (!deleteError) {
+      navigate('/codes')
+    }
+  }
+
   return (
     <AppLayout>
       {/* Header sticky DS */}
@@ -99,14 +163,24 @@ export default function LieuDetail() {
         <div className="flex items-center gap-2 px-4 py-3 relative z-10">
           <button
             type="button"
-            onClick={() => navigate('/codes')}
-            aria-label="Retour aux codes d'accès"
+            onClick={() => {
+              if (mode === 'edit') {
+                handleCancelEdit()
+                return
+              }
+              navigate('/codes')
+            }}
+            aria-label={mode === 'edit' ? 'Annuler la modification' : "Retour aux codes d'accès"}
             className="h-9 w-9 flex items-center justify-center rounded-full shrink-0"
           >
             <ChevronLeft size={20} strokeWidth={2} className="text-marine" />
           </button>
           <h1 className="flex-1 text-h1 text-marine truncate">
-            {loading ? 'Chargement…' : lieu?.nom || 'Fiche lieu'}
+            {loading
+              ? 'Chargement…'
+              : mode === 'edit'
+              ? 'Modifier le lieu'
+              : lieu?.nom || 'Fiche lieu'}
           </h1>
         </div>
         <HeaderWatermark color="olive" />
@@ -125,7 +199,21 @@ export default function LieuDetail() {
           <p className="text-center text-muted py-12">Lieu introuvable.</p>
         )}
 
-        {!loading && !error && lieu && (
+        {/* Edit mode : formulaire du lieu (reutilise LieuForm) */}
+        {!loading && !error && lieu && mode === 'edit' && (
+          <LieuForm
+            initialValues={lieu}
+            existingCategories={existingCategories}
+            onSubmit={handleSubmitEdit}
+            onCancel={handleCancelEdit}
+            submitting={submitting}
+            error={submitError}
+            canDelete={canWrite}
+            onDelete={() => setConfirmDeleteOpen(true)}
+          />
+        )}
+
+        {!loading && !error && lieu && mode === 'view' && (
           <div className="flex flex-col gap-6">
             {/* Identite : tuile olive + nom + categorie */}
             <div className="flex flex-col items-center gap-3 pt-2">
@@ -287,16 +375,36 @@ export default function LieuDetail() {
               </Section>
             )}
 
-            {/* CTA ajouter un code */}
+            {/* CTA ajouter un code + modifier le lieu */}
             {canWrite && (
-              <button
-                type="button"
-                onClick={() => setModal({ open: true, code: null })}
-                className="w-full h-12 rounded-input bg-olive text-white text-button shadow-button flex items-center justify-center gap-2"
+              <div className="flex flex-col gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setModal({ open: true, code: null })}
+                  className="w-full h-12 rounded-input bg-olive text-white text-button shadow-button flex items-center justify-center gap-2"
+                >
+                  <Plus size={18} strokeWidth={2.2} />
+                  Ajouter un code
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode('edit')}
+                  className="w-full h-12 rounded-input bg-carte border border-border text-marine text-button flex items-center justify-center gap-2"
+                >
+                  <Pencil size={16} strokeWidth={2} />
+                  Modifier le lieu
+                </button>
+              </div>
+            )}
+
+            {/* Bandeau lecture seule (remplacant) */}
+            {!canWrite && (
+              <div
+                className="rounded-input px-4 py-3 text-center text-caption text-muted leading-relaxed"
+                style={{ backgroundColor: 'rgba(28,61,82,0.05)' }}
               >
-                <Plus size={18} strokeWidth={2.2} />
-                Ajouter un code
-              </button>
+                Lecture seule — les codes sont gérés par les associés du cabinet.
+              </div>
             )}
 
             {/* Meta footer : auteur + date */}
@@ -328,6 +436,19 @@ export default function LieuDetail() {
           lieuId={lieu.id}
           code={modal.code}
           onSaved={refetch}
+        />
+      )}
+
+      {lieu && (
+        <ConfirmDialog
+          open={confirmDeleteOpen}
+          title="Supprimer ce lieu ?"
+          message={`Cette action est irréversible : le lieu et ses ${totalCodes} code${totalCodes > 1 ? 's' : ''} seront supprimés pour toute l'équipe.`}
+          confirmLabel="Supprimer"
+          confirmVariant="danger"
+          onConfirm={handleDeleteLieu}
+          onCancel={() => setConfirmDeleteOpen(false)}
+          submitting={deleteSubmitting}
         />
       )}
     </AppLayout>

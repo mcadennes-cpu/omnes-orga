@@ -123,7 +123,7 @@ Note d'historique : l'étape 2C avait initialement créé 7 policies sur un mod�
 
 ## Page d'accueil après login
 
-Grille de 7 icônes, adaptée mobile (3 colonnes). Chaque icône ouvre son module.
+Grille de 8 icônes, adaptée mobile (3 colonnes). Chaque icône ouvre son module.
 Toutes les icônes ont la **même taille** dans la grille — aucune icône n'est en pleine largeur ou mise en avant différemment des autres.
 Les modules non accessibles selon le rôle sont **masqués** (pas affichés, pas grisés).
 
@@ -138,6 +138,7 @@ Depuis l'étape 18, chaque tuile de module (Discussion, Immobilier, Événements
 | 5 | Événements | Drive |
 | 6 | SIM | Drive (restreint) |
 | 7 | Immobilier | Cartes + chat |
+| 8 | Codes d'accès | Liste collaborative (sensible) |
 
 ---
 
@@ -708,6 +709,48 @@ Permissions dans `src/lib/permissions.js` : `canAccessImmobilier`, `canCreateImm
 
 ---
 
+### 8. Codes d'accès (étape 21)
+
+Mémoire partagée des codes que l'équipe oublie toujours : identifiants de session informatique / logiciel de dossier patient dans les maisons de retraite, digicodes, wifi, boîte à clés du cabinet, digicodes de domiciles de patients. Design calqué sur l'Annuaire (recherche + pills de catégories), couleur olive, icône `KeyRound`.
+
+Organisation : des **lieux** (regroupés par catégorie en texte libre — « Maison de retraite », « Cabinet », « Domicile » suggérées d'office, toute nouvelle catégorie tapée crée un nouvel « onglet » sans migration) portant chacun des **codes** de deux types :
+- **commun** (`titulaire_id` NULL) : digicode, wifi, boîte à clés — code du lieu, partagé ;
+- **personnel** (`titulaire_id` = un médecin) : session Windows, logiciel patient — un jeu d'identifiants par médecin et par lieu.
+
+#### Tables (Supabase)
+
+- **`lieux`** — `id`, `nom` (NOT NULL), `categorie` (texte libre), `adresse`, `telephone`, `note`, `auteur_id` (FK profiles, ON DELETE SET NULL), timestamps + trigger `set_updated_at`. Index : nom, categorie.
+- **`codes_acces`** — `id`, `lieu_id` (FK lieux, **ON DELETE CASCADE** : supprimer un lieu supprime ses codes), `titulaire_id` (FK profiles, **ON DELETE CASCADE** : un médecin qui part emporte ses codes personnels — surtout pas SET NULL, qui les transformerait en « codes communs »), `label` (NOT NULL), `identifiant` (login, nullable), `code` (NOT NULL), `note`, `auteur_id` (SET NULL), timestamps + trigger. Index : lieu_id, titulaire_id.
+
+Scripts : `docs/sql/21A-1-create-tables-lieux-codes-acces.sql`, `docs/sql/21A-2-rls-lieux-codes-acces.sql`.
+
+#### Droits
+
+Deux fonctions `SECURITY DEFINER` en liste blanche (modèle `can_read_compta`, cf. 11A) :
+- `can_read_codes()` — super_admin / associe_gerant / associe / **remplacant** (il a parfois besoin des codes d'un titulaire pour se loguer sur place) ;
+- `can_write_codes()` — les trois rôles associés uniquement.
+
+8 policies (4 par table) : SELECT via `can_read_codes()` ; INSERT via `can_write_codes()` + `auteur_id = auth.uid()` ; UPDATE/DELETE via `can_write_codes()`. Choix d'équipe assumé : **tout associé peut modifier tout code, y compris le code personnel d'un collègue** (usage collaboratif « le digicode a changé, je le corrige ») ; traçabilité par le méta « Créé par X » de la fiche lieu. Le `poste_bureau` est exclu par construction (liste blanche) : jamais de codes d'accès sur la borne partagée — exclusion à 3 niveaux (tuile masquée, garde de page, RLS).
+
+#### Écrans & routing
+
+| Route | Page | Contenu |
+|---|---|---|
+| `/codes` | `CodesAcces` | Liste des lieux façon Annuaire : recherche (nom/catégorie/note — jamais les codes), pills de catégories, « N codes » par lieu. Aucune donnée sensible sur cet écran. |
+| `/codes/nouveau` | `LieuNouveau` | Création d'un lieu (formulaire `LieuForm`, suggestions de catégories). |
+| `/codes/:id` | `LieuDetail` | Fiche : infos pratiques, note, puis codes en 3 sections — Codes communs, Mes codes, Codes des collègues (un panneau par médecin, avatar, **replié par défaut**). Édition/suppression du lieu (réutilise `LieuForm` ; suppression avec avertissement cascade). Bottom-sheet `CodeAccesFormModal` pour ajouter/éditer/supprimer un code (segmenté Commun/Personnel + sélecteur de médecin). |
+
+Composant clé : `CodeRow` — code **masqué par défaut** (`••••••••`), tap sur l'œil pour révéler, **bouton copier qui fonctionne sans révéler** (pattern copie repris de `RibRow`/MedecinCompta). Hooks : `useLieux` (liste + `codes_acces(count)`), `useLieu` (fiche + codes + profils titulaires). Helpers : `canAccessCodes` / `canWriteCodes` (miroirs React des fonctions Postgres).
+
+#### Limitations connues
+
+- **Stockage en clair côté Postgres** (protégé par RLS stricte) : cohérent avec le traitement des RIB. Un chiffrement applicatif n'apporterait rien tant que l'app doit pouvoir afficher les codes (la clé serait accessible à tout compte compromis) ; les durcissements retenus sont côté affichage (masquage par défaut, copie sans révélation, absence des codes dans la liste et la recherche globale).
+- **Pas d'historique des modifications** (dernière valeur écrase, comme les RIB).
+- **Entrées « Domicile » sensibles** : elles associent l'adresse d'un patient à son digicode. Consigne d'usage : nommage sobre, pas d'information médicale dans les notes.
+- **Module hors recherche globale** (`Recherche.jsx` non modifié) : volontaire, pour qu'aucun code ni nom de lieu sensible ne remonte dans une recherche générique.
+
+---
+
 ## Matrice des accès — vue globale
 
 | Module | super_admin | associe_gerant | associe | remplacant | poste_bureau |
@@ -719,6 +762,7 @@ Permissions dans `src/lib/permissions.js` : `canAccessImmobilier`, `canCreateImm
 | Événements | ✓ édition complète | ✓ édition complète | ✓ création + édition de soi | ✓ lecture + sondage | invisible |
 | SIM | ✓ | ✓ | invisible | invisible | invisible |
 | Immobilier | ✓ création + gestion complète | ✓ création + gestion complète | ✓ si invité (cartes + chat) | — invisible | invisible |
+| Codes d'accès | ✓ édition complète | ✓ édition complète | ✓ édition complète | ✓ lecture seule | invisible |
 
 ---
 
@@ -790,6 +834,8 @@ Les tokens couleurs, typographies, radii et shadows sont centralisés dans `tail
 `src/lib/permissions.js` centralise les règles d'accès du Trombinoscope (cf. section "Permissions fines" du module 1). Les pages et composants importent ces helpers plutôt que de tester `role` directement, ce qui rend les règles modifiables d'un seul endroit.
 
 Depuis l'étape 11, `permissions.js` couvre aussi le RIB : `canViewCompta(role)` et `canEditCompta(role)`, miroirs React des fonctions Postgres `can_read_compta()` et `is_super_admin()` (cf. 11A).
+
+Depuis l'étape 21, même pattern pour les Codes d'accès : `canAccessCodes(role)` et `canWriteCodes(role)`, miroirs de `can_read_codes()` et `can_write_codes()` (cf. 21A-2).
 
 ### Helpers Storage
 
@@ -1346,6 +1392,20 @@ Limitation connue : autoriser le poste bureau à écrire dans l'Annuaire est une
 
 ---
 
+21. ✓ **Étape 21 — FAITE** (sous-étapes 21A → 21D) — Module Codes d'accès (maisons de retraite, cabinet, domiciles)
+
+Besoin de départ : les associés n'arrivent jamais à retrouver leurs codes de session informatique / logiciel de dossier patient en maison de retraite (et les remplaçants en ont parfois besoin pour se loguer). Élargi à la demande de l'équipe : codes du cabinet (wifi, boîte à clés) et digicodes de domiciles de patients, avec des catégories libres extensibles depuis l'app.
+
+   - **21A :** tables `lieux` (nom, categorie libre, adresse, telephone, note) et `codes_acces` (`titulaire_id` NULL = code commun ; FK en CASCADE côté lieu et côté titulaire, cf. section module 8) + RLS stricte via `can_read_codes()` (remplaçant inclus, poste_bureau exclu) et `can_write_codes()` (associés seuls). 8 policies. Scripts `21A-1` / `21A-2`.
+   - **21B :** tuile Home « Codes d'accès » (olive, `KeyRound`, masquée au poste_bureau), routes `/codes` + `/codes/nouveau`, liste des lieux calquée sur l'Annuaire (recherche + pills de catégories dérivées des données + compteur « N codes »), formulaire `LieuForm` avec suggestions de catégories (3 par défaut + celles en base), helpers `canAccessCodes` / `canWriteCodes`, garde de page « Accès restreint ».
+   - **21C :** route `/codes/:id` — fiche lieu avec codes en 3 sections (Codes communs / Mes codes / Codes des collègues, ces derniers repliés par défaut sous l'avatar de chaque médecin), `CodeRow` avec masquage par défaut + tap-to-reveal + copie sans révélation, bottom-sheet `CodeAccesFormModal` (segmenté Commun/Personnel, sélecteur de médecin via `useMedecins`, suppression avec `ConfirmDialog`). Après création d'un lieu, redirection directe sur sa fiche.
+   - **21D :** édition/suppression du lieu depuis sa fiche (réutilise `LieuForm` ; la confirmation de suppression annonce le nombre de codes emportés par la cascade), bandeau lecture seule pour le remplaçant, documentation (section module 8, matrice des accès, limitations).
+
+Fichiers ajoutés : `docs/sql/21A-1`, `docs/sql/21A-2`, `src/hooks/useLieux.js`, `src/hooks/useLieu.js`, `src/pages/CodesAcces.jsx`, `src/pages/LieuNouveau.jsx`, `src/pages/LieuDetail.jsx`, `src/components/codes/LieuForm.jsx`, `src/components/codes/CodeRow.jsx`, `src/components/codes/CodeAccesFormModal.jsx`.
+Fichiers modifiés : `src/lib/modules.js`, `src/lib/permissions.js`, `src/pages/Home.jsx`, `src/App.jsx`.
+
+---
+
 ## Limitations connues
 
 - **Création d'un médecin sans UI dédiée** — RÉSOLU à l'étape 14. Le super_admin peut désormais créer un médecin directement depuis `/trombinoscope` via le bouton "+ Nouveau médecin". La voie dashboard Supabase reste disponible mais n'est plus le chemin nominal.
@@ -1375,6 +1435,7 @@ Limitation connue : autoriser le poste bureau à écrire dans l'Annuaire est une
 - **Pastille d'icône (App Badge) : conditions et limites** — la pastille n'apparaît que sur la PWA **installée** (écran d'accueil) avec la permission notifications accordée ; jamais dans un onglet Safari. Sur iOS, `setAppBadge` ne fonctionne **pas** depuis le callback `onBackgroundMessage` de FCM (bug firebase-js-sdk #8416), d'où la pose dans un listener `push` brut (cf. 18D). À chaque mise à jour du service worker, iOS exige une **fermeture complète + réouverture** de l'app pour activer la nouvelle version : tant que l'ancien SW tourne, la pastille via push ne s'applique pas. Le compteur reflète un nombre de « choses en attente » (cartes / sondages), pas un décompte de messages. La pastille hérite aussi de la limite « un seul appareil par utilisateur » (un seul `fcm_token`).
 - **Duplication de la logique de périmètre « en attente »** — `get_mon_activite` (18A) et `get_activite_count` (18D) répliquent les 4 mêmes sources et filtres (messages non lus Discussion/Immobilier, sondages Discussion, sondages de présence des événements à venir). À garder synchronisées si le périmètre évolue un jour.
 - **PDF/fichiers en PWA desktop — RÉSOLU** — le contournement « téléchargement Blob systématique en standalone » (étape 15 bis), conçu pour le blocage `window.open()` de Safari iOS, s'appliquait par erreur aux PWA desktop (Mac/PC installées via Chrome), où `matchMedia('(display-mode: standalone)')` est aussi vrai. Conséquence : les PDF se téléchargeaient au lieu de s'ouvrir. Corrigé en resserrant la condition du Cas 2 de `openOrDownload` : ajout des helpers `isIos()` et `isIosStandalone()` dans `storageOpen.js`, et le contournement Blob ne s'applique plus qu'en PWA iOS standalone. Sur desktop installé, les fichiers previewable (PDF inclus) s'ouvrent de nouveau dans un onglet. iPhone inchangé.
+- **Codes d'accès en clair côté base (étape 21)** — les codes du module Codes d'accès (sessions EHPAD, digicodes, wifi…) sont stockés en clair dans Postgres, protégés par une RLS stricte (`can_read_codes` / `can_write_codes`), comme les RIB. Quiconque accède au dashboard Supabase ou compromet un compte associé/remplaçant peut les lire. Un chiffrement applicatif a été écarté (la clé devrait rester accessible à l'app, donc à tout compte compromis) au profit de durcissements d'affichage : masquage par défaut avec tap-to-reveal, copie sans révélation, aucun code dans la liste des lieux ni dans la recherche globale, poste_bureau exclu à 3 niveaux. Pas d'historique des modifications. Les entrées « Domicile » associent l'adresse d'un patient à son digicode : nommage sobre recommandé, pas d'information médicale dans les notes.
 - **Menu trois-points de la page détail événement invisible — RÉSOLU** — depuis l'ajout du filigrane dans les headers (`overflow-hidden` sur le `<header>`), le dropdown CSS du menu actions de `/evenements/:id` était rendu mais entièrement rogné par le header : le clic semblait ne rien faire (le voile invisible de fermeture, en `position: fixed`, restait lui actif). Événements était le seul module resté sur l'ancien pattern « dropdown dans le header » ; Discussion et Immobilier avaient déjà migré vers la bottom-sheet via Portal pour la même raison. Corrigé en alignant `ActionsMenu` d'`EvenementDetail.jsx` sur ce pattern (Portal vers `document.body`, feuille `animate-slide-up`, Escape + scroll lock, icônes Pencil/Trash2, action Supprimer en brique).
 
 ---
