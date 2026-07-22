@@ -1,6 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ChevronLeft, MoreVertical, CalendarDays, MapPin } from 'lucide-react'
+import {
+  ChevronLeft,
+  MoreVertical,
+  CalendarDays,
+  MapPin,
+  Pencil,
+  Trash2,
+} from 'lucide-react'
 import AppLayout from '../components/layout/AppLayout'
 import ConfirmDialog from '../components/common/ConfirmDialog'
 import EvenementFormModal from '../features/evenements/EvenementFormModal'
@@ -28,59 +36,107 @@ function formatAuteurCourt(auteur) {
 // Sous-composant : menu trois-points
 // ----------------------------------------------------------------------------
 
+/**
+ * Menu trois-points du header de l'evenement. Rendu en bottom-sheet via
+ * Portal (sort du header en overflow-hidden qui rognait l'ancien dropdown
+ * CSS depuis l'ajout du filigrane).
+ */
 function ActionsMenu({ canEdit, canDelete, onEdit, onDelete }) {
   const [open, setOpen] = useState(false)
+
+  // Escape + scroll lock pendant l'ouverture
+  useEffect(() => {
+    if (!open) return undefined
+    function onKeyDown(e) {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = prev
+    }
+  }, [open])
+
   if (!canEdit && !canDelete) return null
 
+  const items = []
+  if (canEdit) {
+    items.push({
+      key: 'edit',
+      label: "Modifier l'événement",
+      icon: Pencil,
+      onClick: onEdit,
+    })
+  }
+  if (canDelete) {
+    items.push({
+      key: 'delete',
+      label: "Supprimer l'événement",
+      icon: Trash2,
+      onClick: onDelete,
+      danger: true,
+    })
+  }
+
+  function handleBackdrop(e) {
+    if (e.target === e.currentTarget) setOpen(false)
+  }
+
   return (
-    <div className="relative shrink-0">
+    <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label="Actions"
-        className="w-10 h-10 flex items-center justify-center rounded-full text-marine hover:bg-marine/5 active:bg-marine/10 transition-colors"
+        aria-label="Actions de l'événement"
+        aria-haspopup="true"
+        aria-expanded={open}
+        className="w-10 h-10 shrink-0 flex items-center justify-center rounded-full text-marine hover:bg-marine/5 active:bg-marine/10 transition-colors"
       >
         <MoreVertical className="w-5 h-5" strokeWidth={2} />
       </button>
-      {open && (
-        <>
-          {/* Capte le clic exterieur */}
-          <button
-            type="button"
-            aria-hidden
-            tabIndex={-1}
-            onClick={() => setOpen(false)}
-            className="fixed inset-0 z-40 cursor-default"
-          />
-          <div className="absolute right-0 top-11 z-50 w-48 bg-carte rounded-card shadow-card border border-border py-1">
-            {canEdit && (
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false)
-                  onEdit()
-                }}
-                className="w-full text-left px-4 py-2.5 text-sm text-marine hover:bg-fond transition-colors"
-              >
-                Modifier
-              </button>
-            )}
-            {canDelete && (
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false)
-                  onDelete()
-                }}
-                className="w-full text-left px-4 py-2.5 text-sm text-brique font-medium hover:bg-fond transition-colors"
-              >
-                Supprimer
-              </button>
-            )}
+
+      {open && createPortal(
+        <div
+          className="fixed inset-0 z-50 flex flex-col justify-end bg-marine/40 backdrop-blur-sm"
+          onClick={handleBackdrop}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Actions de l'événement"
+        >
+          <div className="bg-carte rounded-t-2xl shadow-2xl animate-slide-up">
+            <div className="pt-3 pb-1 flex justify-center">
+              <div className="w-9 h-1 rounded-full bg-marine/18" />
+            </div>
+            <div className="px-2 py-2">
+              {items.map((it) => {
+                const Icon = it.icon
+                return (
+                  <button
+                    key={it.key}
+                    type="button"
+                    onClick={() => {
+                      setOpen(false)
+                      it.onClick?.()
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-input text-left text-body-m ${
+                      it.danger
+                        ? 'text-brique hover:bg-brique/10'
+                        : 'text-ink hover:bg-fond'
+                    }`}
+                  >
+                    <Icon size={20} aria-hidden="true" />
+                    <span>{it.label}</span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
-        </>
+        </div>,
+        document.body,
       )}
-    </div>
+    </>
   )
 }
 
