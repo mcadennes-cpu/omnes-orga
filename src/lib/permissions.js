@@ -380,6 +380,34 @@ export function canEditCompta(role) {
   return role === ROLES.SUPER_ADMIN
 }
 
+// ----------------------------------------------------------------------------
+// Module Codes d'acces (etape 21)
+// ----------------------------------------------------------------------------
+// Regle metier : les codes d'acces (sessions informatiques en maison de
+// retraite, digicodes, wifi...) sont lisibles par toute l'equipe medicale,
+// remplacants compris (ils en ont parfois besoin pour se loguer sur place).
+// Seuls les trois roles associes ecrivent. Le poste_bureau est totalement
+// exclu : jamais de codes d'acces sur une borne partagee.
+//
+// Ces helpers sont le miroir cote React des fonctions Postgres (21A-2) :
+//   canAccessCodes <-> can_read_codes()  (SELECT)
+//   canWriteCodes  <-> can_write_codes() (INSERT / UPDATE / DELETE)
+// La verite de fond reste la RLS ; ces helpers pilotent le masquage de la
+// tuile Home, les gardes de page et l'affichage des CTA d'edition.
+
+export function canAccessCodes(role) {
+  return role === ROLES.SUPER_ADMIN
+      || role === ROLES.ASSOCIE_GERANT
+      || role === ROLES.ASSOCIE
+      || role === ROLES.REMPLACANT
+}
+
+export function canWriteCodes(role) {
+  return role === ROLES.SUPER_ADMIN
+      || role === ROLES.ASSOCIE_GERANT
+      || role === ROLES.ASSOCIE
+}
+
 // =============================================================================
 // Permissions de création de comptes médecins (étape 4B)
 // =============================================================================

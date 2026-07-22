@@ -6,6 +6,7 @@ import {
   Calendar,
   FileText,
   Home,
+  KeyRound,
 } from 'lucide-react'
 
 export const ROLES = {
@@ -73,6 +74,15 @@ export const MODULES = [
     icon: Home,
     color: 'canard',
     allowedRoles: ['super_admin', 'associe_gerant', 'associe'],
+  },
+  {
+    key: 'codes',
+    label: "Codes d'accès",
+    icon: KeyRound,
+    color: 'olive',
+    // Remplacants inclus (lecture seule, cf. permissions.js) ; poste_bureau
+    // exclu : jamais de codes d'acces sur la borne partagee du cabinet.
+    allowedRoles: ['super_admin', 'associe_gerant', 'associe', 'remplacant'],
   },
 ]
 

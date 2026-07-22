@@ -51,6 +51,10 @@ export default function Home() {
       navigate('/immobilier')
       return
     }
+    if (moduleKey === 'codes') {
+      navigate('/codes')
+      return
+    }
     alert(`Module "${moduleKey}" à venir`)
   }
 
