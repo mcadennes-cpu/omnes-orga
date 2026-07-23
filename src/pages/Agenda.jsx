@@ -34,7 +34,10 @@ export default function Agenda() {
 
   return (
     <Suspense fallback={<Chargement />}>
-      <AgendaApp />
+      {/* Le profil Orga descend dans le module : l'adaptateur (userAdapter.ts)
+          s'en sert pour verifier la coherence des roles et pre-remplir
+          l'ecran de liaison. */}
+      <AgendaApp orgaProfile={profile} />
     </Suspense>
   )
 }

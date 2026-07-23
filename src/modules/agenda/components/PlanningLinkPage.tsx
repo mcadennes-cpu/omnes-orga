@@ -11,10 +11,13 @@ import { CalendarClock, Link2 } from 'lucide-react';
 
 type PlanningLinkPageProps = {
   onSignIn: (email: string, password: string) => Promise<string | null>;
+  // Pré-rempli avec l'e-mail Orga (modifiable : certains associés ont une
+  // adresse différente entre les deux applis).
+  defaultEmail?: string;
 };
 
-export default function PlanningLinkPage({ onSignIn }: PlanningLinkPageProps) {
-  const [email, setEmail] = useState('');
+export default function PlanningLinkPage({ onSignIn, defaultEmail }: PlanningLinkPageProps) {
+  const [email, setEmail] = useState(defaultEmail ?? '');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
