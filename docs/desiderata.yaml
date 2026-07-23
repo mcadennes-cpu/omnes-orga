@@ -1,0 +1,219 @@
+# ============================================================================
+# desiderata.yaml — SOURCE UNIQUE DE VÉRITÉ pour le planning du cabinet
+# ============================================================================
+# Ce fichier remplace les tableaux dupliqués qui existaient dans
+# `_Skills/refaire-le-planning.md` et `parametres.md`. Ces deux fichiers ne
+# doivent plus contenir de tableau de contraintes : ils pointent vers celui-ci.
+#
+# Toute modification d'une contrainte (nouveau desiderata, associé, règle)
+# se fait ICI, nulle part ailleurs. Le script `verifie-planning.py` et le
+# futur optimiseur (`1_optimize.py`) doivent lire ce fichier directement.
+#
+# Dernière mise à jour : 2026-07-14
+# Historique :
+#   - 2026-07-14 : création — fusion des données de refaire-le-planning.md
+#     et parametres.md. Conflit détecté sur les gardes d'IEG entre les deux
+#     anciennes sources.
+#   - 2026-07-14 : conflit IEG confirmé par l'intéressée — voir fiche IEG.
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# 1. Créneaux — définition des plages horaires
+# ----------------------------------------------------------------------------
+creneaux:
+  J1:
+    horaire: "08:00-16:00"
+    site_impose: Beaune
+    unique_par_site_jour: true
+    commentaire: "Créneau rare, 1 seul par jour à Beaune"
+  J2:
+    horaire: "14:00-22:00"
+    unique_par_site_jour: true
+    commentaire: "Créneau rare, 1 seul par site et par jour — la ressource la plus disputée"
+  J3: {horaire: "08:00-18:30", unique_par_site_jour: false}
+  J4: {horaire: "08:00-18:30", unique_par_site_jour: false}
+  J5: {horaire: "08:00-18:30", unique_par_site_jour: false}
+  J6:
+    horaire: "08:00-14:00"
+    reserve_remplacants: true
+    commentaire: "Ne doit JAMAIS contenir un associé — concept 'préJ2' abandonné"
+  J7: {horaire: "08:00-18:30", unique_par_site_jour: false}
+  J8: {horaire: "08:00-18:30", unique_par_site_jour: false}
+
+# Fenêtre de recouvrement maximal utilisée pour vérifier la capacité :
+# J1 (8-16), J2 (14-22) et les créneaux journée (8-18:30) se chevauchent
+# tous entre 14h et 16h. C'est à cette fenêtre que la contrainte de
+# capacité (règle dure n°4) est la plus stricte.
+fenetre_recouvrement_max: "14:00-16:00"
+
+# ----------------------------------------------------------------------------
+# 2. Sites
+# ----------------------------------------------------------------------------
+sites:
+  Beaune:
+    salles: 6
+    salles_avant_demenagement: 2  # historique — déménagement effectué en 2026-07
+  Dijon:
+    salles: 6
+
+# ----------------------------------------------------------------------------
+# 3. Règles dures (invariants — cf. refaire-le-planning.md pour le détail humain)
+# ----------------------------------------------------------------------------
+regles_dures:
+  max_medecins_simultanes: 9
+  max_salles_par_site: 6
+  j1_j2_vides_tolerance_par_site: 3   # nombre max de J1/J2 vides toléré par site sur les 8 sem.
+  lundi_off_apres_weekend_travaille: true  # lundi de la semaine suivante = off obligatoire
+
+# ----------------------------------------------------------------------------
+# 4. Cibles J2 retenues pour la V2 (nombre de J2 sur le roulement 8 semaines)
+# ----------------------------------------------------------------------------
+# Ces chiffres ont été vérifiés contre planning-V2_2026-07.xlsx le 2026-07-14 :
+# comptage exact, conforme à 100%.
+
+# ----------------------------------------------------------------------------
+# 5. Couples (contraintes croisées entre deux médecins)
+# ----------------------------------------------------------------------------
+couples:
+  - medecins: [CB, AS]
+    regle: "J2 le même jour, si possible sur des sites opposés"
+    frequence_min: "4/8"   # au moins 4 semaines sur 8
+    statut: préférence      # pas une règle dure
+
+# ----------------------------------------------------------------------------
+# 6. Médecins associés — fiche individuelle
+# ----------------------------------------------------------------------------
+# site : Fixe Beaune / Fixe Dijon / Préférence Beaune / Préférence Dijon / Flexible
+# a_valider : true tant que la ligne "Règle site" de parametres.md n'a pas été
+#             explicitement confirmée par le médecin concerné (état au 2026-07-14)
+# interdictions_j2 : jours où ce médecin ne doit JAMAIS être en J2
+# jours_non_travailles : jours de la semaine jamais travaillés
+# max_par_periode : plafond sur une combinaison jour+créneau sur une fenêtre glissante
+# notes_manuelles : desiderata réels mais trop nuancés pour être vérifiés
+#                    automatiquement — à relire à l'oeil à chaque révision
+#                    (le script verifie-planning.py les affiche mais ne peut
+#                    pas juger s'ils sont respectés)
+
+medecins:
+
+  MC:
+    nom: Matthieu Cadennes
+    site: Flexible
+    j2_cible: 10
+    gardes_weekend: [S2, S6]
+    regle_recurrente:
+      jour: Mercredi
+      type: "off un mercredi sur deux"
+      frequence_cible: "4/8"
+      quand_travaille:
+        creneau: J1
+        site: Beaune
+    notes_manuelles: []
+
+  CC:
+    nom: Caroline Chauvet
+    site: Flexible
+    j2_cible: 8
+    gardes_weekend: [S2, S6]
+    regle_recurrente:
+      jour: Mercredi
+      type: "plafond de mercredis travaillés"
+      frequence_max: "1/4"   # ≈ 2/8
+    notes_manuelles: []
+
+  XB:
+    nom: Xavier Baudrillart
+    site: Flexible
+    j2_cible: 8
+    gardes_weekend: [S3, S7]
+    notes_manuelles:
+      - "Contraintes individuelles à compléter (aucune remontée à ce jour)."
+
+  TE:
+    nom: Thomas Etienne
+    site: Flexible
+    j2_cible: 9
+    gardes_weekend: [S3, S7]
+    notes_manuelles: []
+
+  AS:
+    nom: Airelle Sauvage
+    site: "Préférence Dijon"
+    a_valider: true
+    j2_cible: 8
+    gardes_weekend: [S1, S5]
+    couple_avec: CB
+    notes_manuelles: []
+
+  CB:
+    nom: Christophe Bertrand
+    site: "Préférence Dijon"
+    a_valider: true
+    j2_cible: 7
+    gardes_weekend: [S1, S5]
+    interdictions_j2:
+      - jour: Mardi
+    max_par_periode:
+      - creneau: J2
+        jour: Vendredi
+        max: 1
+        fenetre_semaines: 4
+    couple_avec: AS
+
+  IEG:
+    nom: Imane El Gari
+    site: "Fixe Beaune"
+    j2_cible: 8
+    gardes_weekend: [S4]
+    doublons_weekend: [S8]
+    # Confirmé par IEG le 2026-07-14 : garde = S4 uniquement, doublon permanent = S8.
+    # Le doublon qui apparaissait en S5 sur planning-V2_2026-07.xlsx était une
+    # convenance ponctuelle au coup par coup, PAS un desiderata permanent — ne
+    # pas le reporter dans les prochains roulements sans nouvelle demande explicite.
+    notes_manuelles:
+      - "100% Beaune (site fixe, aucune exception)."
+
+  LD:
+    nom: Laurène Daudin
+    site: "Préférence Dijon"
+    a_valider: true
+    j2_cible: 6
+    gardes_weekend: []
+    doublons_weekend: [S3, S6]
+    pas_de_garde_seule: true
+    notes_manuelles:
+      - "Éviter un J2 suivi le lendemain d'un créneau du matin, surtout sur l'autre site."
+
+  MY:
+    nom: Mireille Yuan
+    site: Flexible
+    j2_cible: 8
+    gardes_weekend: [S4, S8]
+    jours_non_travailles: [Mercredi]
+    notes_manuelles: []
+
+# ----------------------------------------------------------------------------
+# 7. Desiderata ponctuels (valables pour UN remaniement donné, pas permanents)
+# ----------------------------------------------------------------------------
+# Ne pas laisser grossir cette section indéfiniment : une fois le remaniement
+# archivé (étape A d'IPCRA), déplacer ces lignes dans le journal du projet
+# archivé plutôt que de les garder ici.
+desiderata_ponctuels:
+  - medecin: LD
+    detail: "S5 : lundi off + jeudi Dijon"
+  - medecin: MY
+    detail: "Mercredis S1/S3/S4/S6 réaffectés (voir parametres.md § desiderata reçus)"
+  - medecin: IEG
+    detail: "Doublon S5 sur le roulement V2 (planning-V2_2026-07.xlsx) : convenance
+      ponctuelle, pas un desiderata permanent. Doublon permanent = S8 uniquement."
+  - medecin: MC
+    detail: "Convertir 1 J2 du vendredi (S3 ou S7) en journée, pas celui juste avant
+      sa garde — demande faite pour le roulement V2, à reconfirmer si nouveau
+      remaniement."
+  - medecin: CC
+    detail: "J2 du vendredi placé le vendredi qui précède sa garde — demande faite
+      pour le roulement V2, à reconfirmer si nouveau remaniement."
+  - medecin: TE
+    detail: "Remplacer 1 J2 par une journée (Dijon ou Beaune), jour précis non
+      tranché — demande faite pour le roulement V2, à reconfirmer si nouveau
+      remaniement."

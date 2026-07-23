@@ -9,6 +9,11 @@ modules, schéma Supabase, plan de développement, limitations connues). La
 lire en début de session si le contexte du projet n'est pas déjà clair, et
 la tenir à jour après chaque étape livrée.
 
+**Module Agenda (en cours, étape 22)** : doc dédiée `docs/integration-agenda.md`
+(plan en 8 étapes + suivi d'avancement) — la lire avant tout travail sur ce
+module. Branche `feature/module-agenda`. Le code source de l'agenda d'origine
+est dans `reference-agenda/` : lecture seule, ne **jamais** le modifier.
+
 ## Règles à appliquer systématiquement
 
 ### Accents (français)

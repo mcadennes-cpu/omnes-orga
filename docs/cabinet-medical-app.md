@@ -882,6 +882,9 @@ omnes-orga/
 │   └── watermark-mask.png          ← masque CSS pour LogoOmnes (étape 15 ter)
 ├── docs/
 │   ├── cabinet-medical-app.md      ← ce fichier
+│   ├── integration-agenda.md       ← doc de référence du module Agenda (étape 22)
+│   ├── desiderata.yaml             ← contraintes du roulement des associés (référence pour l'import Excel)
+│   ├── planning-actuel_2025-12.xlsx / planning-V2_2026-07.xlsx ← jeux de test du parseur de roulement (2 formats)
 │   └── sql/                        ← scripts SQL versionnés (4B-1, 4B-2, 5A-1, 5A-2, ..., 11A-1-profiles-compta-rls.sql)
 ├── src/
 │   ├── App.jsx                     ← routing react-router-dom
@@ -925,6 +928,8 @@ omnes-orga/
 │   │   ├── modules.js              ← ROLES, ROLE_LABELS, MODULES, getVisibleModules
 │   │   ├── permissions.js          ← helpers d'autorisation Trombinoscope (+ RIB : canViewCompta / canEditCompta, etape 11B)
 │   │   └── storageOpen.js          ← helper transverse d'ouverture/téléchargement de fichiers Supabase Storage (étape 15 bis)
+│   ├── modules/
+│   │   └── agenda/                 ← module Agenda en TypeScript (étape 22, cf. integration-agenda.md) : App.tsx, 41 composants, lib/supabase.ts = client du projet Planning
 │   └── pages/
 │       ├── Login.jsx
 │       ├── Home.jsx
@@ -957,6 +962,10 @@ VITE_FIREBASE_PROJECT_ID=...
 VITE_FIREBASE_MESSAGING_SENDER_ID=...
 VITE_FIREBASE_APP_ID=...
 VITE_FIREBASE_VAPID_KEY=...
+
+# Module Agenda — projet Supabase Planning (temporaire jusqu'à la migration, étape 7 du plan agenda)
+VITE_AGENDA_SUPABASE_URL=https://xxxx.supabase.co
+VITE_AGENDA_SUPABASE_ANON_KEY=clé_anon_du_projet_planning
 ```
 
 ---
@@ -1403,6 +1412,14 @@ Besoin de départ : les associés n'arrivent jamais à retrouver leurs codes de 
 
 Fichiers ajoutés : `docs/sql/21A-1`, `docs/sql/21A-2`, `src/hooks/useLieux.js`, `src/hooks/useLieu.js`, `src/pages/CodesAcces.jsx`, `src/pages/LieuNouveau.jsx`, `src/pages/LieuDetail.jsx`, `src/components/codes/LieuForm.jsx`, `src/components/codes/CodeRow.jsx`, `src/components/codes/CodeAccesFormModal.jsx`.
 Fichiers modifiés : `src/lib/modules.js`, `src/lib/permissions.js`, `src/pages/Home.jsx`, `src/App.jsx`.
+
+---
+
+22. ⏳ **Étape 22 — EN COURS** — Module Agenda : intégration de l'appli OMNÈS PLANNING (agenda de gardes créé avec Bolt, projet Supabase séparé)
+
+Le module a sa **propre doc de référence** : `docs/integration-agenda.md` (contexte, contraintes, mapping des rôles, plan dédié en 8 étapes, refonte du roulement, import Excel) — la lire avant de travailler sur ce module. Développement sur la branche `feature/module-agenda`. Le code source de l'agenda d'origine est posé en lecture seule dans `reference-agenda/` (exclu de Git et du lint), à ne jamais modifier.
+
+   - **Étape 1/8 du plan agenda — FAITE (23/07/2026)** : squelette `src/modules/agenda/` (50 fichiers TypeScript copiés tels quels, non routés donc invisibles) + second client Supabase `supabaseAgenda` pointant vers le projet Planning (`VITE_AGENDA_SUPABASE_URL` / `VITE_AGENDA_SUPABASE_ANON_KEY`). Détail dans la section « Suivi d'avancement » d'`integration-agenda.md`.
 
 ---
 

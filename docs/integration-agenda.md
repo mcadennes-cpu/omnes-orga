@@ -1,0 +1,393 @@
+# Intégration OMNÈS PLANNING → Omnès-Orga
+> Fichier de référence projet · À fournir à Claude Code en début de session
+> Complète le fichier `cabinet-medical-app.md` (appli principale)
+
+---
+
+## Contexte
+
+Le cabinet dispose de **deux applications** :
+
+1. **Omnès-Orga** (appli principale) — React + Vite + Tailwind + Supabase, hébergée sur Vercel. Terminée, en cours de test par les 10 associés. Usage **mobile-first**. 4 rôles : `super_admin`, `associe_gerant`, `associe`, `remplacant`.
+2. **OMNÈS PLANNING** (agenda de gardes) — créée avec Bolt.new, même stack (React 18 + Vite + TypeScript + Tailwind + Supabase), déployée sur bolt.host, **projet Supabase séparé**. Utilisée activement par tout le cabinet. 2 rôles : `coordinator`, `doctor`.
+
+**Objectif :** intégrer l'agenda comme un **8e module** d'Omnès-Orga, avec l'UI refondue à la charte Omnès, sans jamais interrompre l'agenda actuel qui reste en production pendant tout le développement.
+
+---
+
+## Contraintes impératives
+
+1. **Zéro interruption** : l'agenda Bolt actuel reste utilisé par tout le cabinet jusqu'à la bascule finale.
+2. **Accès bêta** : pendant le développement, le module Agenda dans Omnès-Orga n'est visible que par 2 personnes (le super_admin + 1 testeur désigné). Les autres utilisateurs ne voient pas l'icône.
+3. **Migration des comptes maintenant** : la fusion des utilisateurs se fait avant la création des ~20 comptes remplaçants dans Omnès-Orga (il n'y a que ~10 comptes associés à faire correspondre).
+4. **Double optimisation d'écran** :
+   - Vues **coordinateur** (gestion des demandes, création de gardes, paramètres, planning du jour) → pensées **desktop d'abord**, responsive mobile en secours.
+   - Vues **médecin** (calendrier, mes gardes) → pensées **mobile-first**, comme le reste d'Omnès-Orga.
+
+---
+
+## Ce que contient le code source de l'agenda (dépôt `Omnes.planning`)
+
+~11 700 lignes TypeScript, 45 composants, 34 migrations SQL, 15 tables.
+
+### Tables Supabase (projet Planning)
+
+| Table | Rôle | À migrer ? |
+|---|---|---|
+| `profiles` | Utilisateurs (coordinator/doctor) | ❌ Remplacée par la table `profiles` d'Omnès-Orga |
+| `shifts` | Gardes (date, site, salle, créneau, statut free/pending/assigned) | ✅ avec données |
+| `requests` | Demandes de gardes (pending/approved/rejected/on_hold/cancelled) | ✅ avec données |
+| `sites` | Sites configurables (Dijon, Beaune…) | ✅ avec données |
+| `rooms` | Salles par site | ✅ avec données |
+| `shift_types` | Créneaux horaires configurables | ✅ avec données |
+| `fixed_duty_series` + `fixed_duty_patterns` | Séries de gardes fixes récurrentes | ✅ avec données |
+| `rotation_settings` + `rotation_assignment_rules` | Rotations automatiques | ✅ avec données |
+| `week_templates` + `week_template_items` | Modèles de semaines | ✅ avec données |
+| `opening_week_templates` + `opening_week_template_items` | Modèles de semaines d'ouverture | ✅ avec données |
+| `undo_buffer` | Buffer d'annulation | ✅ structure seule (données jetables) |
+
+Toutes les colonnes `doctor_id`, `assigned_doctor_id`, `created_by`, `reviewed_by` référencent `profiles.id` → à **remapper** vers les nouveaux id lors de la migration (voir section Migration).
+
+### Composants à SUPPRIMER (gérés par Omnès-Orga)
+
+- `LoginPage.tsx` — l'auth existe déjà
+- `PasswordChangeModal.tsx` — mots de passe gérés par l'appli principale
+- `CreateUserModal.tsx`, `EditUserModal.tsx`, `DeleteUserModal.tsx`, `UsersView.tsx` — gestion des comptes déjà en place
+- Fonctions Edge `create-user` et `update-admin-credentials` — inutiles
+- `Navigation.tsx` — remplacée par une navigation interne au module, intégrée au layout Omnès-Orga
+- Config PWA de l'agenda (`manifest.json`…) — Omnès-Orga a la sienne
+
+### Composants à PORTER (cœur du module)
+
+- Vues : `EnhancedCalendarView`, `MyScheduleView`, `DailyScheduleView`, `RequestsView`, `RequestsCalendarView`, `DoctorWeekSummaryView`, `SettingsView`
+- Sous-vues calendrier : `calendar/MonthView`, `calendar/WeekView`, `calendar/DayView`, `calendar/CalendarFilters`
+- Paramètres : `settings/SitesManagement`, `settings/RoomsManagement`, `settings/ShiftTypesManagement`, `settings/RotationManagement`
+- Modals : `ShiftDetailModal` (⚠️ 1 132 lignes — **à découper en sous-composants** lors du portage), `CreateShiftModal`, `ShiftRequestModal`, `CancelRequestModal`, `RejectReasonModal`, `AssignDoctorModal`, `BulkAssignPrevalidatedModal`, `EditSeriesModal`, `SeriesActionModal`, `EditValidatedShiftModal`, `ConflictErrorModal`, modals de templates de semaine, `ExportPlanningModal`
+- Lib : `shiftValidation.ts`, `rotationUtils.ts`, `weekTemplateUtils.ts`, `undoUtils.ts`, `exportUtils.ts`
+- `UndoButton`, `RequestCard`, `ShiftRow`
+
+Destination proposée : `src/modules/agenda/` dans le projet Omnès-Orga.
+
+---
+
+## Mapping des rôles
+
+| Rôle Omnès-Orga | Équivalent agenda | Droits agenda |
+|---|---|---|
+| `super_admin` | coordinator | Tout : création gardes, demandes, paramètres |
+| `associe_gerant` | doctor* | Calendrier, demandes de gardes, mes gardes |
+| `associe` | doctor | Calendrier, demandes de gardes, mes gardes |
+| `remplacant` | doctor | Calendrier, demandes de gardes, mes gardes |
+
+*\* Décision à confirmer : les associés gérants doivent-ils avoir les droits coordinateur sur l'agenda ? Par défaut NON — seul(s) le(s) coordinateur(s) désigné(s). Prévoir éventuellement une colonne `is_agenda_coordinator boolean` dans `profiles` pour découpler le rôle "coordinateur d'agenda" du rôle applicatif.*
+
+Toutes les policies RLS des tables migrées doivent être réécrites avec ce mapping (remplacer les checks `role = 'coordinator'` par le nouveau critère).
+
+---
+
+## Accès bêta (module caché)
+
+Ajouter une colonne dans `profiles` d'Omnès-Orga :
+
+```sql
+ALTER TABLE profiles ADD COLUMN agenda_beta_access boolean DEFAULT false;
+```
+
+- L'icône "Agenda" sur la grille d'accueil ne s'affiche que si `agenda_beta_access = true` (à activer manuellement pour le super_admin + 1 testeur).
+- Les policies RLS des tables agenda incluent aussi ce critère pendant la phase bêta.
+- À la sortie de bêta : passer tout le monde à `true` (ou supprimer la condition), en un seul UPDATE.
+
+---
+
+## UI — Refonte à la charte Omnès
+
+- Palette : navy `#1C3D52`, teal `#2A8FA8`, ambre `#E8A135`, olive `#6B7A3A`, rouge-orangé `#D4503A`, rose-fuchsia `#D94F7E` (déjà dans le `tailwind.config` d'Omnès-Orga — réutiliser les tokens existants, ne pas redéfinir de couleurs en dur).
+- Icônes lucide-react fines sur fonds pastel arrondis, cohérentes avec les 7 modules existants.
+- Statuts des gardes : conserver la logique 🟢 libre / 🟡 en attente / ⚫ assigné mais dans la palette Omnès (ex. teal = libre, ambre = en attente, navy = assigné).
+- **Vues médecin** (calendrier mensuel, mes gardes) : mobile-first, grandes zones tactiles, navigation par mois au swipe si simple à faire.
+- **Vues coordinateur** (demandes, planning du jour, paramètres, création en masse) : layout desktop large (tableaux, colonnes), responsive dégradé sur mobile.
+
+---
+
+## Migration des données (bascule finale)
+
+### Préalable : table de correspondance des emails
+
+⚠️ Les emails correspondent **presque** entre les deux applis, mais certains associés ont deux adresses. Avant migration :
+
+1. Exporter la liste `email, full_name, id` des `profiles` du projet Planning.
+2. Exporter la même liste depuis Omnès-Orga.
+3. Construire manuellement un fichier `mapping.csv` : `old_profile_id, new_profile_id, email_planning, email_orga` — les cas ambigus (double email) sont tranchés à la main.
+
+### Script de migration
+
+1. Export des données du projet Supabase Planning (`pg_dump` ou export CSV par table via le dashboard).
+2. Création des tables dans le projet Omnès-Orga (reprendre les migrations en adaptant `profiles` → nouvelle table + nouvelles RLS).
+3. Import des données en remplaçant chaque référence utilisateur via `mapping.csv`.
+4. Vérifications : nombre de gardes identique, chaque garde assignée pointe vers un profil existant, aucune demande orpheline.
+5. Bascule un soir : annonce au cabinet, activation du module pour tous, mise hors service de l'ancienne appli Bolt (page de redirection).
+
+---
+
+## Plan de développement étape par étape
+
+1. ✓ **Étape 1 — FAITE (23/07/2026)** — Copier `src/modules/agenda/` dans Omnès-Orga, créer un second client Supabase `supabaseAgenda` pointant vers le projet Planning existant (variables `VITE_AGENDA_SUPABASE_URL` / `VITE_AGENDA_SUPABASE_ANON_KEY`). Le module lit/écrit les vraies données actuelles → test réaliste immédiat, sans toucher à l'appli Bolt. Détail dans « Suivi d'avancement » ci-dessous.
+2. **Étape 2** — Ajouter la colonne `agenda_beta_access`, l'icône Agenda conditionnelle sur la grille d'accueil, le routage vers le module.
+3. **Étape 3** — Supprimer du module tout ce qui est listé en "à SUPPRIMER", brancher l'utilisateur connecté d'Omnès-Orga (adaptateur : profil Orga → format attendu par le module, mapping des rôles).
+4. **Étape 4** — Refonte UI vue par vue : calendrier médecin (mobile-first) → mes gardes → demandes coordinateur (desktop) → planning du jour → paramètres. Découper `ShiftDetailModal` à cette étape.
+5. **Étape 5** — Tests en bêta à 2 utilisateurs pendant l'usage réel (les données sont partagées avec l'appli Bolt : tout ce qui se passe dans l'une se voit dans l'autre).
+6. **Étape 6** — Modifications fonctionnelles souhaitées (liste à compléter).
+7. **Étape 7** — Migration des données vers le projet Supabase principal (voir section Migration), remplacement de `supabaseAgenda` par le client unique.
+8. **Étape 8** — Ouverture à tous, création des comptes remplaçants, extinction de l'appli Bolt.
+
+### Suivi d'avancement
+
+- ✓ **Étape 1 — FAITE (23/07/2026)** — branche `feature/module-agenda`, commits `10861b0` (1A) et `4915e1a` (1B).
+  - **1A — Second client Supabase** : `src/modules/agenda/lib/supabase.ts` lit `VITE_AGENDA_SUPABASE_URL` / `VITE_AGENDA_SUPABASE_ANON_KEY` et exporte `supabaseAgenda` **plus un alias `supabase`** — les composants copiés gardent ainsi leurs imports d'origine intacts. Les types du domaine (`Shift`, `Request`, `Site`…) sont repris tels quels dans ce même fichier. `storageKey: 'sb-agenda-auth'` isole la session auth Planning de celle d'Omnès-Orga dans le localStorage. Client factice + `hasValidConfig` si les variables manquent (comportement d'origine). Clés vérifiées par requêtes réelles : les tables répondent 200 (`[]` sans session — la RLS filtre les anonymes) ; le 401 sur `/rest/v1/` racine est **normal** (endpoint du schéma OpenAPI réservé à la clé service_role sur les projets Supabase récents), ne pas s'en inquiéter lors de futurs tests.
+  - **1B — Copie du module** : 50 fichiers copiés depuis `reference-agenda/src/` (App.tsx, ErrorBoundary.tsx, 41 composants dont calendar/ et settings/, 6 libs métier), y compris les composants « à SUPPRIMER » — leur suppression est le travail de l'étape 3, pas de la 1. Non copiés : `main.tsx` (point d'entrée, remplacé par le routage Orga en étape 2), `index.css` (dupliquerait les directives Tailwind), `vite-env.d.ts`. Configs adaptées : glob `content` Tailwind élargi à `{js,jsx,ts,tsx}`, `globalIgnores` ESLint étendu à `reference-agenda` et `src/modules/agenda`.
+  - **Choix d'implémentation** : TypeScript conservé tel quel (Vite compile le `.tsx` nativement ; en contrepartie aucune vérification de types `tsc` — assumé jusqu'à la refonte). Lint du module reporté à l'étape 4. Classe CSS `.brand-title` non portée (utilisée uniquement par LoginPage/Navigation, supprimés en étape 3).
+  - **Vérifications** : `npm run build` passe ; les 50 fichiers compilent via esbuild ; les 47 icônes lucide-react utilisées existent toutes en v1.14 (l'agenda utilisait la v0.344 — risque levé).
+  - **État en fin d'étape** : module présent mais invisible (aucune route ni icône avant l'étape 2). Attention : tant qu'il n'est importé nulle part, `vite build` ne compile pas ses fichiers (hors graphe d'imports). Par ailleurs `npm run lint` remonte ~144 problèmes **préexistants** dans le code principal (src/features, src/hooks, dev-dist…), sans lien avec le module — dette à traiter à part.
+
+---
+
+## Modifications fonctionnelles souhaitées
+
+### MOD-1 — Refonte du système de rotation automatique + import du fichier Excel de roulement
+
+#### Le système actuel (à comprendre avant de le remplacer)
+
+Deux tables :
+
+```
+rotation_settings          → 1 seule ligne : start_date + cycle_length_weeks (défaut 8)
+rotation_assignment_rules  → 1 ligne par case du roulement :
+                             doctor_id, site_id, room_id, shift_type_id,
+                             weekday (0-6), rotation_week (1..N)
+                             UNIQUE(site_id, room_id, shift_type_id, weekday, rotation_week)
+```
+
+Calcul (`src/lib/rotationUtils.ts` → `getRotationWeek`) : on prend le lundi de la semaine visée, on compte le nombre de semaines écoulées depuis `start_date`, modulo `cycle_length_weeks`, +1.
+
+#### Les 4 défauts de conception à corriger
+
+1. **Aucune historisation.** Les règles n'ont ni `valid_from` ni `valid_to`. Modifier le roulement écrase l'ancien : impossible de savoir quel roulement s'appliquait en mars dernier, ni de préparer à l'avance un nouveau roulement qui démarrera en septembre.
+2. **Changer la durée du cycle rebat toutes les cartes.** Comme la semaine de rotation est un modulo à partir d'une date fixe, passer le cycle de 8 à 9 semaines (parce qu'un médecin s'associe) décale rétroactivement **toutes** les semaines, passées et futures. La migration `reset_rotation_assignments` présente dans le dépôt suggère que ce problème a déjà été rencontré. C'est le défaut le plus grave au regard du besoin exprimé (association d'un nouveau médecin).
+3. **Saisie case par case uniquement.** Aucun import en masse. Avec 8 semaines × 5 jours × plusieurs salles × plusieurs créneaux, cela représente potentiellement des centaines de saisies manuelles, alors que la source de vérité du cabinet est **un fichier Excel**.
+4. **Contrainte UNIQUE trop rigide.** Une seule case = un seul médecin. Impossible d'exprimer « deux médecins sur ce créneau » ni « personne cette semaine-là ».
+
+#### Cible proposée : des « plans de roulement » versionnés
+
+```
+rotation_plans
+  id, name (ex. "Roulement 2026 - 11 associés"),
+  start_date, cycle_length_weeks,
+  status ('draft' | 'active' | 'archived'),
+  effective_from date, effective_to date NULL,
+  source_file_name, imported_at, created_by
+
+rotation_plan_rules
+  plan_id → rotation_plans,
+  doctor_id, site_id, room_id, shift_type_id,
+  weekday, rotation_week
+  UNIQUE(plan_id, site_id, room_id, shift_type_id, weekday, rotation_week, doctor_id)
+```
+
+Principes :
+
+- **La semaine de rotation se calcule par rapport au `start_date` du plan**, pas à une date globale. Un nouveau plan repart donc de zéro : plus aucun décalage rétroactif quand le cycle change de longueur.
+- **Plusieurs plans coexistent dans le temps** : l'ancien est archivé avec sa `effective_to`, le nouveau prend le relais à sa `effective_from`. L'historique reste consultable et les plannings passés restent explicables.
+- **Un plan se prépare en brouillon** (`draft`), se prévisualise, puis s'active à une date choisie — sans jamais perturber le roulement en cours.
+- Suppression de la contrainte d'unicité stricte → possibilité de plusieurs médecins sur une case, ou d'une case vide.
+
+#### Import Excel
+
+Fonctionnalité à construire : **Paramètres → Roulement → Importer un fichier Excel**.
+
+Parcours :
+1. Dépôt du fichier `.xlsx` (drag & drop, desktop en priorité — c'est un écran coordinateur).
+2. Parsing côté navigateur avec la bibliothèque **SheetJS (`xlsx`)** — pas d'envoi du fichier sur un serveur, les données restent dans le navigateur.
+3. **Écran de correspondance** : l'appli liste les noms de médecins, les sites, les salles et les créneaux détectés dans le fichier, et demande de les faire correspondre aux enregistrements existants en base. Les correspondances évidentes (nom identique) sont pré-remplies ; seules les ambiguïtés demandent une action. Les correspondances validées sont mémorisées pour les imports suivants.
+4. **Écran de différentiel** : « 14 affectations ajoutées, 3 modifiées, 1 supprimée par rapport au plan actif » — avec le détail, avant toute écriture.
+5. Création d'un plan en brouillon + choix de la date d'entrée en vigueur.
+6. **Prévisualisation** : génération simulée des gardes des N prochaines semaines, affichée en calendrier, avant écriture réelle dans `shifts`.
+
+#### Format du fichier Excel du cabinet (analysé — fichier de référence `planning-actuel_2025-12.xlsx`)
+
+Le fichier est **exporté depuis Apple Numbers**. Le classeur contient donc trois feuilles :
+`Résumé de l'exportation` (à ignorer), `Feuille 1` (le roulement), et `Feuille 1-1` (**le même tableau, décalé d'une colonne**). Cette duplication est une conséquence de l'export Numbers : elle interdit tout parseur reposant sur des coordonnées de cellules fixes.
+
+**Structure de la grille (`Feuille 1`) :**
+
+- Ligne 2 : titre libre — `ROULEMENT MEDECINS ASSOCIES (mis à jour en Décembre 2025)`
+- Ligne 3 : en-têtes de colonnes, de la colonne D à la colonne S — **16 colonnes = 8 semaines × 2 sites** : `S1 Beaune`, `S1 Dijon`, `S2 Beaune`, … `S8 Beaune`, `S8 Dijon`
+- Colonne B : le jour (`Lundi`, `Mardi`, `Mercredi `, `Jeudi `, `vendredi`, `Samedi`, `Dimanche`) — renseigné **uniquement sur la première ligne du bloc**, les suivantes sont vides
+- Colonne C : le créneau
+  - Lundi → vendredi : `J1`, `J2`, `J3`, `J4`, `J5`, `J6 ou J7 ou J8`
+  - Samedi et dimanche : `Garde`, `Doublon`
+- Cellules : **initiales du médecin** (`AS`, `CB`, `CC`, `IEG`, `LD`, `MC`, `MY`, `TE`, `XB` — 9 associés), ou vide
+
+**Volumétrie :** 265 affectations réparties de façon très équilibrée entre les 9 médecins (de 28 à 31 chacun). C'est autant de saisies manuelles évitées par l'import — la justification principale de cette fonctionnalité.
+
+**Cinq particularités que le parseur doit gérer :**
+
+1. **Surcharge de créneau dans la cellule.** Sur la ligne `J6 ou J7 ou J8`, la cellule contient le médecin **et** le créneau réellement retenu : `LD J7`, `AS J7`, `AS J8`, `MY J7` (16 occurrences). Le créneau ne se déduit donc pas de la ligne seule : il faut lire le contenu de la cellule. Format à reconnaître : `<initiales> <code créneau>` optionnel.
+2. **La ligne `Doublon` du week-end** place un **second médecin** sur la même garde que la ligne `Garde`. C'est la preuve directe qu'il faut abandonner la contrainte `UNIQUE` actuelle qui n'autorise qu'un médecin par case.
+3. **Les créneaux dépendent du site.** `J1` n'est renseigné qu'à Beaune, `J4` et `J5` presque exclusivement à Dijon. Le schéma doit accepter qu'un créneau n'existe pas sur tous les sites.
+4. **Samedi et dimanche portent les mêmes affectations** (lignes `Garde` identiques). À traiter comme deux jours distincts, sans chercher à factoriser.
+5. **Irrégularités de saisie humaine à normaliser** : espaces en fin de valeur (`Mercredi `, `Jeudi `, `MY `), espace en début d'en-tête (` S8 Dijon`), casse variable (`vendredi` en minuscule), lignes vides entre les blocs samedi et dimanche, cellule fusionnée. Le parseur doit systématiquement rogner les espaces et comparer sans tenir compte de la casse ni des accents.
+
+**Règles d'implémentation du parseur :**
+
+- **Repérer la feuille et la ligne d'en-tête par leur contenu**, jamais par des coordonnées fixes : chercher la première ligne contenant des libellés du type `S<n> <site>`, et en déduire la colonne de départ. C'est ce qui rendra l'import robuste aux prochains exports Numbers (voir la `Feuille 1-1` décalée).
+- **En déduire dynamiquement** le nombre de semaines du cycle et la liste des sites, plutôt que de coder « 8 » et « Beaune/Dijon » en dur — c'est précisément ce qui doit pouvoir changer.
+- **Propager le jour** de la première ligne du bloc vers les lignes suivantes (remplissage vers le bas).
+- **Table de correspondance des initiales → comptes médecins**, à établir une première fois puis mémorisée (voir l'écran de correspondance décrit plus haut). Le fichier ne contient aucun nom complet ni email : cette correspondance est indispensable et ne peut pas être devinée.
+- **Rapport d'anomalies** en fin d'analyse : initiales inconnues, créneaux non déclarés en base, sites non reconnus, cellules ambiguës — présenté avant toute écriture.
+
+**Note sur le cycle :** 9 médecins pour un cycle de 8 semaines — la durée du cycle n'est pas indexée sur le nombre d'associés. L'arrivée d'un dixième médecin ne changera donc pas mécaniquement la longueur du cycle, mais si elle change, le mécanisme de plans versionnés décrit plus haut évite le décalage rétroactif.
+
+#### Définition des créneaux (source : `desiderata.yaml`)
+
+| Code | Horaire | Contrainte |
+|---|---|---|
+| `J1` | 08:00–16:00 | **Beaune uniquement**, 1 seul par jour |
+| `J2` | 14:00–22:00 | **1 seul par site et par jour** — la ressource la plus disputée |
+| `J3` `J4` `J5` `J7` `J8` | 08:00–18:30 | Journée, multipliables |
+| `J6` | 08:00–14:00 | **Réservé aux remplaçants — jamais un associé** |
+| `Garde` / `Doublon` | week-end | `Doublon` = second médecin sur la même garde |
+
+Fenêtre de recouvrement maximal : 14:00–16:00 (J1, J2 et journées se chevauchent). Capacité : 6 salles par site, **9 associés simultanés maximum**.
+
+**Conséquence architecturale majeure :** le roulement ne concerne que les **9 associés**. Le créneau `J6`, et plus généralement tous les créneaux non couverts par le roulement, sont destinés aux **remplaçants** — c'est-à-dire exactement ce que le circuit « garde libre → demande → approbation » de l'agenda gère déjà. Les deux mécanismes sont donc complémentaires et couvrent chacun une population : **rotation = associés (affectation automatique)**, **demandes = remplaçants (à la demande)**. C'est la clé de lecture du module.
+
+---
+
+#### ⚠️ Le format du fichier a déjà changé entre deux versions
+
+Le cabinet dispose de deux fichiers de roulement, de structures **différentes** :
+
+| | `planning-actuel_2025-12.xlsx` | `planning-V2_2026-07.xlsx` |
+|---|---|---|
+| Origine | Saisie manuelle dans Numbers | Généré par le script d'optimisation |
+| Ligne d'en-tête | ligne 3, semaines en colonnes D→S | ligne 3, semaines en colonnes C→R |
+| Colonne jour / créneau | B et C | A et B |
+| Créneaux | `J1`…`J5` + `J6 ou J7 ou J8` | **`J1` à `J8`, une ligne chacun** |
+| Cellules composites | Oui (`LD J7`, `AS J8`) | **Non — une initiale par cellule** |
+| Feuilles | `Feuille 1` + doublon `Feuille 1-1` | `Roulement V2` + 9 feuilles par médecin |
+
+Deux formats en sept mois : c'est la confirmation définitive que **le parseur doit repérer la grille par son contenu** (chercher la ligne contenant des libellés `S<n> <site>`, en déduire les colonnes ; chercher la colonne des créneaux par ses valeurs `J1`, `Garde`…), et **jamais par des coordonnées fixes**. Il doit accepter les deux formats, donc gérer aussi bien les cellules simples que composites.
+
+---
+
+### MOD-1 bis — Articulation avec le pipeline d'optimisation existant
+
+Le cabinet dispose déjà d'un outillage indépendant, hors application :
+
+- `desiderata.yaml` — **source unique de vérité** des contraintes : créneaux, capacités, règles dures, fiches individuelles des 9 associés (site fixe/flexible, cibles J2, gardes week-end, interdictions, jours non travaillés).
+- `1_optimize.py` — optimiseur sous contraintes **OR-Tools CP-SAT**. Part du planning existant et minimise le bouleversement ; ne décide que l'étiquette J2 / journée, J2 étant la seule ressource rare.
+- `2_generate_xlsx.py` — génère la grille V2 + 9 feuilles imprimables par médecin.
+- `verifie-planning.py` — vérificateur indépendant en lecture seule (443 lignes) : contrôle les 6 règles dures, les desiderata codifiables et la règle « lundi off après week-end travaillé ». Fonctionne aussi sur un fichier **retouché à la main** après négociation entre associés.
+
+**Recommandation : ne PAS réimplémenter l'optimiseur dans l'application.** La conception d'un roulement est une opération rare (quelques fois par an), qui suppose des arbitrages humains et des négociations avec l'équipe ; l'outillage Python existant la traite bien. L'application est la couche de **diffusion et d'exécution**, pas de conception.
+
+**Frontière proposée :**
+
+```
+desiderata.yaml ──► 1_optimize.py ──► 2_generate_xlsx.py ──► planning-Vx.xlsx
+                                                                   │
+                                              (retouches manuelles Numbers)
+                                                                   │
+                                                          verifie-planning.py
+                                                                   │
+                                                          3_export_app.py  ◄── À CRÉER
+                                                                   │
+                                                          roulement-Vx.json
+                                                                   │
+                                            Omnès-Orga → import → rotation_plans
+```
+
+**Script `3_export_app.py` à créer** (une trentaine de lignes, dans le pipeline Python, pas dans l'application) : lit le fichier `.xlsx` **final** — quelle que soit son origine, généré ou retouché à la main — et émet un JSON canonique :
+
+```json
+{
+  "plan": { "nom": "Roulement V2 juillet 2026", "cycle_semaines": 8,
+            "date_debut": "2026-09-07", "source": "planning-V2_2026-07.xlsx" },
+  "creneaux": [ { "code": "J1", "debut": "08:00", "fin": "16:00",
+                  "sites": ["Beaune"], "unique_par_site_jour": true } ],
+  "medecins": [ { "code": "IEG", "nom": "Imane El Gari" } ],
+  "affectations": [ { "medecin": "CB", "semaine": 1, "jour": "Lundi",
+                      "site": "Beaune", "creneau": "J1" } ]
+}
+```
+
+Intérêt : toute la fragilité de lecture reste dans le pipeline Python, là où l'expertise et le vérificateur vivent déjà. L'import côté application devient trivial et robuste — il ne fait plus que valider un JSON et créer un plan. L'import `.xlsx` direct reste utile en secours, mais ce n'est plus le chemin principal.
+
+**Règles dures à porter dans l'application** (validation à la création/affectation d'une garde, à aligner avec `src/lib/shiftValidation.ts`) : un seul `J2` par site et par jour ; un seul `J1` par jour à Beaune ; jamais un associé sur `J6` ; maximum 9 associés simultanés sur la fenêtre 14:00–16:00 ; maximum 6 salles occupées par site ; lundi off obligatoire après un week-end travaillé.
+
+**Incohérence repérée dans le pipeline** (à corriger côté Python, indépendamment de l'application) : `desiderata.yaml` se présente comme la source unique de vérité et prévoit que l'optimiseur le lise, mais `1_optimize.py` code encore en dur le dictionnaire `targetJ2` et le bloc des desiderata. Les valeurs coïncident aujourd'hui, mais la duplication finira par diverger. Sa section 4 (« Cibles J2 retenues pour la V2 ») est par ailleurs vide, les cibles vivant dans les fiches individuelles `j2_cible`.
+
+#### Cas d'usage à couvrir explicitement
+
+- **Association d'un nouveau médecin** → nouveau plan importé depuis l'Excel mis à jour, activé au 1er du mois choisi. Les plannings déjà publiés ne bougent pas.
+- **Ouverture d'un nouveau lieu / nouvelle salle** → création du site/salle dans les paramètres, puis import d'un plan intégrant les nouvelles colonnes.
+- **Départ d'un médecin** → le plan archivé conserve ses affectations passées ; le profil reste en base (désactivé) pour ne pas casser l'historique.
+
+---
+
+### MOD-2 — Refonte du bouton d'annulation
+
+#### Le système actuel
+
+Table `undo_buffer` avec **`UNIQUE(user_id)`** : une seule action mémorisée par utilisateur, écrasée à chaque nouvelle action (`upsert`). Réservée au coordinateur. Couvre 6 types d'actions (`assign_shift`, `unassign_shift`, `validate_request`, `bulk_shift_create`, `bulk_shift_delete`, `delete_shift`). Le bouton interroge la base **toutes les 2 secondes** et utilise `alert()` pour les retours.
+
+#### Les problèmes
+
+1. **Un seul niveau d'annulation** : une deuxième action rend la première définitivement irréversible.
+2. **Aucune péremption** : le bouton reste actif indéfiniment. Le coordinateur peut annuler, sans s'en rendre compte, une action vieille de trois jours — alors que des médecins ont entre-temps demandé ou obtenu les gardes concernées. **C'est le risque le plus sérieux du dispositif actuel.**
+3. **Aucune vérification de cohérence** avant d'annuler : l'état actuel n'est pas comparé à l'état attendu.
+4. **Couverture partielle** : les actions sur les séries, les modèles de semaine et les attributions groupées ne sont pas toutes réversibles.
+5. **UX datée** : `alert()` bloquant, mauvaise expérience sur mobile, sondage réseau permanent.
+6. **Ambiguïté du mot « Annuler »** : dans cette appli, il désigne à la fois l'annulation d'une garde, l'annulation d'une demande, et l'annulation d'une action. À clarifier dans le vocabulaire de l'interface.
+
+#### Trois pistes à arbitrer
+
+**Piste A — Le bandeau éphémère (modèle Gmail).**
+Après chaque action, un bandeau apparaît en bas de l'écran : « 12 gardes créées — Annuler », avec un compte à rebours de 10 à 15 secondes, puis il disparaît. Plus de bouton permanent.
+*Avantages* : supprime d'un coup le risque d'annulation périmée, mentalement évident, excellent sur mobile, permet d'empiler les actions puisque chaque bandeau ne concerne que la sienne.
+*Limite* : plus rien à annuler si l'onglet est fermé entre-temps.
+
+**Piste B — Le journal d'activité.**
+Remplacer l'annulation par un historique complet : qui a fait quoi, quand, avec un bouton « Restaurer » sur les entrées réversibles.
+*Avantages* : traçabilité — précieuse dans un cabinet médical pour savoir qui a supprimé une garde ; annulation possible bien après coup.
+*Limite* : plus de travail, et la restauration tardive rouvre le risque de conflit.
+
+**Piste C — L'hybride (recommandation).**
+Bandeau éphémère pour l'annulation immédiate (couvre la grande majorité des cas) **+** journal d'activité pour la traçabilité, la restauration ciblée n'étant proposée que lorsque l'état actuel le permet encore.
+À compléter par deux mesures de fond :
+- **Suppression douce** (`deleted_at`) au lieu de suppression réelle pour les gardes : restaurer devient trivial et sans risque.
+- **Garde-fou de cohérence** : avant toute restauration, comparer l'état actuel à l'état attendu. En cas d'écart (« cette garde a été demandée par le Dr X depuis »), afficher un avertissement explicite et laisser le choix, plutôt que d'écraser silencieusement.
+
+Autres améliorations à prévoir quelle que soit la piste retenue : remplacer `alert()` par les notifications de l'appli principale, supprimer le sondage toutes les 2 secondes (l'état d'annulation vit côté client, ou via le temps réel Supabase), et raccourci clavier Ctrl/Cmd+Z sur les écrans coordinateur (usage desktop).
+
+---
+
+## Éléments à fournir avant l'étape 6
+
+- [x] ~~Le fichier Excel de roulement~~ — deux fichiers fournis et analysés (`planning-actuel_2025-12.xlsx` et `planning-V2_2026-07.xlsx`). **Placer les deux dans `docs/`** : ils servent de jeux de test au parseur, précisément parce que leurs formats diffèrent.
+- [x] ~~Signification des codes J1 à J8~~ — documentée dans `desiderata.yaml`, reprise dans le tableau ci-dessus. **Placer `desiderata.yaml` dans `docs/`** : il fait autorité sur les contraintes.
+- [x] ~~Noms complets des 9 associés~~ — connus (`analyse-planning-actuel.md`).
+- [ ] **⚠️ Date réelle de démarrage du roulement V2** : quelle semaine calendaire correspond à `S1` ? Aucun fichier ne le précise, et c'est la valeur `start_date` du plan — sans elle, l'application ne peut pas placer le roulement sur le calendrier.
+- [ ] **Emails des 9 associés** dans Omnès-Orga, pour relier les initiales aux comptes. (Attention à l'orthographe variable *Laurene / Laurène Daudin* selon les fichiers.)
+- [ ] **État des `shift_types` déjà déclarés dans l'agenda** : correspondent-ils aux codes J1–J8 et à leurs horaires réels ? À vérifier dans l'onglet Paramètres avant l'import.
+- [ ] Décision sur la piste d'annulation retenue (A, B ou C).
+- [ ] Confirmation : les associés gérants ont-ils les droits coordinateur sur l'agenda ?
+
+---
+
+## Conseils pour Claude Code
+
+- Fournir ce fichier ET `cabinet-medical-app.md` en début de session.
+- Travailler en local (`npm run dev`) sur une branche Git dédiée `feature/module-agenda` ; commit après chaque étape validée.
+- Ne jamais exécuter de migration SQL sur le projet Supabase Planning en production — en phase 1–6, le module est **client** de cette base, il ne la modifie pas structurellement.
+- L'étape 7 (migration) se prépare sur une copie locale des données avant d'être rejouée en production.
