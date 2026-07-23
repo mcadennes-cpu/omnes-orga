@@ -1,18 +1,18 @@
 import { Profile } from '../lib/supabase';
-import { Calendar, CalendarCheck, ClipboardList, LogOut, Menu, X, Users, Settings, CalendarDays } from 'lucide-react';
+import { Calendar, CalendarCheck, ClipboardList, LogOut, Menu, X, Settings, CalendarDays } from 'lucide-react';
 import { useState } from 'react';
 
 type NavigationProps = {
   currentUser: Profile;
-  currentView: 'calendar' | 'schedule' | 'daily-schedule' | 'requests' | 'users' | 'settings';
-  onViewChange: (view: 'calendar' | 'schedule' | 'daily-schedule' | 'requests' | 'users' | 'settings') => void;
+  currentView: 'calendar' | 'schedule' | 'daily-schedule' | 'requests' | 'settings';
+  onViewChange: (view: 'calendar' | 'schedule' | 'daily-schedule' | 'requests' | 'settings') => void;
   onSignOut: () => void;
 };
 
 export default function Navigation({ currentUser, currentView, onViewChange, onSignOut }: NavigationProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const NavButton = ({ view, icon: Icon, label }: { view: 'calendar' | 'schedule' | 'daily-schedule' | 'requests' | 'users' | 'settings', icon: any, label: string }) => (
+  const NavButton = ({ view, icon: Icon, label }: { view: 'calendar' | 'schedule' | 'daily-schedule' | 'requests' | 'settings', icon: any, label: string }) => (
     <button
       onClick={() => {
         onViewChange(view);
@@ -52,7 +52,6 @@ export default function Navigation({ currentUser, currentView, onViewChange, onS
             {currentUser.role === 'coordinator' && (
               <>
                 <NavButton view="requests" icon={ClipboardList} label="Demandes" />
-                <NavButton view="users" icon={Users} label="Utilisateurs" />
                 <NavButton view="settings" icon={Settings} label="Paramètres" />
               </>
             )}
@@ -95,7 +94,6 @@ export default function Navigation({ currentUser, currentView, onViewChange, onS
               {currentUser.role === 'coordinator' && (
                 <>
                   <NavButton view="requests" icon={ClipboardList} label="Demandes" />
-                  <NavButton view="users" icon={Users} label="Utilisateurs" />
                   <NavButton view="settings" icon={Settings} label="Paramètres" />
                 </>
               )}
