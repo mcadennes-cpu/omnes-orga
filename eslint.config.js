@@ -5,7 +5,9 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // reference-agenda : code source de l'agenda Bolt, lecture seule, jamais linte
+  // src/modules/agenda : module en TypeScript, lint reporte a la refonte UI (etape 4)
+  globalIgnores(['dist', 'reference-agenda', 'src/modules/agenda']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [

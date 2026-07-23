@@ -1,0 +1,421 @@
+import { useState, useEffect } from 'react';
+import { supabase, Shift, Profile } from '../lib/supabase';
+import { Calendar as CalendarIcon, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import CalendarFilters from './calendar/CalendarFilters';
+import WeekView from './calendar/WeekView';
+import MonthView from './calendar/MonthView';
+import DoctorWeekSummaryView from './DoctorWeekSummaryView';
+import ShiftRequestModal from './ShiftRequestModal';
+import CreateShiftModal from './CreateShiftModal';
+import ShiftDetailModal from './ShiftDetailModal';
+import SaveWeekTemplateModal from './SaveWeekTemplateModal';
+import DeleteWeekTemplateModal from './DeleteWeekTemplateModal';
+import DuplicateWeekTemplateModal from './DuplicateWeekTemplateModal';
+import UndoButton from './UndoButton';
+import { saveWeekAsTemplate, duplicateWeekTemplate } from '../lib/weekTemplateUtils';
+
+type EnhancedCalendarViewProps = {
+  currentUser: Profile;
+};
+
+export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarViewProps) {
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [locationFilter, setLocationFilter] = useState<'all' | 'Dijon' | 'Beaune'>('all');
+  const [roomFilter, setRoomFilter] = useState('all');
+  const [doctorFilter, setDoctorFilter] = useState('all');
+  const [shiftTypeFilter, setShiftTypeFilter] = useState('all');
+  const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
+  const [showDeleteTemplateModal, setShowDeleteTemplateModal] = useState(false);
+  const [showDuplicateTemplateModal, setShowDuplicateTemplateModal] = useState(false);
+  const [availableDoctors, setAvailableDoctors] = useState<Array<{ id: string; name: string }>>([]);
+
+  const isMobile = currentUser.role === 'doctor';
+
+  useEffect(() => {
+    loadShifts();
+    loadDoctors();
+
+    const subscription = supabase
+      .channel('shifts_and_requests_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shifts' }, () => {
+        loadShifts();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, () => {
+        loadShifts();
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [selectedDate, viewMode, locationFilter, roomFilter, doctorFilter, shiftTypeFilter]);
+
+  const loadDoctors = async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .eq('role', 'doctor')
+      .order('full_name');
+
+    if (data) {
+      setAvailableDoctors(data.map(d => ({ id: d.id, name: d.full_name })));
+    }
+  };
+
+  const formatDateLocal = (d: Date): string => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getDateRange = () => {
+    const date = new Date(selectedDate);
+
+    if (viewMode === 'week') {
+      const startOfWeek = new Date(date);
+      startOfWeek.setDate(date.getDate() - date.getDay() + 1);
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6);
+
+      return {
+        start: formatDateLocal(startOfWeek),
+        end: formatDateLocal(endOfWeek)
+      };
+    } else {
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      const firstDayOfMonth = new Date(year, month, 1);
+
+      const startDayOfWeek = firstDayOfMonth.getDay();
+      const adjustedStartDay = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1;
+      const gridStart = new Date(year, month, 1 - adjustedStartDay);
+
+      const gridEnd = new Date(gridStart);
+      gridEnd.setDate(gridStart.getDate() + 41);
+
+      return {
+        start: formatDateLocal(gridStart),
+        end: formatDateLocal(gridEnd)
+      };
+    }
+  };
+
+  const loadShifts = async () => {
+    setLoading(true);
+    const { start, end } = getDateRange();
+
+    let query = supabase
+      .from('shifts')
+      .select(`
+        *,
+        assigned_doctor:profiles!assigned_doctor_id(id, full_name, email),
+        shift_type_data:shift_types!shift_type_id(id, name, time_range),
+        requests(id, status, doctor_id)
+      `)
+      .gte('date', start)
+      .lte('date', end)
+      .order('date', { ascending: true })
+      .order('shift_type', { ascending: true });
+
+    if (locationFilter !== 'all') {
+      query = query.eq('location', locationFilter);
+    }
+
+    if (roomFilter !== 'all') {
+      query = query.eq('room', roomFilter);
+    }
+
+    if (doctorFilter !== 'all') {
+      query = query.eq('assigned_doctor_id', doctorFilter);
+    }
+
+    if (shiftTypeFilter !== 'all') {
+      query = query.eq('shift_type', shiftTypeFilter);
+    }
+
+    const { data, error } = await query;
+
+    if (!error && data) {
+      const transformedShifts = data.map(shift => {
+        const hasPendingRequest = shift.requests?.some((r: any) => r.status === 'pending');
+        const doctorName = shift.assigned_doctor?.full_name || null;
+        const timeRange = shift.shift_type_data?.time_range || shift.shift_type;
+
+        return {
+          ...shift,
+          status: hasPendingRequest ? 'pending' : shift.status,
+          doctor_name: doctorName,
+          time_range: timeRange,
+          hasPendingRequest
+        } as any;
+      });
+      setShifts(transformedShifts);
+    }
+    setLoading(false);
+  };
+
+  const handleShiftClick = (shift: Shift) => {
+    setSelectedShift(shift);
+    if (currentUser.role === 'doctor' && shift.status === 'free') {
+      setShowRequestModal(true);
+    } else if (currentUser.role === 'coordinator') {
+      setShowDetailModal(true);
+    }
+  };
+
+  const handleDayClick = (date: Date) => {
+    setSelectedDate(date.toISOString().split('T')[0]);
+    setViewMode('week');
+  };
+
+  const handleWeekChange = (direction: 'prev' | 'next') => {
+    const currentDate = new Date(selectedDate);
+    const newDate = new Date(currentDate);
+    newDate.setDate(currentDate.getDate() + (direction === 'next' ? 7 : -7));
+    setSelectedDate(newDate.toISOString().split('T')[0]);
+  };
+
+  const handleMonthChange = (direction: 'prev' | 'next') => {
+    const currentDate = new Date(selectedDate);
+    const newDate = new Date(currentDate);
+    newDate.setMonth(currentDate.getMonth() + (direction === 'next' ? 1 : -1));
+    setSelectedDate(newDate.toISOString().split('T')[0]);
+  };
+
+  const getStatusBadge = (status: string, shift?: Shift) => {
+    const isPendingAssignment = status === 'pending' && shift?.assigned_doctor_id;
+    const hasPendingRequests = status === 'pending' && !shift?.assigned_doctor_id;
+
+    const styles = {
+      free: 'bg-gray-100 text-gray-800 border-gray-200',
+      pending: isPendingAssignment ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      assigned: 'bg-green-100 text-green-800 border-green-200'
+    }[status] || 'bg-gray-100 text-gray-800';
+
+    const labels = {
+      free: 'LIBRE',
+      pending: isPendingAssignment ? 'PRÉ-VALIDÉ' : 'DEMANDES EN ATTENTE',
+      assigned: 'ASSIGNÉ'
+    }[status] || status.toUpperCase();
+
+    return (
+      <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${styles}`}>
+        {labels}
+      </span>
+    );
+  };
+
+  const handleSaveAsTemplate = async (templateName: string) => {
+    const date = new Date(selectedDate);
+    const startOfWeek = new Date(date);
+    startOfWeek.setDate(date.getDate() - date.getDay() + 1);
+
+    await saveWeekAsTemplate(startOfWeek, templateName, currentUser.id);
+    alert('Modèle de semaine sauvegardé avec succès!');
+  };
+
+  const handleDuplicateTemplate = async (templateId: string, startDate: string, endDate: string) => {
+    const result = await duplicateWeekTemplate(templateId, startDate, endDate);
+    alert(`Duplication terminée!\nCréées: ${result.created}\nIgnorées: ${result.skipped}`);
+    loadShifts();
+  };
+
+  const availableRooms = Array.from(new Set(shifts.map(s => s.room))).sort();
+
+  return (
+    <div className="w-full max-w-[2000px] mx-auto space-y-4 px-2">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-cyan-100 rounded-lg">
+              <CalendarIcon className="w-6 h-6 text-cyan-600" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-teal-900">Calendrier des Gardes</h2>
+              <p className="text-sm text-gray-600">Merci de donner vos disponibilités</p>
+            </div>
+          </div>
+
+          {currentUser.role === 'coordinator' && (
+            <div className="flex items-center gap-3">
+              <UndoButton userId={currentUser.id} onUndoComplete={loadShifts} />
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="bg-pink-500 hover:bg-pink-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center gap-2 shadow-md"
+              >
+                <Plus className="w-5 h-5" />
+                Créer une garde
+              </button>
+            </div>
+          )}
+        </div>
+
+        <CalendarFilters
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          selectedDate={viewMode === 'month' ? selectedDate.slice(0, 7) : selectedDate}
+          onDateChange={(date) => setSelectedDate(viewMode === 'month' ? `${date}-01` : date)}
+          locationFilter={locationFilter}
+          onLocationChange={setLocationFilter}
+          roomFilter={roomFilter}
+          onRoomChange={setRoomFilter}
+          doctorFilter={doctorFilter}
+          onDoctorFilter={setDoctorFilter}
+          shiftTypeFilter={shiftTypeFilter}
+          onShiftTypeFilter={setShiftTypeFilter}
+          availableRooms={availableRooms}
+          availableDoctors={availableDoctors}
+          isMobile={isMobile}
+        />
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-2 md:p-4">
+        {loading ? (
+          <div className="text-center py-12 text-gray-500">Chargement...</div>
+        ) : (
+          <>
+            {viewMode === 'week' && (
+              <>
+                {currentUser.role === 'doctor' ? (
+                  <>
+                    <div className="flex items-center justify-between mb-4 px-2">
+                      <button
+                        onClick={() => handleWeekChange('prev')}
+                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                      >
+                        <ChevronLeft className="w-5 h-5 text-gray-600" />
+                      </button>
+                      <h3 className="font-semibold text-gray-900">
+                        {(() => {
+                          const date = new Date(selectedDate);
+                          const startOfWeek = new Date(date);
+                          startOfWeek.setDate(date.getDate() - date.getDay() + 1);
+                          const endOfWeek = new Date(startOfWeek);
+                          endOfWeek.setDate(startOfWeek.getDate() + 6);
+
+                          const formatDate = (d: Date) => {
+                            return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+                          };
+
+                          return `${formatDate(startOfWeek)} - ${formatDate(endOfWeek)}`;
+                        })()}
+                      </h3>
+                      <button
+                        onClick={() => handleWeekChange('next')}
+                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                      >
+                        <ChevronRight className="w-5 h-5 text-gray-600" />
+                      </button>
+                    </div>
+                    <DoctorWeekSummaryView
+                      weekStart={(() => {
+                        const date = new Date(selectedDate);
+                        const startOfWeek = new Date(date);
+                        startOfWeek.setDate(date.getDate() - date.getDay() + 1);
+                        return startOfWeek;
+                      })()}
+                      shifts={shifts}
+                      currentUserId={currentUser.id}
+                      filters={{
+                        selectedSite: locationFilter,
+                        selectedRoom: roomFilter,
+                      }}
+                      onRequestsSubmitted={loadShifts}
+                    />
+                  </>
+                ) : (
+                  <WeekView
+                    shifts={shifts}
+                    currentWeek={new Date(selectedDate)}
+                    onWeekChange={handleWeekChange}
+                    onShiftClick={handleShiftClick}
+                    getStatusBadge={getStatusBadge}
+                    isMobile={isMobile}
+                    isCoordinator={currentUser.role === 'coordinator'}
+                    onSaveAsTemplate={() => setShowSaveTemplateModal(true)}
+                    onDeleteTemplate={() => setShowDeleteTemplateModal(true)}
+                    onDuplicateTemplate={() => setShowDuplicateTemplateModal(true)}
+                  />
+                )}
+              </>
+            )}
+            {viewMode === 'month' && (
+              <MonthView
+                shifts={shifts}
+                currentMonth={new Date(selectedDate)}
+                onMonthChange={handleMonthChange}
+                onDayClick={handleDayClick}
+                getStatusBadge={getStatusBadge}
+                isMobile={isMobile}
+              />
+            )}
+          </>
+        )}
+      </div>
+
+      {showRequestModal && selectedShift && (
+        <ShiftRequestModal
+          shift={selectedShift}
+          doctorId={currentUser.id}
+          onClose={() => {
+            setShowRequestModal(false);
+            setSelectedShift(null);
+          }}
+          onSuccess={loadShifts}
+        />
+      )}
+
+      {showCreateModal && (
+        <CreateShiftModal
+          coordinatorId={currentUser.id}
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={loadShifts}
+        />
+      )}
+
+      {showDetailModal && selectedShift && (
+        <ShiftDetailModal
+          shift={selectedShift}
+          onClose={() => {
+            setShowDetailModal(false);
+            setSelectedShift(null);
+          }}
+          onSuccess={loadShifts}
+          hideValidation={true}
+        />
+      )}
+
+      {showSaveTemplateModal && (
+        <SaveWeekTemplateModal
+          onClose={() => setShowSaveTemplateModal(false)}
+          onSave={handleSaveAsTemplate}
+        />
+      )}
+
+      {showDeleteTemplateModal && (
+        <DeleteWeekTemplateModal
+          onClose={() => setShowDeleteTemplateModal(false)}
+          onSuccess={() => {
+            setShowDeleteTemplateModal(false);
+            loadShifts();
+          }}
+        />
+      )}
+
+      {showDuplicateTemplateModal && (
+        <DuplicateWeekTemplateModal
+          onClose={() => setShowDuplicateTemplateModal(false)}
+          onDuplicate={handleDuplicateTemplate}
+        />
+      )}
+    </div>
+  );
+}
