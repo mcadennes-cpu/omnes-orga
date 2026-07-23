@@ -12,6 +12,8 @@ import SaveWeekTemplateModal from './SaveWeekTemplateModal';
 import DeleteWeekTemplateModal from './DeleteWeekTemplateModal';
 import DuplicateWeekTemplateModal from './DuplicateWeekTemplateModal';
 import UndoButton from './UndoButton';
+import StatusBadge from './ui/StatusBadge';
+import { AgendaStatusKey } from '../lib/statusStyles';
 import { saveWeekAsTemplate, duplicateWeekTemplate } from '../lib/weekTemplateUtils';
 
 type EnhancedCalendarViewProps = {
@@ -190,27 +192,16 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
     setSelectedDate(newDate.toISOString().split('T')[0]);
   };
 
+  // Mappe l'ancienne logique de statut vers la cle statusStyles : comportement
+  // inchange (les memes cas qu'avant), seul le rendu passe a la charte Omnes.
   const getStatusBadge = (status: string, shift?: Shift) => {
     const isPendingAssignment = status === 'pending' && shift?.assigned_doctor_id;
-    const hasPendingRequests = status === 'pending' && !shift?.assigned_doctor_id;
-
-    const styles = {
-      free: 'bg-gray-100 text-gray-800 border-gray-200',
-      pending: isPendingAssignment ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      assigned: 'bg-green-100 text-green-800 border-green-200'
-    }[status] || 'bg-gray-100 text-gray-800';
-
-    const labels = {
-      free: 'LIBRE',
-      pending: isPendingAssignment ? 'PRÉ-VALIDÉ' : 'DEMANDES EN ATTENTE',
-      assigned: 'ASSIGNÉ'
-    }[status] || status.toUpperCase();
-
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${styles}`}>
-        {labels}
-      </span>
-    );
+    let key: AgendaStatusKey;
+    if (status === 'free') key = 'libre';
+    else if (status === 'assigned') key = 'assigne';
+    else if (isPendingAssignment) key = 'prevalide';
+    else key = 'demandes';
+    return <StatusBadge status={key} />;
   };
 
   const handleSaveAsTemplate = async (templateName: string) => {
@@ -232,15 +223,15 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
 
   return (
     <div className="w-full max-w-[2000px] mx-auto space-y-4 px-2">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
+      <div className="bg-carte rounded-card shadow-card border border-border p-4 md:p-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-cyan-100 rounded-lg">
-              <CalendarIcon className="w-6 h-6 text-cyan-600" />
+            <div className="p-2 bg-canard/10 rounded-pill">
+              <CalendarIcon className="w-6 h-6 text-canard" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-teal-900">Calendrier des Gardes</h2>
-              <p className="text-sm text-gray-600">Merci de donner vos disponibilités</p>
+              <h2 className="text-h2 text-ink">Calendrier des gardes</h2>
+              <p className="text-caption">Merci de donner vos disponibilités</p>
             </div>
           </div>
 
@@ -249,7 +240,7 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
               <UndoButton userId={currentUser.id} onUndoComplete={loadShifts} />
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="bg-pink-500 hover:bg-pink-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center gap-2 shadow-md"
+                className="flex items-center gap-2 rounded-input bg-marine px-4 py-2.5 text-button text-white shadow-button transition-colors hover:bg-marine/90"
               >
                 <Plus className="w-5 h-5" />
                 Créer une garde
@@ -277,9 +268,9 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
         />
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-2 md:p-4">
+      <div className="bg-carte rounded-card shadow-card border border-border p-2 md:p-4">
         {loading ? (
-          <div className="text-center py-12 text-gray-500">Chargement...</div>
+          <div className="py-12 text-center text-muted">Chargement…</div>
         ) : (
           <>
             {viewMode === 'week' && (
@@ -289,11 +280,11 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
                     <div className="flex items-center justify-between mb-4 px-2">
                       <button
                         onClick={() => handleWeekChange('prev')}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                        className="rounded-pill p-2 transition-colors hover:bg-fond"
                       >
-                        <ChevronLeft className="w-5 h-5 text-gray-600" />
+                        <ChevronLeft className="w-5 h-5 text-marine" />
                       </button>
-                      <h3 className="font-semibold text-gray-900">
+                      <h3 className="text-body-l font-semibold capitalize text-ink">
                         {(() => {
                           const date = new Date(selectedDate);
                           const startOfWeek = new Date(date);
@@ -310,9 +301,9 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
                       </h3>
                       <button
                         onClick={() => handleWeekChange('next')}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                        className="rounded-pill p-2 transition-colors hover:bg-fond"
                       >
-                        <ChevronRight className="w-5 h-5 text-gray-600" />
+                        <ChevronRight className="w-5 h-5 text-marine" />
                       </button>
                     </div>
                     <DoctorWeekSummaryView

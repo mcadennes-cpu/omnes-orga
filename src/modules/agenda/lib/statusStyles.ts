@@ -39,14 +39,14 @@ export const STATUS_STYLES: Record<AgendaStatusKey, AgendaStatusStyle> = {
   },
   prevalide: {
     key: 'prevalide',
-    label: 'Pre-valide',
+    label: 'Pré-validé',
     badgeClass: 'bg-marine/10 text-marine border-marine/20',
     softClass: 'bg-marine/10 text-marine',
     dotClass: 'bg-marine',
   },
   assigne: {
     key: 'assigne',
-    label: 'Assigne',
+    label: 'Assigné',
     badgeClass: 'bg-olive/12 text-olive border-olive/25',
     softClass: 'bg-olive/12 text-olive',
     dotClass: 'bg-olive',

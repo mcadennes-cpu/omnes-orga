@@ -191,42 +191,42 @@ export default function DoctorWeekSummaryView({
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {dayData.map((day) => (
           <div key={day.dateString} className="space-y-2">
             <button
               onClick={() => toggleDay(day.dateString)}
-              className={`w-full p-4 rounded-lg border-2 transition-all ${
+              className={`w-full rounded-card border-2 p-4 transition-all ${
                 expandedDay === day.dateString
-                  ? 'border-cyan-500 bg-cyan-50'
+                  ? 'border-canard bg-canard/5'
                   : day.count > 0
-                  ? 'border-gray-200 bg-white hover:border-cyan-300 hover:bg-cyan-50'
-                  : 'border-gray-200 bg-gray-50 cursor-default'
+                  ? 'border-border bg-carte hover:border-canard/50 hover:bg-canard/5'
+                  : 'cursor-default border-border bg-fond'
               }`}
               disabled={day.count === 0}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 text-left">
-                  <div className="font-semibold text-gray-900 mb-1">
+                  <div className="mb-1 text-body-m font-semibold text-ink">
                     {formatDayHeader(day.date)}
                   </div>
-                  <div className="text-sm text-gray-600">
+                  <div className="text-caption">
                     {day.count > 0 ? (
                       <>
-                        <span className="font-medium text-cyan-600">{day.count}</span> garde{day.count > 1 ? 's' : ''} disponible{day.count > 1 ? 's' : ''}
+                        <span className="font-semibold text-canard">{day.count}</span> garde{day.count > 1 ? 's' : ''} disponible{day.count > 1 ? 's' : ''}
                         {getFilterText()}
                       </>
                     ) : (
-                      <span className="text-gray-400">Aucune garde disponible</span>
+                      <span className="text-faint">Aucune garde disponible</span>
                     )}
                   </div>
                 </div>
                 {day.count > 0 && (
                   <div>
                     {expandedDay === day.dateString ? (
-                      <ChevronUp className="w-5 h-5 text-cyan-600" />
+                      <ChevronUp className="h-5 w-5 text-canard" />
                     ) : (
-                      <ChevronDown className="w-5 h-5 text-gray-400" />
+                      <ChevronDown className="h-5 w-5 text-faint" />
                     )}
                   </div>
                 )}
@@ -234,67 +234,67 @@ export default function DoctorWeekSummaryView({
             </button>
 
             {expandedDay === day.dateString && day.freeShifts.length > 0 && (
-              <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
-                <div className="flex items-center justify-between pb-3 border-b border-gray-200">
+              <div className="space-y-3 rounded-card border border-border bg-carte p-4">
+                <div className="flex items-center justify-between border-b border-border pb-3">
                   <button
                     onClick={() => selectAllForDay(day.freeShifts)}
-                    className="flex items-center gap-2 text-sm text-cyan-600 hover:text-cyan-700 font-medium"
+                    className="flex items-center gap-2 text-body-m font-medium text-canard hover:text-canard/80"
                   >
-                    <CheckSquare className="w-4 h-4" />
+                    <CheckSquare className="h-4 w-4" />
                     Tout cocher
                   </button>
                   <button
                     onClick={() => deselectAllForDay(day.freeShifts)}
-                    className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-700 font-medium"
+                    className="flex items-center gap-2 text-body-m font-medium text-muted hover:text-ink"
                   >
-                    <Square className="w-4 h-4" />
+                    <Square className="h-4 w-4" />
                     Tout décocher
                   </button>
                 </div>
 
-                <div className="space-y-2 max-h-96 overflow-y-auto">
+                <div className="max-h-96 space-y-2 overflow-y-auto">
                   {day.freeShifts.map((shift) => {
                     const alreadyRequestedByCurrentUser = hasCurrentUserRequest(shift);
                     const alreadyRequestedByOthers = hasOtherPendingRequests(shift);
                     return (
                       <label
                         key={shift.id}
-                        className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                        className={`flex cursor-pointer items-start gap-3 rounded-card border-2 p-3 transition-all ${
                           selectedShifts.has(shift.id)
-                            ? 'border-cyan-500 bg-cyan-50'
+                            ? 'border-canard bg-canard/5'
                             : alreadyRequestedByCurrentUser
-                            ? 'border-green-200 bg-green-50'
-                            : 'border-gray-200 hover:border-cyan-300 hover:bg-gray-50'
+                            ? 'border-olive/30 bg-olive/5'
+                            : 'border-border hover:border-canard/50 hover:bg-fond'
                         }`}
                       >
                         <input
                           type="checkbox"
                           checked={selectedShifts.has(shift.id)}
                           onChange={() => toggleShiftSelection(shift.id)}
-                          className="mt-1 w-4 h-4 text-cyan-600 rounded focus:ring-cyan-500"
+                          className="mt-1 h-4 w-4 accent-canard"
                           disabled={alreadyRequestedByCurrentUser}
                         />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <div className="font-semibold text-gray-900">
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-1 flex items-center gap-2">
+                            <div className="font-semibold text-ink">
                               {shift.shift_type}
                             </div>
                             {alreadyRequestedByCurrentUser && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+                              <span className="inline-flex items-center gap-1 rounded-pill border border-olive/25 bg-olive/12 px-2 py-0.5 text-xs font-medium text-olive">
                                 ✓ Déjà demandée
                               </span>
                             )}
                             {!alreadyRequestedByCurrentUser && alreadyRequestedByOthers && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
-                                <Users className="w-3 h-3" />
+                              <span className="inline-flex items-center gap-1 rounded-pill border border-ocre/30 bg-ocre/15 px-2 py-0.5 text-xs font-medium text-ocre-fonce">
+                                <Users className="h-3 w-3" />
                                 Autres demandes
                               </span>
                             )}
                           </div>
-                          <div className="text-sm text-gray-600">
+                          <div className="text-caption">
                             {shift.time_range}
                           </div>
-                          <div className="text-sm text-gray-500">
+                          <div className="text-caption">
                             {shift.location} - {shift.room}
                           </div>
                         </div>
@@ -304,11 +304,11 @@ export default function DoctorWeekSummaryView({
                 </div>
 
                 {selectedShifts.size > 0 && (
-                  <div className="pt-3 border-t border-gray-200">
+                  <div className="border-t border-border pt-3">
                     <button
                       onClick={() => handleSubmitRequests(day.freeShifts)}
                       disabled={submitting}
-                      className="w-full px-4 py-3 bg-cyan-600 text-white rounded-lg font-semibold hover:bg-cyan-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full rounded-input bg-marine px-4 py-3 text-button text-white shadow-button transition-colors hover:bg-marine/90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {submitting ? (
                         'Envoi en cours...'
@@ -325,11 +325,11 @@ export default function DoctorWeekSummaryView({
       </div>
 
       {dayData.every(day => day.count === 0) && (
-        <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
-          <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-          <p className="text-gray-600">Aucune garde disponible cette semaine</p>
+        <div className="rounded-card border border-border bg-carte py-12 text-center">
+          <Calendar className="mx-auto mb-3 h-12 w-12 text-faint" />
+          <p className="text-muted">Aucune garde disponible cette semaine</p>
           {(filters.selectedSite !== 'all' || filters.selectedRoom !== 'all') && (
-            <p className="text-sm text-gray-500 mt-2">
+            <p className="mt-2 text-caption">
               Essayez de modifier les filtres
             </p>
           )}

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Shift } from '../../lib/supabase';
 import { ChevronLeft, ChevronRight, Repeat } from 'lucide-react';
 import { getRotationSettings, getRotationWeek, getWeekDates } from '../../lib/rotationUtils';
+import { STATUS_STYLES, resolveShiftStatus } from '../../lib/statusStyles';
 
 type MonthViewProps = {
   shifts: Shift[];
@@ -95,45 +96,34 @@ export default function MonthView({
 
   const weekDays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
-  const getStatusColor = (status: string, shift: Shift) => {
-    if (status === 'free') return 'bg-gray-400';
-
-    // Check for on_hold requests (blue - pre-validation)
-    const onHoldCount = (shift as any).onHoldRequestsCount || 0;
-    if (onHoldCount > 0) return 'bg-blue-500';
-
-    // Check for pending requests (yellow)
-    const pendingCount = shift.pendingRequestsCount || 0;
-    if (pendingCount > 0) return 'bg-yellow-500';
-
-    if (status === 'pending' && shift.assigned_doctor_id) return 'bg-blue-500';
-    if (status === 'pending') return 'bg-yellow-500';
-    return 'bg-green-500';
-  };
+  // Pastille pleine (points du calendrier) : delegue a la source unique des
+  // statuts. La logique de resolveShiftStatus reprend exactement l'ancien
+  // getStatusColor (gris/bleu/jaune/vert), remappe sur la palette Omnes.
+  const getStatusColor = (shift: Shift) => STATUS_STYLES[resolveShiftStatus(shift)].dotClass;
 
   if (isMobile) {
     return (
       <div className="space-y-3">
-        <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+        <div className="flex items-center justify-between rounded-input bg-fond p-2">
           <button
             onClick={() => onMonthChange('prev')}
-            className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+            className="rounded-pill p-2 transition-colors hover:bg-carte"
           >
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft className="h-5 w-5 text-marine" />
           </button>
-          <span className="font-semibold text-gray-900 capitalize">{getMonthName()}</span>
+          <span className="text-body-l font-semibold capitalize text-ink">{getMonthName()}</span>
           <button
             onClick={() => onMonthChange('next')}
-            className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+            className="rounded-pill p-2 transition-colors hover:bg-carte"
           >
-            <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="h-5 w-5 text-marine" />
           </button>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200">
+        <div className="overflow-hidden rounded-card border border-border bg-carte">
+          <div className="grid grid-cols-7 border-b border-border bg-fond">
             {weekDays.map((day) => (
-              <div key={day} className="p-2 text-center text-xs font-semibold text-gray-600">
+              <div key={day} className="p-2 text-center text-caption font-semibold">
                 {day}
               </div>
             ))}
@@ -150,28 +140,28 @@ export default function MonthView({
                   key={idx}
                   onClick={() => isCurrentMonth && onDayClick(date)}
                   disabled={!isCurrentMonth}
-                  className={`aspect-square p-1 border-b border-r border-gray-200 ${
-                    !isCurrentMonth ? 'bg-gray-50 text-gray-400' : 'bg-white hover:bg-gray-50'
+                  className={`aspect-square border-b border-r border-border p-1 ${
+                    !isCurrentMonth ? 'bg-fond text-faint' : 'bg-carte hover:bg-fond'
                   } ${hasShifts && isCurrentMonth ? 'cursor-pointer' : ''}`}
                 >
-                  <div className={`text-xs font-medium ${!isCurrentMonth ? 'text-gray-400' : 'text-gray-900'}`}>
+                  <div className={`text-xs font-medium ${!isCurrentMonth ? 'text-faint' : 'text-ink'}`}>
                     {date.getDate()}
                   </div>
                   {hasShifts && isCurrentMonth && (
-                    <div className="flex flex-wrap gap-0.5 mt-1 justify-center">
+                    <div className="mt-1 flex flex-wrap justify-center gap-0.5">
                       {dayShifts.slice(0, 3).map((shift, i) => (
                         <div
                           key={i}
-                          className={`w-1 h-1 rounded-full ${getStatusColor(shift.status, shift)}`}
+                          className={`h-1 w-1 rounded-full ${getStatusColor(shift)}`}
                         />
                       ))}
                       {dayShifts.length > 3 && (
-                        <div className="text-[8px] text-gray-600">+{dayShifts.length - 3}</div>
+                        <div className="text-[8px] text-muted">+{dayShifts.length - 3}</div>
                       )}
                     </div>
                   )}
                   {freeCount > 0 && isCurrentMonth && (
-                    <div className="text-[9px] text-gray-600 font-semibold mt-0.5">
+                    <div className="mt-0.5 text-[9px] font-semibold text-muted">
                       {freeCount} libre{freeCount > 1 ? 's' : ''}
                     </div>
                   )}
@@ -186,28 +176,28 @@ export default function MonthView({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between bg-gray-50 p-4 rounded-lg">
+      <div className="flex items-center justify-between rounded-input bg-fond p-4">
         <button
           onClick={() => onMonthChange('prev')}
-          className="flex items-center gap-2 px-4 py-2 hover:bg-gray-200 rounded-lg transition-colors font-medium text-gray-700"
+          className="flex items-center gap-2 rounded-pill px-4 py-2 text-body-m font-medium text-marine transition-colors hover:bg-carte"
         >
-          <ChevronLeft className="w-5 h-5" />
+          <ChevronLeft className="h-5 w-5" />
           Précédent
         </button>
-        <h3 className="text-lg font-semibold text-gray-900 capitalize">{getMonthName()}</h3>
+        <h3 className="text-h2 capitalize text-ink">{getMonthName()}</h3>
         <button
           onClick={() => onMonthChange('next')}
-          className="flex items-center gap-2 px-4 py-2 hover:bg-gray-200 rounded-lg transition-colors font-medium text-gray-700"
+          className="flex items-center gap-2 rounded-pill px-4 py-2 text-body-m font-medium text-marine transition-colors hover:bg-carte"
         >
           Suivant
-          <ChevronRight className="w-5 h-5" />
+          <ChevronRight className="h-5 w-5" />
         </button>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="grid grid-cols-7 bg-gray-50 border-b-2 border-gray-300">
+      <div className="overflow-hidden rounded-card border border-border bg-carte">
+        <div className="grid grid-cols-7 border-b border-border bg-fond">
           {weekDays.map((day) => (
-            <div key={day} className="p-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-200 last:border-r-0">
+            <div key={day} className="border-r border-border p-3 text-center text-caption font-semibold last:border-r-0">
               {day}
             </div>
           ))}
@@ -229,21 +219,21 @@ export default function MonthView({
                 key={idx}
                 onClick={() => isCurrentMonth && hasShifts && onDayClick(date)}
                 disabled={!isCurrentMonth || !hasShifts}
-                className={`min-h-[100px] p-2 border-b border-r border-gray-200 text-left ${
+                className={`min-h-[100px] border-b border-r border-border p-2 text-left ${
                   !isCurrentMonth
-                    ? 'bg-gray-50 text-gray-400'
+                    ? 'bg-fond text-faint'
                     : hasShifts
-                    ? 'bg-white hover:bg-gray-50 cursor-pointer'
-                    : 'bg-white'
+                    ? 'cursor-pointer bg-carte hover:bg-fond'
+                    : 'bg-carte'
                 }`}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <div className={`text-sm font-semibold ${!isCurrentMonth ? 'text-gray-400' : 'text-gray-900'}`}>
+                <div className="mb-2 flex items-center justify-between">
+                  <div className={`text-sm font-semibold ${!isCurrentMonth ? 'text-faint' : 'text-ink'}`}>
                     {date.getDate()}
                   </div>
                   {rotationInfo && (
-                    <div className="flex items-center gap-1 bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded text-[9px] font-semibold">
-                      <Repeat className="w-2.5 h-2.5" />
+                    <div className="flex items-center gap-1 rounded-pill bg-marine/[0.08] px-1.5 py-0.5 text-[9px] font-semibold text-marine">
+                      <Repeat className="h-2.5 w-2.5" />
                       <span>S{rotationInfo.week}</span>
                     </div>
                   )}
@@ -251,22 +241,22 @@ export default function MonthView({
                 {hasShifts && isCurrentMonth && (
                   <div className="space-y-1">
                     {freeCount > 0 && (
-                      <div className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                      <div className={`rounded-pill px-2 py-1 text-xs ${STATUS_STYLES.libre.softClass}`}>
                         {freeCount} libre{freeCount > 1 ? 's' : ''}
                       </div>
                     )}
                     {requestPendingCount > 0 && (
-                      <div className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                      <div className={`rounded-pill px-2 py-1 text-xs ${STATUS_STYLES.demandes.softClass}`}>
                         {requestPendingCount} demande{requestPendingCount > 1 ? 's' : ''}
                       </div>
                     )}
                     {preValidatedCount > 0 && (
-                      <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                      <div className={`rounded-pill px-2 py-1 text-xs ${STATUS_STYLES.prevalide.softClass}`}>
                         {preValidatedCount} pré-validé{preValidatedCount > 1 ? 's' : ''}
                       </div>
                     )}
                     {assignedCount > 0 && (
-                      <div className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                      <div className={`rounded-pill px-2 py-1 text-xs ${STATUS_STYLES.assigne.softClass}`}>
                         {assignedCount} assigné{assignedCount > 1 ? 's' : ''}
                       </div>
                     )}
