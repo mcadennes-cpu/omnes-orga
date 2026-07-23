@@ -1421,6 +1421,8 @@ Le module a sa **propre doc de référence** : `docs/integration-agenda.md` (con
 
    - **Étape 1/8 du plan agenda — FAITE (23/07/2026)** : squelette `src/modules/agenda/` (50 fichiers TypeScript copiés tels quels, non routés donc invisibles) + second client Supabase `supabaseAgenda` pointant vers le projet Planning (`VITE_AGENDA_SUPABASE_URL` / `VITE_AGENDA_SUPABASE_ANON_KEY`). Détail dans la section « Suivi d'avancement » d'`integration-agenda.md`.
 
+   - **Étape 2/8 du plan agenda — FAITE (23/07/2026)** : colonne `profiles.agenda_beta_access` (script `docs/sql/22-2A`, activée pour les 2 super_admin = le duo de bêta-testeurs), tuile « Planning » sur la grille d'accueil (canard, `CalendarClock`, mécanisme générique `betaFlag` dans `modules.js`), route `/planning` chargée en `React.lazy` (chunk séparé ~42 kB gzip). Correction au passage de la collision du token Tailwind `fuchsia` (marque vs gamme standard). Détail dans « Suivi d'avancement » d'`integration-agenda.md`.
+
 ---
 
 ## Limitations connues

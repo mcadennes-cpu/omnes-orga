@@ -4,6 +4,7 @@ import {
   Building2,
   MessageSquare,
   Calendar,
+  CalendarClock,
   FileText,
   Home,
   KeyRound,
@@ -84,9 +85,31 @@ export const MODULES = [
     // exclu : jamais de codes d'acces sur la borne partagee du cabinet.
     allowedRoles: ['super_admin', 'associe_gerant', 'associe', 'remplacant'],
   },
+  {
+    // "agenda" reste l'identifiant interne partout (dossier src/modules/agenda,
+    // colonne agenda_beta_access, docs) ; seul le label affiche dit "Planning",
+    // le nom que le cabinet utilise deja (OMNES PLANNING).
+    key: 'agenda',
+    label: 'Planning',
+    icon: CalendarClock,
+    color: 'canard',
+    // poste_bureau exclu : le planning de gardes ne concerne que les medecins.
+    allowedRoles: ['super_admin', 'associe_gerant', 'associe', 'remplacant'],
+    // Phase beta (etapes 2-6 integration agenda) : visible uniquement si
+    // profiles.agenda_beta_access = true. A la sortie de beta, supprimer
+    // simplement cette ligne pour ouvrir le module a tous les allowedRoles.
+    betaFlag: 'agenda_beta_access',
+  },
 ]
 
-export function getVisibleModules(role) {
+// role : filtre principal (comme les RLS cote base). profile : le profil
+// complet (useRole), utilise pour les modules en beta — si un module porte
+// betaFlag, il n'est visible que si profile[betaFlag] est vrai.
+export function getVisibleModules(role, profile = null) {
   if (!role) return []
-  return MODULES.filter((m) => m.allowedRoles.includes(role))
+  return MODULES.filter((m) => {
+    if (!m.allowedRoles.includes(role)) return false
+    if (m.betaFlag && !profile?.[m.betaFlag]) return false
+    return true
+  })
 }

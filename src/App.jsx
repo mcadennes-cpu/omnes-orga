@@ -24,6 +24,7 @@ import SimFolder from './pages/SimFolder'
 import Immobilier from './pages/Immobilier'
 import ImmobilierBoard from './pages/ImmobilierBoard'
 import ImmobilierCard from './pages/ImmobilierCard'
+import Agenda from './pages/Agenda'
 import Installer from './pages/Installer'
 import CodesAcces from './pages/CodesAcces'
 import LieuNouveau from './pages/LieuNouveau'
@@ -78,6 +79,7 @@ export default function App() {
           <Route path="/immobilier" element={<Immobilier />} />
           <Route path="/immobilier/:boardId" element={<ImmobilierBoard />} />
           <Route path="/immobilier/:boardId/:cardId" element={<ImmobilierCard />} />
+          <Route path="/planning" element={<Agenda />} />
           <Route path="/installer" element={<Installer />} />
           <Route path="/codes" element={<CodesAcces />} />
           <Route path="/codes/nouveau" element={<LieuNouveau />} />

@@ -11,7 +11,7 @@ import LogoOmnes from '../components/common/LogoOmnes'
 
 export default function Home() {
   const navigate = useNavigate()
-  const { role, prenom, loading } = useRole()
+  const { role, prenom, profile, loading } = useRole()
   const { items, parModule, loading: activiteLoading } = useMonActivite()
 
   if (loading) {
@@ -55,6 +55,10 @@ export default function Home() {
       navigate('/codes')
       return
     }
+    if (moduleKey === 'agenda') {
+      navigate('/planning')
+      return
+    }
     alert(`Module "${moduleKey}" à venir`)
   }
 
@@ -73,7 +77,7 @@ export default function Home() {
     navigate(`/discussion/${item.board_id}/${item.card_id}`)
   }
 
-  const visibleModules = getVisibleModules(role)
+  const visibleModules = getVisibleModules(role, profile)
   const posteBureau = isPosteBureau(role)
 
   // Pastille de non-lus par module. total = nb de choses distinctes a traiter

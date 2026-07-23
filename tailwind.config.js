@@ -1,3 +1,5 @@
+import colors from 'tailwindcss/colors'
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
@@ -14,7 +16,10 @@ export default {
         'ocre-fonce': '#A06A0E',
         olive:     '#6B7A3A',
         brique:    '#D4503A',
-        fuchsia:   '#D94F7E',
+        // DEFAULT = rose Omnes (bg-fuchsia, text-fuchsia... inchanges) ;
+        // le spread restaure la gamme standard fuchsia-50..950 que la
+        // definition simple ecrasait (utilisee par le module agenda).
+        fuchsia:   { ...colors.fuchsia, DEFAULT: '#D94F7E' },
 
         // Couleurs neutres
         fond:  '#F5F7F9',
