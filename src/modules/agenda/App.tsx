@@ -72,7 +72,7 @@ function App({ orgaProfile }: AppProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-fond">
       <AgendaHeader
         currentUser={currentUser}
         currentView={currentView}
@@ -96,8 +96,8 @@ function App({ orgaProfile }: AppProps) {
         )}
       </main>
 
-      <footer className="mt-12 py-6 text-center text-sm text-gray-600 border-t border-gray-200">
-        <p>© 2025 OMNÈS MÉDECINS • une équipe • 7j/7 • sur rendez-vous</p>
+      <footer className="mt-12 border-t border-border py-6 text-center">
+        <p className="text-caption">© 2025 OMNÈS MÉDECINS • une équipe • 7j/7 • sur rendez-vous</p>
       </footer>
     </div>
   );
