@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { supabase, Shift, Profile, Request } from '../lib/supabase';
 import { CalendarCheck, Calendar, MapPin, Clock, AlertCircle, X, ChevronDown, ChevronUp, FileText } from 'lucide-react';
 import CancelRequestModal from './CancelRequestModal';
+import Segmented from './ui/Segmented';
+import { getHoraireStyle } from '../lib/horaireStyles';
 
 type PendingRequest = Request & {
   shift: Shift;
@@ -144,32 +146,6 @@ export default function MyScheduleView({ currentUser }: MyScheduleViewProps) {
     setExpandedDays(newExpanded);
   };
 
-  const getShiftColor = (shiftType: string) => {
-    const pastelColors = [
-      'bg-blue-100',
-      'bg-pink-100',
-      'bg-purple-100',
-      'bg-yellow-100',
-      'bg-orange-100',
-      'bg-rose-100',
-      'bg-cyan-100',
-      'bg-lime-100',
-      'bg-amber-100',
-      'bg-violet-100',
-      'bg-fuchsia-100',
-      'bg-sky-100',
-      'bg-emerald-100',
-      'bg-indigo-100'
-    ];
-
-    let hash = 0;
-    for (let i = 0; i < shiftType.length; i++) {
-      hash = shiftType.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const index = Math.abs(hash) % pastelColors.length;
-    return pastelColors[index];
-  };
-
   const groupShiftsByDate = (shiftsToGroup: Shift[]) => {
     return shiftsToGroup.reduce((acc, shift) => {
       if (!acc[shift.date]) {
@@ -189,168 +165,166 @@ export default function MyScheduleView({ currentUser }: MyScheduleViewProps) {
   const confirmedDates = Object.keys(groupedConfirmedShifts).sort();
   const pendingDates = Object.keys(groupedPendingShifts).sort();
 
+  // Lignes lieu / salle / horaire d'une garde, communes aux deux vues.
+  const shiftInfoGrid = (shift: Shift) => (
+    <div className="grid grid-cols-3 gap-4">
+      <div className="flex items-center gap-2">
+        <MapPin className="h-4 w-4 text-muted" />
+        <span className="text-body-m font-medium text-ink">{shift.location}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <Calendar className="h-4 w-4 text-muted" />
+        <span className="text-body-m font-medium text-ink">{shift.room}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <Clock className="h-4 w-4 text-muted" />
+        <span className="text-body-m font-medium text-ink">{shift.shift_type}</span>
+      </div>
+    </div>
+  );
+
+  const coordinatorNote = (note: string) => (
+    <div className="mt-3 flex items-start gap-2 border-t border-border pt-3">
+      <FileText className="mt-0.5 h-4 w-4 flex-shrink-0 text-canard" />
+      <p className="text-body-m text-ink">{note}</p>
+    </div>
+  );
+
+  // Bouton destructif "Retirer cette garde" (vue en attente).
+  const removeButton = (request: PendingRequest) => (
+    <button
+      onClick={() => handleCancelRequest(request)}
+      className="text-body-m font-medium text-brique hover:text-brique/80 hover:underline"
+    >
+      Retirer cette garde
+    </button>
+  );
+
+  const emptyState = (icon: JSX.Element, title: string, subtitle: string) => (
+    <div className="py-12 text-center">
+      <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-fond">
+        {icon}
+      </div>
+      <p className="mb-2 text-muted">{title}</p>
+      <p className="text-caption">{subtitle}</p>
+    </div>
+  );
+
+  // Rend une journee (une ou plusieurs gardes), coloriee par horaire. Chaque
+  // garde porte sa propre couleur (une meme journee peut melanger les creneaux).
+  const renderDay = (
+    date: string,
+    dayShifts: Shift[],
+    renderExtra?: (shift: Shift) => JSX.Element | null,
+  ) => {
+    const isExpanded = expandedDays.has(date);
+    const hasMultipleShifts = dayShifts.length > 1;
+
+    const shiftCard = (shift: Shift, withDate: boolean) => {
+      const style = getHoraireStyle(shift.shift_type, shift.date);
+      return (
+        <div key={shift.id} className={`rounded-card p-4 ${style.cardClass}`}>
+          {withDate && (
+            <div className="mb-3 font-semibold capitalize text-ink">{formatDate(date)}</div>
+          )}
+          {shiftInfoGrid(shift)}
+          {shift.coordinator_note && coordinatorNote(shift.coordinator_note)}
+          {renderExtra && <div className="mt-3">{renderExtra(shift)}</div>}
+        </div>
+      );
+    };
+
+    if (!hasMultipleShifts) {
+      return <div key={date}>{shiftCard(dayShifts[0], true)}</div>;
+    }
+
+    return (
+      <div key={date} className="overflow-hidden rounded-card border border-border">
+        <button
+          onClick={() => toggleDayExpansion(date)}
+          className="flex w-full items-center justify-between bg-fond p-4 text-left transition-colors hover:bg-border/40"
+        >
+          <div>
+            <span className="font-semibold capitalize text-ink">{formatDate(date)}</span>
+            <span className="ml-2 text-caption">({dayShifts.length} gardes)</span>
+          </div>
+          {isExpanded ? (
+            <ChevronUp className="h-5 w-5 text-muted" />
+          ) : (
+            <ChevronDown className="h-5 w-5 text-muted" />
+          )}
+        </button>
+        {isExpanded && (
+          <div className="space-y-2 bg-carte p-2">
+            {dayShifts.map((shift) => shiftCard(shift, false))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {error && (
-        <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 rounded-card border-2 border-brique/20 bg-brique/10 p-4">
+          <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-brique" />
           <div className="flex-1">
-            <p className="text-red-900 font-medium mb-1">Impossible de retirer cette demande</p>
-            <p className="text-red-700 text-sm">{error}</p>
+            <p className="mb-1 font-medium text-brique">Impossible de retirer cette demande</p>
+            <p className="text-body-m text-brique/80">{error}</p>
           </div>
           <button
             onClick={() => setError(null)}
-            className="p-1 hover:bg-red-100 rounded transition-colors"
+            className="rounded p-1 transition-colors hover:bg-brique/10"
           >
-            <X className="w-4 h-4 text-red-600" />
+            <X className="h-4 w-4 text-brique" />
           </button>
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-pink-100 rounded-lg">
-            <CalendarCheck className="w-6 h-6 text-pink-600" />
+      <div className="rounded-card border border-border bg-carte p-6 shadow-card">
+        <div className="mb-6 flex items-center gap-3">
+          <div className="rounded-pill bg-canard/10 p-2">
+            <CalendarCheck className="h-6 w-6 text-canard" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-teal-900">Mes Gardes</h2>
-            <p className="text-sm text-gray-600">Consultez vos gardes confirmées et en attente</p>
+            <h2 className="text-h2 text-ink">Mes gardes</h2>
+            <p className="text-caption">Consultez vos gardes confirmées et en attente</p>
           </div>
         </div>
 
-        <div className="flex gap-2 mb-6">
-          <button
-            onClick={() => setViewMode('confirmed')}
-            className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
-              viewMode === 'confirmed'
-                ? 'bg-green-500 text-white shadow-md'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Mes gardes confirmées
-          </button>
-          <button
-            onClick={() => setViewMode('pending')}
-            className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
-              viewMode === 'pending'
-                ? 'bg-gray-700 text-white shadow-md'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Mes gardes en attente
-          </button>
+        <div className="mb-6">
+          <Segmented
+            ariaLabel="Filtre des gardes"
+            value={viewMode}
+            onChange={setViewMode}
+            options={[
+              { value: 'confirmed', label: 'Confirmées' },
+              { value: 'pending', label: 'En attente' },
+            ]}
+          />
         </div>
 
         {loading ? (
-          <div className="text-center py-12 text-gray-500">Chargement...</div>
+          <div className="py-12 text-center text-muted">Chargement…</div>
         ) : viewMode === 'confirmed' ? (
           confirmedDates.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
-                <CalendarCheck className="w-8 h-8 text-gray-400" />
-              </div>
-              <p className="text-gray-600 mb-2">Aucune garde confirmée</p>
-              <p className="text-sm text-gray-500">Consultez le calendrier pour demander des gardes</p>
-            </div>
+            emptyState(
+              <CalendarCheck className="h-8 w-8 text-faint" />,
+              'Aucune garde confirmée',
+              'Consultez le calendrier pour demander des gardes',
+            )
           ) : (
             <div className="space-y-3">
-              {confirmedDates.map((date) => {
-                const dayShifts = groupedConfirmedShifts[date];
-                const isExpanded = expandedDays.has(date);
-                const hasMultipleShifts = dayShifts.length > 1;
-
-                return (
-                  <div key={date} className="border border-gray-200 rounded-lg overflow-hidden">
-                    {hasMultipleShifts ? (
-                      <>
-                        <button
-                          onClick={() => toggleDayExpansion(date)}
-                          className="w-full flex items-center justify-between p-4 bg-green-50 hover:bg-green-100 transition-colors text-left"
-                        >
-                          <div>
-                            <span className="font-semibold text-gray-900">{formatDate(date)}</span>
-                            <span className="ml-2 text-sm text-gray-600">({dayShifts.length} gardes)</span>
-                          </div>
-                          {isExpanded ? (
-                            <ChevronUp className="w-5 h-5 text-gray-600" />
-                          ) : (
-                            <ChevronDown className="w-5 h-5 text-gray-600" />
-                          )}
-                        </button>
-                        {isExpanded && (
-                          <div className="divide-y divide-gray-200">
-                            {dayShifts.map((shift) => (
-                              <div key={shift.id} className={`p-4 ${getShiftColor(shift.shift_type)}`}>
-                                <div className="grid grid-cols-3 gap-4">
-                                  <div className="flex items-center gap-2">
-                                    <MapPin className="w-4 h-4 text-gray-700" />
-                                    <span className="text-sm font-medium text-gray-900">{shift.location}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <Calendar className="w-4 h-4 text-gray-700" />
-                                    <span className="text-sm font-medium text-gray-900">{shift.room}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <Clock className="w-4 h-4 text-gray-700" />
-                                    <span className="text-sm font-medium text-gray-900">{shift.shift_type}</span>
-                                  </div>
-                                </div>
-                                {shift.coordinator_note && (
-                                  <div className="flex items-start gap-2 mt-3 pt-3 border-t border-gray-300">
-                                    <FileText className="w-4 h-4 text-teal-600 flex-shrink-0 mt-0.5" />
-                                    <p className="text-sm text-gray-700">{shift.coordinator_note}</p>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className={`p-4 ${dayShifts.length > 0 ? getShiftColor(dayShifts[0].shift_type) : 'bg-white'}`}>
-                        <div className="mb-3">
-                          <span className="font-semibold text-gray-900">{formatDate(date)}</span>
-                        </div>
-                        {dayShifts.map((shift) => (
-                          <div key={shift.id}>
-                            <div className="grid grid-cols-3 gap-4">
-                              <div className="flex items-center gap-2">
-                                <MapPin className="w-4 h-4 text-gray-700" />
-                                <span className="text-sm font-medium text-gray-900">{shift.location}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Calendar className="w-4 h-4 text-gray-700" />
-                                <span className="text-sm font-medium text-gray-900">{shift.room}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Clock className="w-4 h-4 text-gray-700" />
-                                <span className="text-sm font-medium text-gray-900">{shift.shift_type}</span>
-                              </div>
-                            </div>
-                            {shift.coordinator_note && (
-                              <div className="flex items-start gap-2 mt-3 pt-3 border-t border-gray-300">
-                                <FileText className="w-4 h-4 text-teal-600 flex-shrink-0 mt-0.5" />
-                                <p className="text-sm text-gray-700">{shift.coordinator_note}</p>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {confirmedDates.map((date) => renderDay(date, groupedConfirmedShifts[date]))}
             </div>
           )
         ) : (
           pendingDates.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
-                <Calendar className="w-8 h-8 text-gray-400" />
-              </div>
-              <p className="text-gray-600 mb-2">Aucune garde en attente</p>
-              <p className="text-sm text-gray-500">Utilisez le calendrier pour demander des gardes</p>
-            </div>
+            emptyState(
+              <Calendar className="h-8 w-8 text-faint" />,
+              'Aucune garde en attente',
+              'Utilisez le calendrier pour demander des gardes',
+            )
           ) : (
             <div className="space-y-3">
               {pendingDates.map((date) => {
@@ -359,97 +333,10 @@ export default function MyScheduleView({ currentUser }: MyScheduleViewProps) {
                   return request && request.status === 'pending';
                 });
                 if (dayShifts.length === 0) return null;
-                const isExpanded = expandedDays.has(date);
-                const hasMultipleShifts = dayShifts.length > 1;
-
-                return (
-                  <div key={date} className="border border-yellow-200 bg-yellow-50 rounded-lg overflow-hidden">
-                    {hasMultipleShifts ? (
-                      <>
-                        <button
-                          onClick={() => toggleDayExpansion(date)}
-                          className="w-full flex items-center justify-between p-4 bg-yellow-100 hover:bg-yellow-200 transition-colors text-left"
-                        >
-                          <div>
-                            <span className="font-semibold text-gray-900">{formatDate(date)}</span>
-                            <span className="ml-2 text-sm text-gray-600">({dayShifts.length} gardes)</span>
-                          </div>
-                          {isExpanded ? (
-                            <ChevronUp className="w-5 h-5 text-gray-600" />
-                          ) : (
-                            <ChevronDown className="w-5 h-5 text-gray-600" />
-                          )}
-                        </button>
-                        {isExpanded && (
-                          <div className="divide-y divide-gray-200">
-                            {dayShifts.map((shift) => {
-                              const request = pendingRequests.find(r => r.shift_id === shift.id);
-                              if (!request) return null;
-                              return (
-                                <div key={shift.id} className="p-4 bg-white">
-                                  <div className="grid grid-cols-3 gap-4 mb-3">
-                                    <div className="flex items-center gap-2">
-                                      <MapPin className="w-4 h-4 text-gray-600" />
-                                      <span className="text-sm font-medium">{shift.location}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <Calendar className="w-4 h-4 text-gray-600" />
-                                      <span className="text-sm font-medium">{shift.room}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <Clock className="w-4 h-4 text-gray-600" />
-                                      <span className="text-sm font-medium">{shift.shift_type}</span>
-                                    </div>
-                                  </div>
-                                  <button
-                                    onClick={() => handleCancelRequest(request)}
-                                    className="text-sm text-red-600 hover:text-red-700 font-medium hover:underline"
-                                  >
-                                    Retirer cette garde
-                                  </button>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="p-4 bg-white">
-                        <div className="mb-3">
-                          <span className="font-semibold text-gray-900">{formatDate(date)}</span>
-                        </div>
-                        {dayShifts.map((shift) => {
-                          const request = pendingRequests.find(r => r.shift_id === shift.id);
-                          if (!request) return null;
-                          return (
-                            <div key={shift.id}>
-                              <div className="grid grid-cols-3 gap-4 mb-3">
-                                <div className="flex items-center gap-2">
-                                  <MapPin className="w-4 h-4 text-gray-600" />
-                                  <span className="text-sm font-medium">{shift.location}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Calendar className="w-4 h-4 text-gray-600" />
-                                  <span className="text-sm font-medium">{shift.room}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Clock className="w-4 h-4 text-gray-600" />
-                                  <span className="text-sm font-medium">{shift.shift_type}</span>
-                                </div>
-                              </div>
-                              <button
-                                onClick={() => handleCancelRequest(request)}
-                                className="text-sm text-red-600 hover:text-red-700 font-medium hover:underline"
-                              >
-                                Retirer cette garde
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
+                return renderDay(date, dayShifts, (shift) => {
+                  const request = pendingRequests.find(r => r.shift_id === shift.id);
+                  return request ? removeButton(request) : null;
+                });
               })}
             </div>
           )
