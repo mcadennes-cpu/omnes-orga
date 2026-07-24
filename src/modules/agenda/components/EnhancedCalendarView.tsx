@@ -5,7 +5,6 @@ import CalendarFilters from './calendar/CalendarFilters';
 import WeekView from './calendar/WeekView';
 import MonthView from './calendar/MonthView';
 import DoctorWeekSummaryView from './DoctorWeekSummaryView';
-import ShiftRequestModal from './ShiftRequestModal';
 import CreateShiftModal from './CreateShiftModal';
 import ShiftDetailModal from './ShiftDetailModal';
 import SaveWeekTemplateModal from './SaveWeekTemplateModal';
@@ -30,7 +29,6 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
   const [doctorFilter, setDoctorFilter] = useState('all');
   const [shiftTypeFilter, setShiftTypeFilter] = useState('all');
   const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
-  const [showRequestModal, setShowRequestModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
@@ -166,9 +164,7 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
 
   const handleShiftClick = (shift: Shift) => {
     setSelectedShift(shift);
-    if (currentUser.role === 'doctor' && shift.status === 'free') {
-      setShowRequestModal(true);
-    } else if (currentUser.role === 'coordinator') {
+    if (currentUser.role === 'coordinator') {
       setShowDetailModal(true);
     }
   };
@@ -351,18 +347,6 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
           </>
         )}
       </div>
-
-      {showRequestModal && selectedShift && (
-        <ShiftRequestModal
-          shift={selectedShift}
-          doctorId={currentUser.id}
-          onClose={() => {
-            setShowRequestModal(false);
-            setSelectedShift(null);
-          }}
-          onSuccess={loadShifts}
-        />
-      )}
 
       {showCreateModal && (
         <CreateShiftModal
