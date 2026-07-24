@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase, Shift, Profile } from '../lib/supabase';
 import { Calendar, MapPin, Clock, Users, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import Avatar from '../../../components/common/Avatar';
+import { getHoraireStyle } from '../lib/horaireStyles';
 
 type ShiftWithDoctor = Shift & {
   assigned_doctor: Profile | null;
@@ -10,6 +12,20 @@ type Site = {
   id: number;
   name: string;
 };
+
+// Champ date / select a la charte Omnes (focus canard).
+const fieldClass =
+  'rounded-input border border-border bg-carte px-4 py-2 text-body-m text-ink ' +
+  'focus:border-canard focus:outline-none focus:ring-2 focus:ring-canard/30';
+
+// Le module lit la base Planning : les profils n'ont pas de photo (elles vivent
+// cote Orga, cf. etape 7). On decoupe donc juste le nom complet pour alimenter
+// <Avatar> : initiales + couleur deterministe. Quand les donnees seront
+// unifiees, il suffira de passer photo_url pour afficher la vraie photo.
+function toAvatarProfile(fullName: string) {
+  const parts = (fullName || '').trim().split(/\s+/);
+  return { prenom: parts[0] || '', nom: parts.slice(1).join(' ') };
+}
 
 export default function DailyScheduleView() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -101,78 +117,52 @@ export default function DailyScheduleView() {
 
   const doctorNames = Object.keys(groupedShifts).sort();
 
-  const getDoctorColor = (doctorName: string) => {
-    const pastelColors = [
-      'bg-blue-100',
-      'bg-pink-100',
-      'bg-purple-100',
-      'bg-yellow-100',
-      'bg-orange-100',
-      'bg-rose-100',
-      'bg-cyan-100',
-      'bg-lime-100',
-      'bg-amber-100',
-      'bg-violet-100',
-      'bg-fuchsia-100',
-      'bg-sky-100',
-      'bg-emerald-100',
-      'bg-indigo-100'
-    ];
-
-    let hash = 0;
-    for (let i = 0; i < doctorName.length; i++) {
-      hash = doctorName.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const index = Math.abs(hash) % pastelColors.length;
-    return pastelColors[index];
-  };
-
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-teal-100 rounded-lg">
-            <Users className="w-6 h-6 text-teal-600" />
+      <div className="rounded-card border border-border bg-carte p-6 shadow-card">
+        <div className="mb-6 flex items-center gap-3">
+          <div className="rounded-pill bg-canard/10 p-2">
+            <Users className="h-6 w-6 text-canard" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-teal-900">Planning du jour</h2>
-            <p className="text-sm text-gray-600">Consultez les médecins assignés pour une journée</p>
+            <h2 className="text-h2 text-ink">Planning du jour</h2>
+            <p className="text-caption">Consultez les médecins assignés pour une journée</p>
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-4 mb-6">
+        <div className="mb-6 flex items-center justify-between gap-4">
           <button
             onClick={() => changeDate(-1)}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="rounded-pill p-2 transition-colors hover:bg-fond"
           >
-            <ChevronLeft className="w-5 h-5 text-gray-700" />
+            <ChevronLeft className="h-5 w-5 text-marine" />
           </button>
 
-          <div className="flex-1 flex items-center gap-3">
-            <Calendar className="w-5 h-5 text-teal-600" />
+          <div className="flex flex-1 items-center gap-3">
+            <Calendar className="h-5 w-5 flex-shrink-0 text-canard" />
             <input
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className={`flex-1 ${fieldClass}`}
             />
           </div>
 
           <button
             onClick={() => changeDate(1)}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="rounded-pill p-2 transition-colors hover:bg-fond"
           >
-            <ChevronRight className="w-5 h-5 text-gray-700" />
+            <ChevronRight className="h-5 w-5 text-marine" />
           </button>
         </div>
 
         <div className="mb-6">
           <div className="flex items-center gap-3">
-            <MapPin className="w-5 h-5 text-teal-600" />
+            <MapPin className="h-5 w-5 flex-shrink-0 text-canard" />
             <select
               value={selectedSite}
               onChange={(e) => setSelectedSite(e.target.value)}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              className={`flex-1 ${fieldClass}`}
             >
               <option value="all">Tous les sites</option>
               {sites.map((site) => (
@@ -184,57 +174,63 @@ export default function DailyScheduleView() {
           </div>
         </div>
 
-        <div className="text-center mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">{formatDate(selectedDate)}</h3>
+        <div className="mb-6 text-center">
+          <h3 className="text-h2 capitalize text-ink">{formatDate(selectedDate)}</h3>
         </div>
 
         {loading ? (
-          <div className="text-center py-12 text-gray-500">Chargement...</div>
+          <div className="py-12 text-center text-muted">Chargement…</div>
         ) : doctorNames.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
-              <Users className="w-8 h-8 text-gray-400" />
+          <div className="py-12 text-center">
+            <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-fond">
+              <Users className="h-8 w-8 text-faint" />
             </div>
-            <p className="text-gray-600 mb-2">Aucun médecin assigné</p>
-            <p className="text-sm text-gray-500">Il n'y a pas de gardes assignées pour cette date</p>
+            <p className="mb-2 text-muted">Aucun médecin assigné</p>
+            <p className="text-caption">Il n'y a pas de gardes assignées pour cette date</p>
           </div>
         ) : (
           <div className="space-y-4">
             {doctorNames.map((doctorName) => {
               const doctorShifts = groupedShifts[doctorName];
               return (
-                <div key={doctorName} className="border border-gray-200 rounded-lg overflow-hidden">
-                  <div className={`${getDoctorColor(doctorName)} px-4 py-3 border-b border-gray-200`}>
-                    <h4 className="font-semibold text-gray-900">{doctorName}</h4>
+                <div key={doctorName} className="overflow-hidden rounded-card border border-border">
+                  <div className="flex items-center gap-3 bg-fond px-4 py-3">
+                    <Avatar profile={toAvatarProfile(doctorName)} size={40} />
+                    <div>
+                      <h4 className="text-body-l font-semibold text-ink">{doctorName}</h4>
+                      <p className="text-caption">
+                        {doctorShifts.length} garde{doctorShifts.length > 1 ? 's' : ''}
+                      </p>
+                    </div>
                   </div>
-                  <div className="p-4 space-y-3">
-                    {doctorShifts.map((shift) => (
-                      <div
-                        key={shift.id}
-                        className="p-3 bg-gray-50 rounded-lg"
-                      >
-                        <div className="flex flex-wrap items-center gap-4">
-                          <div className="flex items-center gap-2 min-w-[120px]">
-                            <MapPin className="w-4 h-4 text-teal-600 flex-shrink-0" />
-                            <span className="text-sm font-medium text-gray-900">{shift.location}</span>
+                  <div className="space-y-2 p-3">
+                    {doctorShifts.map((shift) => {
+                      const style = getHoraireStyle(shift.shift_type, shift.date);
+                      return (
+                        <div key={shift.id} className={`rounded-card p-3 ${style.cardClass}`}>
+                          <div className="flex flex-wrap items-center gap-4">
+                            <div className="flex min-w-[120px] items-center gap-2">
+                              <MapPin className="h-4 w-4 flex-shrink-0 text-muted" />
+                              <span className="text-body-m font-medium text-ink">{shift.location}</span>
+                            </div>
+                            <div className="flex min-w-[100px] items-center gap-2">
+                              <Calendar className="h-4 w-4 flex-shrink-0 text-muted" />
+                              <span className="text-body-m text-ink">{shift.room}</span>
+                            </div>
+                            <div className="flex min-w-[120px] items-center gap-2">
+                              <Clock className="h-4 w-4 flex-shrink-0 text-muted" />
+                              <span className="text-body-m text-ink">{shift.shift_type}</span>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 min-w-[100px]">
-                            <Calendar className="w-4 h-4 text-teal-600 flex-shrink-0" />
-                            <span className="text-sm text-gray-700">{shift.room}</span>
-                          </div>
-                          <div className="flex items-center gap-2 min-w-[120px]">
-                            <Clock className="w-4 h-4 text-teal-600 flex-shrink-0" />
-                            <span className="text-sm text-gray-700">{shift.shift_type}</span>
-                          </div>
+                          {shift.coordinator_note && (
+                            <div className="mt-2 flex items-start gap-2 border-t border-border pt-2">
+                              <FileText className="mt-0.5 h-4 w-4 flex-shrink-0 text-canard" />
+                              <p className="text-body-m text-ink">{shift.coordinator_note}</p>
+                            </div>
+                          )}
                         </div>
-                        {shift.coordinator_note && (
-                          <div className="flex items-start gap-2 mt-2 pt-2 border-t border-gray-200">
-                            <FileText className="w-4 h-4 text-teal-600 flex-shrink-0 mt-0.5" />
-                            <p className="text-sm text-gray-700">{shift.coordinator_note}</p>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               );
