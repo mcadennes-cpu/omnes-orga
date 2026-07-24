@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { supabase, Shift } from '../lib/supabase';
-import { X, UserPlus, Repeat } from 'lucide-react';
+import { Repeat } from 'lucide-react';
 import { getRotationSettings, getRotationWeek } from '../lib/rotationUtils';
 import { checkDoctorDailyConflict } from '../lib/shiftValidation';
 import ConflictErrorModal from './ConflictErrorModal';
+import BottomSheet from './ui/BottomSheet';
 
 type Doctor = {
   id: string;
@@ -329,50 +330,47 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
 
   if (showRotationPrompt) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <Repeat className="w-6 h-6 text-blue-600" />
-              <h2 className="text-xl font-bold text-gray-900">Appliquer au roulement ?</h2>
-            </div>
+      <BottomSheet title="Appliquer au roulement ?" onClose={onClose} busy={loading}>
+        <div className="mb-4 flex items-start gap-3">
+          <div className="rounded-pill bg-canard/10 p-2">
+            <Repeat className="h-5 w-5 text-canard" />
           </div>
-
-          <p className="text-gray-700 mb-6">
-            Voulez-vous appliquer ce médecin à toutes les gardes correspondantes de la même semaine de roulement (même jour, même site, même salle, même horaire) ?
+          <p className="text-body-m text-ink">
+            Voulez-vous appliquer ce médecin à toutes les gardes correspondantes de la même
+            semaine de roulement (même jour, même site, même salle, même horaire) ?
           </p>
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
-          )}
-
-          <div className="space-y-3">
-            <button
-              onClick={handleOnlyThisShift}
-              disabled={loading}
-              className="w-full px-4 py-3 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-            >
-              Assigner seulement cette garde
-            </button>
-            <button
-              onClick={handleApplyToRotation}
-              disabled={loading}
-              className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
-            >
-              {loading ? 'Application...' : 'Assigner pour la semaine de roulement'}
-            </button>
-            <button
-              onClick={handleCancelAssignment}
-              disabled={loading}
-              className="w-full px-4 py-3 border-2 border-red-300 text-red-700 font-semibold rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
-            >
-              Annuler
-            </button>
-          </div>
         </div>
-      </div>
+
+        {error && (
+          <div className="mb-4 rounded-input border border-brique/20 bg-brique/10 p-3">
+            <p className="text-body-m text-brique">{error}</p>
+          </div>
+        )}
+
+        <div className="space-y-3">
+          <button
+            onClick={handleOnlyThisShift}
+            disabled={loading}
+            className="w-full rounded-input border border-border px-4 py-3 text-button text-marine transition-colors hover:bg-fond disabled:opacity-50"
+          >
+            Assigner seulement cette garde
+          </button>
+          <button
+            onClick={handleApplyToRotation}
+            disabled={loading}
+            className="w-full rounded-input bg-marine px-4 py-3 text-button text-white shadow-button transition-colors hover:bg-marine/90 disabled:opacity-50"
+          >
+            {loading ? 'Application…' : 'Assigner pour la semaine de roulement'}
+          </button>
+          <button
+            onClick={handleCancelAssignment}
+            disabled={loading}
+            className="w-full rounded-input border border-brique/30 px-4 py-3 text-button text-brique transition-colors hover:bg-brique/5 disabled:opacity-50"
+          >
+            Annuler
+          </button>
+        </div>
+      </BottomSheet>
     );
   }
 
@@ -389,100 +387,90 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <UserPlus className="w-6 h-6 text-teal-600" />
-            <h2 className="text-xl font-bold text-teal-900">Assigner un médecin</h2>
-          </div>
+    <BottomSheet
+      title="Assigner un médecin"
+      onClose={onClose}
+      busy={loading}
+      footer={
+        <>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            disabled={loading}
+            className="h-12 flex-1 rounded-input border border-border text-button text-marine disabled:opacity-50"
           >
-            <X className="w-5 h-5 text-gray-600" />
+            Annuler
           </button>
-        </div>
-
-        <div className="space-y-4">
-          {shift.status === 'pending' && pendingRequesters.length > 0 && (
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-3">
-                Médecins ayant demandé cette garde
-              </label>
-              <div className="space-y-2 mb-4">
-                {pendingRequesters.map((doctor) => (
-                  <button
-                    key={doctor.id}
-                    onClick={() => setSelectedDoctorId(doctor.id)}
-                    className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
-                      selectedDoctorId === doctor.id
-                        ? 'border-teal-600 bg-teal-50'
-                        : 'border-gray-200 hover:border-teal-300 bg-white'
-                    }`}
-                  >
-                    <div className="font-semibold text-gray-900">{doctor.full_name}</div>
-                    <div className="text-sm text-gray-600">{doctor.email}</div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      Demandé le {new Date(doctor.requestedAt!).toLocaleDateString('fr-FR', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </div>
-                  </button>
-                ))}
-              </div>
-              <div className="text-sm text-gray-600 mb-2">Ou choisir un autre médecin :</div>
-            </div>
-          )}
+          <button
+            onClick={handleAssign}
+            disabled={loading || !selectedDoctorId}
+            className="h-12 flex-1 rounded-input bg-marine text-button text-white shadow-button transition-colors hover:bg-marine/90 disabled:opacity-50"
+          >
+            {loading ? 'Assignation…' : 'Confirmer'}
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        {shift.status === 'pending' && pendingRequesters.length > 0 && (
           <div>
-            {!(shift.status === 'pending' && pendingRequesters.length > 0) && (
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Sélectionner un médecin
-              </label>
-            )}
-            <select
-              value={selectedDoctorId}
-              onChange={(e) => setSelectedDoctorId(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-              disabled={loading}
-            >
-              <option value="">-- Choisir un médecin --</option>
-              {doctors.map((doctor) => (
-                <option key={doctor.id} value={doctor.id}>
-                  {doctor.full_name} ({doctor.email})
-                </option>
+            <label className="mb-3 block text-field-label">
+              Médecins ayant demandé cette garde
+            </label>
+            <div className="mb-4 space-y-2">
+              {pendingRequesters.map((doctor) => (
+                <button
+                  key={doctor.id}
+                  onClick={() => setSelectedDoctorId(doctor.id)}
+                  className={`w-full rounded-card border-2 p-3 text-left transition-all ${
+                    selectedDoctorId === doctor.id
+                      ? 'border-canard bg-canard/5'
+                      : 'border-border bg-carte hover:border-canard/50'
+                  }`}
+                >
+                  <div className="font-semibold text-ink">{doctor.full_name}</div>
+                  <div className="text-caption">{doctor.email}</div>
+                  <div className="mt-1 text-caption">
+                    Demandé le {new Date(doctor.requestedAt!).toLocaleDateString('fr-FR', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </div>
+                </button>
               ))}
-            </select>
-          </div>
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <p className="text-sm text-red-800">{error}</p>
             </div>
-          )}
-
-          <div className="flex gap-3 pt-2">
-            <button
-              onClick={onClose}
-              disabled={loading}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-            >
-              Annuler
-            </button>
-            <button
-              onClick={handleAssign}
-              disabled={loading || !selectedDoctorId}
-              className="flex-1 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
-            >
-              {loading ? 'Assignation...' : 'Confirmer'}
-            </button>
+            <div className="mb-2 text-caption">Ou choisir un autre médecin :</div>
           </div>
+        )}
+        <div>
+          {!(shift.status === 'pending' && pendingRequesters.length > 0) && (
+            <label className="mb-2 block text-field-label">
+              Sélectionner un médecin
+            </label>
+          )}
+          <select
+            value={selectedDoctorId}
+            onChange={(e) => setSelectedDoctorId(e.target.value)}
+            className="w-full rounded-input border border-border bg-carte px-4 py-2 text-body-m text-ink focus:border-canard focus:outline-none focus:ring-2 focus:ring-canard/30"
+            disabled={loading}
+          >
+            <option value="">-- Choisir un médecin --</option>
+            {doctors.map((doctor) => (
+              <option key={doctor.id} value={doctor.id}>
+                {doctor.full_name} ({doctor.email})
+              </option>
+            ))}
+          </select>
         </div>
+
+        {error && (
+          <div className="rounded-input border border-brique/20 bg-brique/10 p-3">
+            <p className="text-body-m text-brique">{error}</p>
+          </div>
+        )}
       </div>
-    </div>
+    </BottomSheet>
   );
 }

@@ -23,9 +23,11 @@ type BottomSheetProps = {
   ariaLabel?: string;
 };
 
-// Primitive de modale bottom-sheet a la charte Omnes, reutilisee par toutes les
-// modales du module (evite de reimplementer createPortal + scroll-lock + Escape
-// dans chacune). Pattern calque sur src/components/common/AvatarUploadModal.jsx.
+// Primitive de modale du module, reutilisee par toutes les modales.
+// RESPONSIVE : feuille qui remonte du bas sur mobile (pattern tactile), et
+// rectangle centre a coins arrondis sur ordinateur (>= md, ecrans coordinateur
+// de Charlotte). Meme composant, deux presentations selon la taille d'ecran.
+// Pattern mobile calque sur src/components/common/AvatarUploadModal.jsx.
 export default function BottomSheet({
   open,
   onClose,
@@ -61,14 +63,14 @@ export default function BottomSheet({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-overlay"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-overlay md:items-center md:p-4"
       onClick={handleBackdrop}
       role="dialog"
       aria-modal="true"
       aria-label={typeof title === 'string' ? title : ariaLabel}
     >
       <div
-        className={`w-full ${maxWidthClass} max-h-[92vh] overflow-y-auto rounded-t-card bg-carte shadow-card animate-slide-up`}
+        className={`w-full ${maxWidthClass} max-h-[92vh] overflow-y-auto rounded-t-card bg-carte shadow-card animate-slide-up md:max-h-[85vh] md:rounded-card md:animate-none`}
       >
         {title && (
           <header className="sticky top-0 z-10 flex h-14 items-center justify-center border-b border-border bg-carte px-4">
