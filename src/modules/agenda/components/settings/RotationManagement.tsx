@@ -9,6 +9,10 @@ type RotationSettings = {
   cycle_length_weeks: number;
 };
 
+const fieldClass =
+  'w-full rounded-input border border-border bg-carte px-4 py-2 text-body-m text-ink ' +
+  'focus:border-canard focus:outline-none focus:ring-2 focus:ring-canard/30';
+
 export default function RotationManagement() {
   const [settings, setSettings] = useState<RotationSettings | null>(null);
   const [startDate, setStartDate] = useState('');
@@ -94,38 +98,34 @@ export default function RotationManagement() {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 bg-blue-100 rounded-lg">
-          <Repeat className="w-6 h-6 text-blue-600" />
+    <div className="rounded-card border border-border bg-carte p-6 shadow-card">
+      <div className="mb-6 flex items-center gap-3">
+        <div className="rounded-pill bg-canard/10 p-2">
+          <Repeat className="h-6 w-6 text-canard" />
         </div>
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Paramètres du roulement</h2>
-          <p className="text-sm text-gray-600">Configuration du cycle de rotation des gardes</p>
+          <h2 className="text-h2 text-ink">Paramètres du roulement</h2>
+          <p className="text-caption">Configuration du cycle de rotation des gardes</p>
         </div>
       </div>
 
       <div className="space-y-6">
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Début du roulement
-          </label>
-          <p className="text-xs text-gray-600 mb-2">
+          <label className="mb-2 block text-field-label">Début du roulement</label>
+          <p className="mb-2 text-caption">
             Date de début de la semaine 1 du roulement (de préférence un lundi)
           </p>
           <input
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className={fieldClass}
           />
         </div>
 
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Durée du roulement (en semaines)
-          </label>
-          <p className="text-xs text-gray-600 mb-2">
+          <label className="mb-2 block text-field-label">Durée du roulement (en semaines)</label>
+          <p className="mb-2 text-caption">
             Nombre de semaines dans un cycle complet de rotation (entre 1 et 52)
           </p>
           <input
@@ -134,18 +134,18 @@ export default function RotationManagement() {
             max="52"
             value={cycleLength}
             onChange={(e) => setCycleLength(parseInt(e.target.value) || 1)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className={fieldClass}
           />
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+          <div className="rounded-input border border-brique/20 bg-brique/10 px-4 py-3 text-body-m text-brique">
             {error}
           </div>
         )}
 
         {success && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
+          <div className="rounded-input border border-green-300 bg-green-100 px-4 py-3 text-body-m text-green-800">
             {success}
           </div>
         )}
@@ -153,10 +153,10 @@ export default function RotationManagement() {
         <button
           onClick={handleSave}
           disabled={loading || !startDate || cycleLength < 1 || cycleLength > 52}
-          className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 rounded-input bg-marine px-6 py-3 text-button text-white shadow-button transition-colors hover:bg-marine/90 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <Save className="w-4 h-4" />
-          {loading ? 'Enregistrement...' : 'Enregistrer les paramètres'}
+          <Save className="h-4 w-4" />
+          {loading ? 'Enregistrement…' : 'Enregistrer les paramètres'}
         </button>
       </div>
     </div>

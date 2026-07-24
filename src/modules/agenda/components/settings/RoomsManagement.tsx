@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase, Room, Site } from '../../lib/supabase';
 import { DoorOpen, Plus, Edit2, Trash2, Check, X, AlertCircle } from 'lucide-react';
+import BottomSheet from '../ui/BottomSheet';
+
+const fieldClass =
+  'w-full rounded-input border border-border bg-carte px-3 py-2 text-body-m text-ink ' +
+  'focus:border-canard focus:outline-none focus:ring-2 focus:ring-canard/30';
 
 export default function RoomsManagement() {
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -147,52 +152,52 @@ export default function RoomsManagement() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-6">
+      <div className="rounded-card border border-border bg-carte p-6 shadow-card">
+        <div className="mb-6 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <DoorOpen className="w-6 h-6 text-green-600" />
+            <div className="rounded-pill bg-canard/10 p-2">
+              <DoorOpen className="h-6 w-6 text-canard" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-teal-900">Gestion des Salles</h2>
-              <p className="text-sm text-gray-600">Gérez les salles de consultation par site</p>
+              <h2 className="text-h2 text-ink">Gestion des salles</h2>
+              <p className="text-caption">Gérez les salles de consultation par site</p>
             </div>
           </div>
 
           <button
             onClick={() => setShowCreateModal(true)}
-            className="bg-pink-500 hover:bg-pink-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
+            className="flex items-center gap-2 rounded-input bg-marine px-4 py-2 text-button text-white shadow-button transition-colors hover:bg-marine/90"
           >
-            <Plus className="w-5 h-5" />
-            Nouvelle Salle
+            <Plus className="h-5 w-5" />
+            Nouvelle salle
           </button>
         </div>
 
-        <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
           {sites.filter(s => s.is_active).map((site) => {
             const roomCount = getRoomCount(site.id);
             return (
-              <div key={site.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <div className="flex items-center gap-2 mb-2">
+              <div key={site.id} className="rounded-card border border-border bg-fond p-4">
+                <div className="mb-2 flex items-center gap-2">
                   <div
-                    className="w-4 h-4 rounded"
+                    className="h-4 w-4 rounded-pill"
                     style={{ backgroundColor: site.color || '#3B82F6' }}
                   />
-                  <h3 className="font-semibold text-gray-900">{site.name}</h3>
+                  <h3 className="font-semibold text-ink">{site.name}</h3>
                 </div>
-                <p className="text-2xl font-bold text-teal-700">{roomCount}</p>
-                <p className="text-xs text-gray-600">salle{roomCount > 1 ? 's' : ''} active{roomCount > 1 ? 's' : ''}</p>
+                <p className="text-h1 text-canard">{roomCount}</p>
+                <p className="text-caption">salle{roomCount > 1 ? 's' : ''} active{roomCount > 1 ? 's' : ''}</p>
               </div>
             );
           })}
         </div>
 
         <div className="mb-4 flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700">Filtrer par site:</label>
+          <label className="text-field-label">Filtrer par site :</label>
           <select
             value={filterSite}
             onChange={(e) => setFilterSite(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+            className="rounded-input border border-border bg-carte px-3 py-2 text-body-m text-ink focus:border-canard focus:outline-none focus:ring-2 focus:ring-canard/30"
           >
             <option value="all">Tous les sites</option>
             {sites.filter(s => s.is_active).map((site) => (
@@ -202,25 +207,25 @@ export default function RoomsManagement() {
         </div>
 
         {loading ? (
-          <div className="text-center py-12 text-gray-500">Chargement...</div>
+          <div className="py-12 text-center text-muted">Chargement…</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b-2 border-gray-200">
+              <thead className="border-b border-border bg-fond">
                 <tr>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Site</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Nom de la salle</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Statut</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Créée le</th>
-                  <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Actions</th>
+                  <th className="px-4 py-3 text-left text-field-label">Site</th>
+                  <th className="px-4 py-3 text-left text-field-label">Nom de la salle</th>
+                  <th className="px-4 py-3 text-left text-field-label">Statut</th>
+                  <th className="px-4 py-3 text-left text-field-label">Créée le</th>
+                  <th className="px-4 py-3 text-right text-field-label">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-border">
                 {filteredRooms.map((room) => (
-                  <tr key={room.id} className="hover:bg-gray-50">
+                  <tr key={room.id} className="hover:bg-fond">
                     {editingRoom?.id === room.id ? (
                       <>
-                        <td className="px-4 py-3 text-gray-600">
+                        <td className="px-4 py-3 text-body-m text-muted">
                           {room.site?.name}
                         </td>
                         <td className="px-4 py-3">
@@ -228,7 +233,7 @@ export default function RoomsManagement() {
                             type="text"
                             value={editingRoom.name}
                             onChange={(e) => setEditingRoom({ ...editingRoom, name: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                            className={fieldClass}
                           />
                         </td>
                         <td className="px-4 py-3">
@@ -237,27 +242,27 @@ export default function RoomsManagement() {
                               type="checkbox"
                               checked={editingRoom.is_active}
                               onChange={(e) => setEditingRoom({ ...editingRoom, is_active: e.target.checked })}
-                              className="w-4 h-4 text-pink-500 rounded focus:ring-pink-500"
+                              className="h-4 w-4 accent-canard"
                             />
-                            <span className="text-sm">Actif</span>
+                            <span className="text-body-m text-ink">Actif</span>
                           </label>
                         </td>
-                        <td className="px-4 py-3 text-gray-600 text-sm">
+                        <td className="px-4 py-3 text-caption">
                           {new Date(room.created_at).toLocaleDateString('fr-FR')}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-2">
                             <button
                               onClick={() => handleUpdateRoom(editingRoom)}
-                              className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                              className="rounded-pill p-2 text-green-600 transition-colors hover:bg-green-50"
                             >
-                              <Check className="w-5 h-5" />
+                              <Check className="h-5 w-5" />
                             </button>
                             <button
                               onClick={() => setEditingRoom(null)}
-                              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                              className="rounded-pill p-2 text-muted transition-colors hover:bg-fond"
                             >
-                              <X className="w-5 h-5" />
+                              <X className="h-5 w-5" />
                             </button>
                           </div>
                         </td>
@@ -267,41 +272,41 @@ export default function RoomsManagement() {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <div
-                              className="w-3 h-3 rounded"
+                              className="h-3 w-3 rounded-pill"
                               style={{ backgroundColor: room.site?.color || '#3B82F6' }}
                             />
-                            <span className="font-medium text-gray-900">{room.site?.name}</span>
+                            <span className="font-medium text-ink">{room.site?.name}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 font-medium text-gray-900">{room.name}</td>
+                        <td className="px-4 py-3 font-medium text-ink">{room.name}</td>
                         <td className="px-4 py-3">
                           <button
                             onClick={() => handleToggleActive(room)}
-                            className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                            className={`rounded-pill px-3 py-1 text-xs font-semibold ${
                               room.is_active
                                 ? 'bg-green-100 text-green-800'
-                                : 'bg-gray-100 text-gray-600'
+                                : 'bg-fond text-muted'
                             }`}
                           >
                             {room.is_active ? 'Actif' : 'Inactif'}
                           </button>
                         </td>
-                        <td className="px-4 py-3 text-gray-600 text-sm">
+                        <td className="px-4 py-3 text-caption">
                           {new Date(room.created_at).toLocaleDateString('fr-FR')}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-2">
                             <button
                               onClick={() => setEditingRoom(room)}
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              className="rounded-pill p-2 text-canard transition-colors hover:bg-canard/10"
                             >
-                              <Edit2 className="w-5 h-5" />
+                              <Edit2 className="h-5 w-5" />
                             </button>
                             <button
                               onClick={() => handleDeleteRoom(room)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              className="rounded-pill p-2 text-brique transition-colors hover:bg-brique/10"
                             >
-                              <Trash2 className="w-5 h-5" />
+                              <Trash2 className="h-5 w-5" />
                             </button>
                           </div>
                         </td>
@@ -316,73 +321,74 @@ export default function RoomsManagement() {
       </div>
 
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Créer une nouvelle salle</h3>
+        <BottomSheet
+          title="Créer une nouvelle salle"
+          onClose={() => {
+            setShowCreateModal(false);
+            setNewRoom({ siteId: '', name: '' });
+            setError('');
+          }}
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setNewRoom({ siteId: '', name: '' });
+                  setError('');
+                }}
+                className="h-12 flex-1 rounded-input border border-border text-button text-marine"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                form="create-room-form"
+                className="h-12 flex-1 rounded-input bg-marine text-button text-white shadow-button transition-colors hover:bg-marine/90"
+              >
+                Créer
+              </button>
+            </>
+          }
+        >
+          {error && (
+            <div className="mb-4 flex items-start gap-2 rounded-input border border-brique/20 bg-brique/10 px-4 py-3 text-body-m text-brique">
+              <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
 
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm flex items-start gap-2">
-                <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                <span>{error}</span>
-              </div>
-            )}
+          <form id="create-room-form" onSubmit={handleCreateRoom} className="space-y-4">
+            <div>
+              <label className="mb-2 block text-field-label">Site *</label>
+              <select
+                required
+                value={newRoom.siteId}
+                onChange={(e) => setNewRoom({ ...newRoom, siteId: e.target.value })}
+                className={fieldClass}
+              >
+                <option value="">Sélectionnez un site</option>
+                {sites.filter(s => s.is_active).map((site) => (
+                  <option key={site.id} value={site.id}>
+                    {site.name} ({getRoomCount(site.id)}/10 salles)
+                  </option>
+                ))}
+              </select>
+            </div>
 
-            <form onSubmit={handleCreateRoom} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Site *
-                </label>
-                <select
-                  required
-                  value={newRoom.siteId}
-                  onChange={(e) => setNewRoom({ ...newRoom, siteId: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                >
-                  <option value="">Sélectionnez un site</option>
-                  {sites.filter(s => s.is_active).map((site) => (
-                    <option key={site.id} value={site.id}>
-                      {site.name} ({getRoomCount(site.id)}/10 salles)
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nom de la salle *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newRoom.name}
-                  onChange={(e) => setNewRoom({ ...newRoom, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                  placeholder="Ex: Salle 1, Cabinet A..."
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCreateModal(false);
-                    setNewRoom({ siteId: '', name: '' });
-                    setError('');
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 font-medium transition-colors"
-                >
-                  Créer
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+            <div>
+              <label className="mb-2 block text-field-label">Nom de la salle *</label>
+              <input
+                type="text"
+                required
+                value={newRoom.name}
+                onChange={(e) => setNewRoom({ ...newRoom, name: e.target.value })}
+                className={fieldClass}
+                placeholder="Ex : Salle 1, Cabinet A…"
+              />
+            </div>
+          </form>
+        </BottomSheet>
       )}
     </div>
   );

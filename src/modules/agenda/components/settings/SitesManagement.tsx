@@ -1,8 +1,13 @@
 import { useState, useEffect } from 'react';
-import { supabase, Site, Room } from '../../lib/supabase';
-import { Building2, Plus, Edit2, Check, X, DoorOpen, Trash2 } from 'lucide-react';
+import { supabase, Site } from '../../lib/supabase';
+import { Building2, Plus, Edit2, Check, X, DoorOpen } from 'lucide-react';
+import BottomSheet from '../ui/BottomSheet';
 
 type SiteWithRoomCount = Site & { roomCount: number };
+
+const fieldClass =
+  'w-full rounded-input border border-border bg-carte px-3 py-2 text-body-m text-ink ' +
+  'focus:border-canard focus:outline-none focus:ring-2 focus:ring-canard/30';
 
 export default function SitesManagement() {
   const [sites, setSites] = useState<SiteWithRoomCount[]>([]);
@@ -210,47 +215,49 @@ export default function SitesManagement() {
     }
   };
 
+  const roomDelta = managingRoomsSite ? newRoomCount - managingRoomsSite.roomCount : 0;
+
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-6">
+      <div className="rounded-card border border-border bg-carte p-6 shadow-card">
+        <div className="mb-6 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Building2 className="w-6 h-6 text-blue-600" />
+            <div className="rounded-pill bg-canard/10 p-2">
+              <Building2 className="h-6 w-6 text-canard" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-teal-900">Gestion des Sites</h2>
-              <p className="text-sm text-gray-600">Gérez les sites et leurs salles de consultation</p>
+              <h2 className="text-h2 text-ink">Gestion des sites</h2>
+              <p className="text-caption">Gérez les sites et leurs salles de consultation</p>
             </div>
           </div>
 
           <button
             onClick={() => setShowCreateModal(true)}
-            className="bg-pink-500 hover:bg-pink-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
+            className="flex items-center gap-2 rounded-input bg-marine px-4 py-2 text-button text-white shadow-button transition-colors hover:bg-marine/90"
           >
-            <Plus className="w-5 h-5" />
-            Nouveau Site
+            <Plus className="h-5 w-5" />
+            Nouveau site
           </button>
         </div>
 
         {loading ? (
-          <div className="text-center py-12 text-gray-500">Chargement...</div>
+          <div className="py-12 text-center text-muted">Chargement…</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b-2 border-gray-200">
+              <thead className="border-b border-border bg-fond">
                 <tr>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Nom</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Couleur</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Nombre de salles</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Statut</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Créé le</th>
-                  <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Actions</th>
+                  <th className="px-4 py-3 text-left text-field-label">Nom</th>
+                  <th className="px-4 py-3 text-left text-field-label">Couleur</th>
+                  <th className="px-4 py-3 text-left text-field-label">Nombre de salles</th>
+                  <th className="px-4 py-3 text-left text-field-label">Statut</th>
+                  <th className="px-4 py-3 text-left text-field-label">Créé le</th>
+                  <th className="px-4 py-3 text-right text-field-label">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-border">
                 {sites.map((site) => (
-                  <tr key={site.id} className="hover:bg-gray-50">
+                  <tr key={site.id} className="hover:bg-fond">
                     {editingSite?.id === site.id ? (
                       <>
                         <td className="px-4 py-3">
@@ -258,7 +265,7 @@ export default function SitesManagement() {
                             type="text"
                             value={editingSite.name}
                             onChange={(e) => setEditingSite({ ...editingSite, name: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                            className={fieldClass}
                           />
                         </td>
                         <td className="px-4 py-3">
@@ -266,51 +273,49 @@ export default function SitesManagement() {
                             type="color"
                             value={editingSite.color || '#3B82F6'}
                             onChange={(e) => setEditingSite({ ...editingSite, color: e.target.value })}
-                            className="w-16 h-10 border border-gray-300 rounded cursor-pointer"
+                            className="h-10 w-16 cursor-pointer rounded-input border border-border"
                           />
                         </td>
-                        <td className="px-4 py-3 text-gray-700">{site.roomCount} salle{site.roomCount > 1 ? 's' : ''}</td>
+                        <td className="px-4 py-3 text-body-m text-muted">{site.roomCount} salle{site.roomCount > 1 ? 's' : ''}</td>
                         <td className="px-4 py-3">
                           <label className="flex items-center gap-2">
                             <input
                               type="checkbox"
                               checked={editingSite.is_active}
                               onChange={(e) => setEditingSite({ ...editingSite, is_active: e.target.checked })}
-                              className="w-4 h-4 text-pink-500 rounded focus:ring-pink-500"
+                              className="h-4 w-4 accent-canard"
                             />
-                            <span className="text-sm">Actif</span>
+                            <span className="text-body-m text-ink">Actif</span>
                           </label>
                         </td>
-                        <td className="px-4 py-3 text-gray-600 text-sm">
+                        <td className="px-4 py-3 text-caption">
                           {new Date(site.created_at).toLocaleDateString('fr-FR')}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-2">
                             <button
                               onClick={() => handleUpdateSite(editingSite)}
-                              className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                              className="rounded-pill p-2 text-green-600 transition-colors hover:bg-green-50"
                             >
-                              <Check className="w-5 h-5" />
+                              <Check className="h-5 w-5" />
                             </button>
                             <button
                               onClick={() => setEditingSite(null)}
-                              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                              className="rounded-pill p-2 text-muted transition-colors hover:bg-fond"
                             >
-                              <X className="w-5 h-5" />
+                              <X className="h-5 w-5" />
                             </button>
                           </div>
                         </td>
                       </>
                     ) : (
                       <>
-                        <td className="px-4 py-3 font-medium text-gray-900">{site.name}</td>
+                        <td className="px-4 py-3 font-medium text-ink">{site.name}</td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-8 h-8 rounded border border-gray-300"
-                              style={{ backgroundColor: site.color || '#3B82F6' }}
-                            />
-                          </div>
+                          <div
+                            className="h-8 w-8 rounded-pill border border-border"
+                            style={{ backgroundColor: site.color || '#3B82F6' }}
+                          />
                         </td>
                         <td className="px-4 py-3">
                           <button
@@ -318,42 +323,42 @@ export default function SitesManagement() {
                               setManagingRoomsSite(site);
                               setNewRoomCount(site.roomCount);
                             }}
-                            className="flex items-center gap-2 text-teal-600 hover:text-teal-700 font-medium"
+                            className="flex items-center gap-2 font-medium text-canard hover:text-canard/80"
                           >
-                            <DoorOpen className="w-4 h-4" />
+                            <DoorOpen className="h-4 w-4" />
                             {site.roomCount} salle{site.roomCount > 1 ? 's' : ''}
                           </button>
                         </td>
                         <td className="px-4 py-3">
                           <button
                             onClick={() => handleToggleActive(site)}
-                            className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                            className={`rounded-pill px-3 py-1 text-xs font-semibold ${
                               site.is_active
                                 ? 'bg-green-100 text-green-800'
-                                : 'bg-gray-100 text-gray-600'
+                                : 'bg-fond text-muted'
                             }`}
                           >
                             {site.is_active ? 'Actif' : 'Inactif'}
                           </button>
                         </td>
-                        <td className="px-4 py-3 text-gray-600 text-sm">
+                        <td className="px-4 py-3 text-caption">
                           {new Date(site.created_at).toLocaleDateString('fr-FR')}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-2">
                             <button
                               onClick={() => setEditingSite(site)}
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              className="rounded-pill p-2 text-canard transition-colors hover:bg-canard/10"
                               title="Modifier"
                             >
-                              <Edit2 className="w-5 h-5" />
+                              <Edit2 className="h-5 w-5" />
                             </button>
                             <button
                               onClick={() => handleDelete(site)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              className="rounded-pill p-2 text-brique transition-colors hover:bg-brique/10"
                               title="Supprimer"
                             >
-                              <X className="w-5 h-5" />
+                              <X className="h-5 w-5" />
                             </button>
                           </div>
                         </td>
@@ -368,148 +373,145 @@ export default function SitesManagement() {
       </div>
 
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Créer un nouveau site</h3>
+        <BottomSheet
+          title="Créer un nouveau site"
+          onClose={() => {
+            setShowCreateModal(false);
+            setNewSite({ name: '', color: '#3B82F6', roomCount: 6 });
+            setError('');
+          }}
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setNewSite({ name: '', color: '#3B82F6', roomCount: 6 });
+                  setError('');
+                }}
+                className="h-12 flex-1 rounded-input border border-border text-button text-marine"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                form="create-site-form"
+                className="h-12 flex-1 rounded-input bg-marine text-button text-white shadow-button transition-colors hover:bg-marine/90"
+              >
+                Créer
+              </button>
+            </>
+          }
+        >
+          {error && (
+            <div className="mb-4 rounded-input border border-brique/20 bg-brique/10 px-4 py-3 text-body-m text-brique">
+              {error}
+            </div>
+          )}
 
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">
-                {error}
-              </div>
-            )}
+          <form id="create-site-form" onSubmit={handleCreateSite} className="space-y-4">
+            <div>
+              <label className="mb-2 block text-field-label">Nom du site *</label>
+              <input
+                type="text"
+                required
+                value={newSite.name}
+                onChange={(e) => setNewSite({ ...newSite, name: e.target.value })}
+                className={fieldClass}
+                placeholder="Ex : Paris, Lyon…"
+              />
+            </div>
 
-            <form onSubmit={handleCreateSite} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nom du site *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newSite.name}
-                  onChange={(e) => setNewSite({ ...newSite, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                  placeholder="Ex: Paris, Lyon..."
-                />
-              </div>
+            <div>
+              <label className="mb-2 block text-field-label">Couleur (optionnel)</label>
+              <input
+                type="color"
+                value={newSite.color}
+                onChange={(e) => setNewSite({ ...newSite, color: e.target.value })}
+                className="h-12 w-full cursor-pointer rounded-input border border-border"
+              />
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Couleur (optionnel)
-                </label>
-                <input
-                  type="color"
-                  value={newSite.color}
-                  onChange={(e) => setNewSite({ ...newSite, color: e.target.value })}
-                  className="w-full h-12 border border-gray-300 rounded-lg cursor-pointer"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nombre de salles (1-10) *
-                </label>
-                <input
-                  type="number"
-                  required
-                  min="1"
-                  max="10"
-                  value={newSite.roomCount}
-                  onChange={(e) => setNewSite({ ...newSite, roomCount: parseInt(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Les salles seront nommées automatiquement (Salle 1, Salle 2, etc.)
-                </p>
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCreateModal(false);
-                    setNewSite({ name: '', color: '#3B82F6', roomCount: 6 });
-                    setError('');
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 font-medium transition-colors"
-                >
-                  Créer
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+            <div>
+              <label className="mb-2 block text-field-label">Nombre de salles (1-10) *</label>
+              <input
+                type="number"
+                required
+                min="1"
+                max="10"
+                value={newSite.roomCount}
+                onChange={(e) => setNewSite({ ...newSite, roomCount: parseInt(e.target.value) })}
+                className={fieldClass}
+              />
+              <p className="mt-1 text-caption">
+                Les salles seront nommées automatiquement (Salle 1, Salle 2, etc.)
+              </p>
+            </div>
+          </form>
+        </BottomSheet>
       )}
 
       {managingRoomsSite && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">
-              Gérer les salles de {managingRoomsSite.name}
-            </h3>
-
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">
-                {error}
-              </div>
-            )}
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nombre actuel de salles: {managingRoomsSite.roomCount}
-                </label>
-                <label className="block text-sm font-medium text-gray-700 mb-2 mt-4">
-                  Nouveau nombre de salles (1-10) *
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="10"
-                  value={newRoomCount}
-                  onChange={(e) => setNewRoomCount(parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                />
-                {newRoomCount > managingRoomsSite.roomCount && (
-                  <p className="text-xs text-green-600 mt-1">
-                    {newRoomCount - managingRoomsSite.roomCount} salle{newRoomCount - managingRoomsSite.roomCount > 1 ? 's' : ''} sera{newRoomCount - managingRoomsSite.roomCount > 1 ? 'ont' : ''} ajoutée{newRoomCount - managingRoomsSite.roomCount > 1 ? 's' : ''}
-                  </p>
-                )}
-                {newRoomCount < managingRoomsSite.roomCount && (
-                  <p className="text-xs text-red-600 mt-1">
-                    {managingRoomsSite.roomCount - newRoomCount} salle{managingRoomsSite.roomCount - newRoomCount > 1 ? 's' : ''} sera{managingRoomsSite.roomCount - newRoomCount > 1 ? 'ont' : ''} supprimée{managingRoomsSite.roomCount - newRoomCount > 1 ? 's' : ''} (si aucune garde n'est assignée)
-                  </p>
-                )}
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={() => {
-                    setManagingRoomsSite(null);
-                    setNewRoomCount(6);
-                    setError('');
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
-                >
-                  Annuler
-                </button>
-                <button
-                  onClick={handleAdjustRoomCount}
-                  disabled={newRoomCount === managingRoomsSite.roomCount}
-                  className="flex-1 px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Appliquer
-                </button>
-              </div>
+        <BottomSheet
+          title={`Gérer les salles de ${managingRoomsSite.name}`}
+          onClose={() => {
+            setManagingRoomsSite(null);
+            setNewRoomCount(6);
+            setError('');
+          }}
+          footer={
+            <>
+              <button
+                onClick={() => {
+                  setManagingRoomsSite(null);
+                  setNewRoomCount(6);
+                  setError('');
+                }}
+                className="h-12 flex-1 rounded-input border border-border text-button text-marine"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleAdjustRoomCount}
+                disabled={newRoomCount === managingRoomsSite.roomCount}
+                className="h-12 flex-1 rounded-input bg-marine text-button text-white shadow-button transition-colors hover:bg-marine/90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Appliquer
+              </button>
+            </>
+          }
+        >
+          {error && (
+            <div className="mb-4 rounded-input border border-brique/20 bg-brique/10 px-4 py-3 text-body-m text-brique">
+              {error}
             </div>
+          )}
+
+          <div>
+            <p className="mb-2 text-body-m text-ink">
+              Nombre actuel de salles : {managingRoomsSite.roomCount}
+            </p>
+            <label className="mb-2 mt-4 block text-field-label">Nouveau nombre de salles (1-10) *</label>
+            <input
+              type="number"
+              min="1"
+              max="10"
+              value={newRoomCount}
+              onChange={(e) => setNewRoomCount(parseInt(e.target.value))}
+              className={fieldClass}
+            />
+            {roomDelta > 0 && (
+              <p className="mt-1 text-xs text-green-600">
+                {roomDelta} salle{roomDelta > 1 ? 's' : ''} sera{roomDelta > 1 ? 'ont' : ''} ajoutée{roomDelta > 1 ? 's' : ''}
+              </p>
+            )}
+            {roomDelta < 0 && (
+              <p className="mt-1 text-xs text-brique">
+                {-roomDelta} salle{-roomDelta > 1 ? 's' : ''} sera{-roomDelta > 1 ? 'ont' : ''} supprimée{-roomDelta > 1 ? 's' : ''} (si aucune garde n'est assignée)
+              </p>
+            )}
           </div>
-        </div>
+        </BottomSheet>
       )}
     </div>
   );

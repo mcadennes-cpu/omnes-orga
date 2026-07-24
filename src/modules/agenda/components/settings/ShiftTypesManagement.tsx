@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase, ShiftType } from '../../lib/supabase';
-import { Clock, Plus, Edit2, Check, X, MoveUp, MoveDown, Trash2 } from 'lucide-react';
+import { Clock, Plus, Edit2, Check, X, MoveUp, MoveDown } from 'lucide-react';
+import BottomSheet from '../ui/BottomSheet';
+
+const fieldClass =
+  'w-full rounded-input border border-border bg-carte px-3 py-2 text-body-m text-ink ' +
+  'focus:border-canard focus:outline-none focus:ring-2 focus:ring-canard/30';
 
 export default function ShiftTypesManagement() {
   const [shiftTypes, setShiftTypes] = useState<ShiftType[]>([]);
@@ -137,54 +142,54 @@ export default function ShiftTypesManagement() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-6">
+      <div className="rounded-card border border-border bg-carte p-6 shadow-card">
+        <div className="mb-6 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Clock className="w-6 h-6 text-purple-600" />
+            <div className="rounded-pill bg-canard/10 p-2">
+              <Clock className="h-6 w-6 text-canard" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-teal-900">Gestion des Horaires</h2>
-              <p className="text-sm text-gray-600">Gérez les types de gardes disponibles</p>
+              <h2 className="text-h2 text-ink">Gestion des horaires</h2>
+              <p className="text-caption">Gérez les types de gardes disponibles</p>
             </div>
           </div>
 
           <button
             onClick={() => setShowCreateModal(true)}
-            className="bg-pink-500 hover:bg-pink-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
+            className="flex items-center gap-2 rounded-input bg-marine px-4 py-2 text-button text-white shadow-button transition-colors hover:bg-marine/90"
           >
-            <Plus className="w-5 h-5" />
-            Nouvel Horaire
+            <Plus className="h-5 w-5" />
+            Nouvel horaire
           </button>
         </div>
 
         {loading ? (
-          <div className="text-center py-12 text-gray-500">Chargement...</div>
+          <div className="py-12 text-center text-muted">Chargement…</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b-2 border-gray-200">
+              <thead className="border-b border-border bg-fond">
                 <tr>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Ordre</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Nom</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Horaire</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Statut</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Créé le</th>
-                  <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Actions</th>
+                  <th className="px-4 py-3 text-left text-field-label">Ordre</th>
+                  <th className="px-4 py-3 text-left text-field-label">Nom</th>
+                  <th className="px-4 py-3 text-left text-field-label">Horaire</th>
+                  <th className="px-4 py-3 text-left text-field-label">Statut</th>
+                  <th className="px-4 py-3 text-left text-field-label">Créé le</th>
+                  <th className="px-4 py-3 text-right text-field-label">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-border">
                 {shiftTypes.map((shiftType, index) => (
-                  <tr key={shiftType.id} className="hover:bg-gray-50">
+                  <tr key={shiftType.id} className="hover:bg-fond">
                     {editingShiftType?.id === shiftType.id ? (
                       <>
-                        <td className="px-4 py-3 text-gray-600 text-sm">{index + 1}</td>
+                        <td className="px-4 py-3 text-caption">{index + 1}</td>
                         <td className="px-4 py-3">
                           <input
                             type="text"
                             value={editingShiftType.name}
                             onChange={(e) => setEditingShiftType({ ...editingShiftType, name: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                            className={fieldClass}
                           />
                         </td>
                         <td className="px-4 py-3">
@@ -192,7 +197,7 @@ export default function ShiftTypesManagement() {
                             type="text"
                             value={editingShiftType.time_range}
                             onChange={(e) => setEditingShiftType({ ...editingShiftType, time_range: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                            className={fieldClass}
                             placeholder="08:00-14:00"
                           />
                         </td>
@@ -202,27 +207,27 @@ export default function ShiftTypesManagement() {
                               type="checkbox"
                               checked={editingShiftType.is_active}
                               onChange={(e) => setEditingShiftType({ ...editingShiftType, is_active: e.target.checked })}
-                              className="w-4 h-4 text-pink-500 rounded focus:ring-pink-500"
+                              className="h-4 w-4 accent-canard"
                             />
-                            <span className="text-sm">Actif</span>
+                            <span className="text-body-m text-ink">Actif</span>
                           </label>
                         </td>
-                        <td className="px-4 py-3 text-gray-600 text-sm">
+                        <td className="px-4 py-3 text-caption">
                           {new Date(shiftType.created_at).toLocaleDateString('fr-FR')}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-2">
                             <button
                               onClick={() => handleUpdateShiftType(editingShiftType)}
-                              className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                              className="rounded-pill p-2 text-green-600 transition-colors hover:bg-green-50"
                             >
-                              <Check className="w-5 h-5" />
+                              <Check className="h-5 w-5" />
                             </button>
                             <button
                               onClick={() => setEditingShiftType(null)}
-                              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                              className="rounded-pill p-2 text-muted transition-colors hover:bg-fond"
                             >
-                              <X className="w-5 h-5" />
+                              <X className="h-5 w-5" />
                             </button>
                           </div>
                         </td>
@@ -234,51 +239,51 @@ export default function ShiftTypesManagement() {
                             <button
                               onClick={() => handleReorder(shiftType, 'up')}
                               disabled={index === 0}
-                              className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                              className="p-1 text-faint transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
                             >
-                              <MoveUp className="w-4 h-4" />
+                              <MoveUp className="h-4 w-4" />
                             </button>
                             <button
                               onClick={() => handleReorder(shiftType, 'down')}
                               disabled={index === shiftTypes.length - 1}
-                              className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                              className="p-1 text-faint transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
                             >
-                              <MoveDown className="w-4 h-4" />
+                              <MoveDown className="h-4 w-4" />
                             </button>
                           </div>
                         </td>
-                        <td className="px-4 py-3 font-medium text-gray-900">{shiftType.name}</td>
-                        <td className="px-4 py-3 text-gray-700 font-mono">{shiftType.time_range}</td>
+                        <td className="px-4 py-3 font-medium text-ink">{shiftType.name}</td>
+                        <td className="px-4 py-3 font-mono text-ink">{shiftType.time_range}</td>
                         <td className="px-4 py-3">
                           <button
                             onClick={() => handleToggleActive(shiftType)}
-                            className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                            className={`rounded-pill px-3 py-1 text-xs font-semibold ${
                               shiftType.is_active
                                 ? 'bg-green-100 text-green-800'
-                                : 'bg-gray-100 text-gray-600'
+                                : 'bg-fond text-muted'
                             }`}
                           >
                             {shiftType.is_active ? 'Actif' : 'Inactif'}
                           </button>
                         </td>
-                        <td className="px-4 py-3 text-gray-600 text-sm">
+                        <td className="px-4 py-3 text-caption">
                           {new Date(shiftType.created_at).toLocaleDateString('fr-FR')}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-2">
                             <button
                               onClick={() => setEditingShiftType(shiftType)}
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              className="rounded-pill p-2 text-canard transition-colors hover:bg-canard/10"
                               title="Modifier"
                             >
-                              <Edit2 className="w-5 h-5" />
+                              <Edit2 className="h-5 w-5" />
                             </button>
                             <button
                               onClick={() => handleDelete(shiftType)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              className="rounded-pill p-2 text-brique transition-colors hover:bg-brique/10"
                               title="Supprimer"
                             >
-                              <X className="w-5 h-5" />
+                              <X className="h-5 w-5" />
                             </button>
                           </div>
                         </td>
@@ -293,71 +298,72 @@ export default function ShiftTypesManagement() {
       </div>
 
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Créer un nouvel horaire</h3>
+        <BottomSheet
+          title="Créer un nouvel horaire"
+          onClose={() => {
+            setShowCreateModal(false);
+            setNewShiftType({ name: '', timeRange: '' });
+            setError('');
+          }}
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setNewShiftType({ name: '', timeRange: '' });
+                  setError('');
+                }}
+                className="h-12 flex-1 rounded-input border border-border text-button text-marine"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                form="create-shift-type-form"
+                className="h-12 flex-1 rounded-input bg-marine text-button text-white shadow-button transition-colors hover:bg-marine/90"
+              >
+                Créer
+              </button>
+            </>
+          }
+        >
+          {error && (
+            <div className="mb-4 rounded-input border border-brique/20 bg-brique/10 px-4 py-3 text-body-m text-brique">
+              {error}
+            </div>
+          )}
 
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">
-                {error}
-              </div>
-            )}
+          <form id="create-shift-type-form" onSubmit={handleCreateShiftType} className="space-y-4">
+            <div>
+              <label className="mb-2 block text-field-label">Nom *</label>
+              <input
+                type="text"
+                required
+                value={newShiftType.name}
+                onChange={(e) => setNewShiftType({ ...newShiftType, name: e.target.value })}
+                className={fieldClass}
+                placeholder="Ex : 08h-14h, Matinée…"
+              />
+            </div>
 
-            <form onSubmit={handleCreateShiftType} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nom *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newShiftType.name}
-                  onChange={(e) => setNewShiftType({ ...newShiftType, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                  placeholder="Ex: 08h-14h, Matinée..."
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Horaire (format HH:MM-HH:MM) *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newShiftType.timeRange}
-                  onChange={(e) => setNewShiftType({ ...newShiftType, timeRange: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent font-mono"
-                  placeholder="08:00-14:00"
-                  pattern="[0-2][0-9]:[0-5][0-9]-[0-2][0-9]:[0-5][0-9]"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Format: HH:MM-HH:MM (exemple: 08:00-14:00)
-                </p>
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCreateModal(false);
-                    setNewShiftType({ name: '', timeRange: '' });
-                    setError('');
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 font-medium transition-colors"
-                >
-                  Créer
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+            <div>
+              <label className="mb-2 block text-field-label">Horaire (format HH:MM-HH:MM) *</label>
+              <input
+                type="text"
+                required
+                value={newShiftType.timeRange}
+                onChange={(e) => setNewShiftType({ ...newShiftType, timeRange: e.target.value })}
+                className={`${fieldClass} font-mono`}
+                placeholder="08:00-14:00"
+                pattern="[0-2][0-9]:[0-5][0-9]-[0-2][0-9]:[0-5][0-9]"
+              />
+              <p className="mt-1 text-caption">
+                Format : HH:MM-HH:MM (exemple : 08:00-14:00)
+              </p>
+            </div>
+          </form>
+        </BottomSheet>
       )}
     </div>
   );

@@ -5,63 +5,45 @@ import RoomsManagement from './settings/RoomsManagement';
 import ShiftTypesManagement from './settings/ShiftTypesManagement';
 import RotationManagement from './settings/RotationManagement';
 
+type SettingsTab = 'sites' | 'rooms' | 'shift_types' | 'rotation';
+
+const TABS: { id: SettingsTab; label: string }[] = [
+  { id: 'sites', label: 'Sites' },
+  { id: 'rooms', label: 'Salles' },
+  { id: 'shift_types', label: 'Horaires' },
+  { id: 'rotation', label: 'Roulement' },
+];
+
 export default function SettingsView() {
-  const [activeTab, setActiveTab] = useState<'sites' | 'rooms' | 'shift_types' | 'rotation'>('sites');
+  const [activeTab, setActiveTab] = useState<SettingsTab>('sites');
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-teal-100 rounded-lg">
-            <Settings className="w-6 h-6 text-teal-600" />
+      <div className="rounded-card border border-border bg-carte p-6 shadow-card">
+        <div className="mb-6 flex items-center gap-3">
+          <div className="rounded-pill bg-canard/10 p-2">
+            <Settings className="h-6 w-6 text-canard" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-teal-900">Paramètres</h1>
-            <p className="text-sm text-gray-600">Configuration des sites, salles et horaires</p>
+            <h1 className="text-h1 text-ink">Paramètres</h1>
+            <p className="text-caption">Configuration des sites, salles et horaires</p>
           </div>
         </div>
 
-        <div className="flex gap-2 border-b border-gray-200">
-          <button
-            onClick={() => setActiveTab('sites')}
-            className={`px-6 py-3 font-medium transition-colors border-b-2 ${
-              activeTab === 'sites'
-                ? 'border-pink-500 text-pink-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            Sites
-          </button>
-          <button
-            onClick={() => setActiveTab('rooms')}
-            className={`px-6 py-3 font-medium transition-colors border-b-2 ${
-              activeTab === 'rooms'
-                ? 'border-pink-500 text-pink-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            Salles
-          </button>
-          <button
-            onClick={() => setActiveTab('shift_types')}
-            className={`px-6 py-3 font-medium transition-colors border-b-2 ${
-              activeTab === 'shift_types'
-                ? 'border-pink-500 text-pink-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            Horaires
-          </button>
-          <button
-            onClick={() => setActiveTab('rotation')}
-            className={`px-6 py-3 font-medium transition-colors border-b-2 ${
-              activeTab === 'rotation'
-                ? 'border-pink-500 text-pink-600'
-                : 'border-transparent text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            Roulement
-          </button>
+        <div className="flex gap-2 overflow-x-auto border-b border-border hide-scrollbar">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`whitespace-nowrap border-b-2 px-6 py-3 text-button transition-colors ${
+                activeTab === tab.id
+                  ? 'border-canard text-canard'
+                  : 'border-transparent text-muted hover:text-ink'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
