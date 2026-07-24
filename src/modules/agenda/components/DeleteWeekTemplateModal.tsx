@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { X, Trash2, AlertTriangle } from 'lucide-react';
+import { Trash2, AlertTriangle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import BottomSheet from './ui/BottomSheet';
 
 type WeekTemplate = {
   id: string;
@@ -12,6 +13,10 @@ type DeleteWeekTemplateModalProps = {
   onClose: () => void;
   onSuccess: () => void;
 };
+
+const fieldClass =
+  'w-full rounded-input border border-border bg-carte px-4 py-3 text-body-m text-ink ' +
+  'focus:border-canard focus:outline-none focus:ring-2 focus:ring-canard/30';
 
 export default function DeleteWeekTemplateModal({ onClose, onSuccess }: DeleteWeekTemplateModalProps) {
   const [templates, setTemplates] = useState<WeekTemplate[]>([]);
@@ -85,77 +90,17 @@ export default function DeleteWeekTemplateModal({ onClose, onSuccess }: DeleteWe
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-900">Supprimer un modèle de semaine</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        <div className="p-6">
-          {templates.length === 0 ? (
-            <div className="text-center py-8">
-              <AlertTriangle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600 text-lg">
-                Aucun modèle n'est disponible pour suppression.
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Sélectionner un modèle
-                </label>
-                <select
-                  value={selectedTemplateId}
-                  onChange={(e) => setSelectedTemplateId(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                  disabled={loading}
-                >
-                  <option value="">Sélectionner un modèle</option>
-                  {templates.map((template) => (
-                    <option key={template.id} value={template.id}>
-                      {template.name} ({formatDate(template.created_at)})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {selectedTemplate && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-                  <div className="flex gap-3">
-                    <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-red-900 font-medium mb-1">
-                        Êtes-vous sûr de vouloir supprimer le modèle « {selectedTemplate.name} ({formatDate(selectedTemplate.created_at)}) » ?
-                      </p>
-                      <p className="text-red-700 text-sm">
-                        Cette action est définitive et ne supprimera PAS les gardes déjà créées à partir de ce modèle.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
-                  {error}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        <div className="sticky bottom-0 bg-gray-50 px-6 py-4 flex gap-3 justify-end border-t border-gray-200">
+    <BottomSheet
+      title="Supprimer un modèle de semaine"
+      onClose={onClose}
+      busy={loading}
+      maxWidthClass="max-w-2xl"
+      footer={
+        <>
           <button
             onClick={onClose}
             disabled={loading}
-            className="px-6 py-3 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+            className="h-12 flex-1 rounded-input border border-border text-button text-marine disabled:opacity-50"
           >
             Annuler
           </button>
@@ -163,14 +108,64 @@ export default function DeleteWeekTemplateModal({ onClose, onSuccess }: DeleteWe
             <button
               onClick={handleDelete}
               disabled={loading || !selectedTemplateId}
-              className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+              className="flex h-12 flex-1 items-center justify-center gap-2 rounded-input bg-brique text-button text-white shadow-button transition-colors hover:bg-brique/90 disabled:opacity-50"
             >
-              <Trash2 className="w-5 h-5" />
+              <Trash2 className="h-5 w-5" />
               Supprimer le modèle
             </button>
           )}
+        </>
+      }
+    >
+      {templates.length === 0 ? (
+        <div className="py-8 text-center">
+          <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-faint" />
+          <p className="text-body-l text-muted">
+            Aucun modèle n'est disponible pour suppression.
+          </p>
         </div>
-      </div>
-    </div>
+      ) : (
+        <div className="space-y-4">
+          <div>
+            <label className="mb-2 block text-field-label">Sélectionner un modèle</label>
+            <select
+              value={selectedTemplateId}
+              onChange={(e) => setSelectedTemplateId(e.target.value)}
+              className={fieldClass}
+              disabled={loading}
+            >
+              <option value="">Sélectionner un modèle</option>
+              {templates.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name} ({formatDate(template.created_at)})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {selectedTemplate && (
+            <div className="rounded-card border border-brique/20 bg-brique/10 p-4">
+              <div className="flex gap-3">
+                <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-brique" />
+                <div className="flex-1">
+                  <p className="mb-1 font-medium text-brique">
+                    Êtes-vous sûr de vouloir supprimer le modèle « {selectedTemplate.name} ({formatDate(selectedTemplate.created_at)}) » ?
+                  </p>
+                  <p className="text-body-m text-brique/80">
+                    Cette action est définitive et ne supprimera PAS les gardes déjà créées à partir de ce modèle.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="rounded-input border border-brique/20 bg-brique/10 px-4 py-3 text-body-m text-brique">
+              {error}
+            </div>
+          )}
+        </div>
+      )}
+    </BottomSheet>
   );
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Undo2 } from 'lucide-react';
 import { getUndoAction, executeUndo } from '../lib/undoUtils';
+import BottomSheet from './ui/BottomSheet';
 
 type UndoButtonProps = {
   userId: string;
@@ -13,6 +14,8 @@ export default function UndoButton({ userId, onUndoComplete }: UndoButtonProps) 
   const [loading, setLoading] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
+  // NB : le sondage toutes les 2 s et l'alert() sont conserves tels quels ;
+  // la refonte de l'annulation (bandeau ephemere, temps reel) est MOD-2 / etape 6.
   useEffect(() => {
     checkUndoAvailability();
     const interval = setInterval(checkUndoAvailability, 2000);
@@ -50,43 +53,46 @@ export default function UndoButton({ userId, onUndoComplete }: UndoButtonProps) 
       <button
         onClick={() => setShowConfirm(true)}
         disabled={!undoAvailable || loading}
-        className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex items-center gap-2 rounded-input border border-ocre/40 bg-ocre/10 px-4 py-2 text-button text-ocre-fonce transition-colors hover:bg-ocre/20 disabled:cursor-not-allowed disabled:opacity-50"
         title={undoAvailable ? `Annuler: ${undoDescription}` : 'Aucune action récente à annuler'}
       >
-        <Undo2 className="w-4 h-4" />
+        <Undo2 className="h-4 w-4" />
         Annuler dernière action
       </button>
 
       {showConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Confirmer l'annulation</h3>
-            <p className="text-gray-700 mb-2">
-              Êtes-vous sûr de vouloir annuler la dernière action ?
-            </p>
-            {undoDescription && (
-              <p className="text-sm text-gray-600 mb-4 bg-gray-50 p-3 rounded">
-                <span className="font-semibold">Action:</span> {undoDescription}
-              </p>
-            )}
-            <div className="flex items-center justify-end gap-3">
+        <BottomSheet
+          title="Confirmer l'annulation"
+          onClose={() => setShowConfirm(false)}
+          busy={loading}
+          footer={
+            <>
               <button
                 onClick={() => setShowConfirm(false)}
                 disabled={loading}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors font-medium"
+                className="h-12 flex-1 rounded-input border border-border text-button text-marine disabled:opacity-50"
               >
                 Annuler
               </button>
               <button
                 onClick={handleUndo}
                 disabled={loading}
-                className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors font-semibold disabled:opacity-50"
+                className="h-12 flex-1 rounded-input bg-marine text-button text-white shadow-button transition-colors hover:bg-marine/90 disabled:opacity-50"
               >
-                {loading ? 'Annulation...' : 'Confirmer'}
+                {loading ? 'Annulation…' : 'Confirmer'}
               </button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        >
+          <p className="mb-3 text-body-m text-ink">
+            Êtes-vous sûr de vouloir annuler la dernière action ?
+          </p>
+          {undoDescription && (
+            <p className="rounded-input bg-fond p-3 text-body-m text-muted">
+              <span className="font-semibold text-ink">Action :</span> {undoDescription}
+            </p>
+          )}
+        </BottomSheet>
       )}
     </>
   );

@@ -7,7 +7,9 @@ import { Shift } from './supabase';
 //   libre     -> canard (teal)   "a prendre"
 //   demandes  -> ocre  (ambre)   "a trancher"  (texte ocre-fonce pour le contraste)
 //   prevalide -> marine (navy)   "presque acte"
-//   assigne   -> olive (vert)    "acte"
+//   assigne   -> vert            "acte" (convention feu vert ; l'olive de la
+//                                 marque tirant trop sur le kaki, on prend un
+//                                 vert statut standard — deviation assumee)
 export type AgendaStatusKey = 'libre' | 'demandes' | 'prevalide' | 'assigne';
 
 export interface AgendaStatusStyle {
@@ -47,9 +49,9 @@ export const STATUS_STYLES: Record<AgendaStatusKey, AgendaStatusStyle> = {
   assigne: {
     key: 'assigne',
     label: 'Assigné',
-    badgeClass: 'bg-olive/12 text-olive border-olive/25',
-    softClass: 'bg-olive/12 text-olive',
-    dotClass: 'bg-olive',
+    badgeClass: 'bg-green-100 text-green-800 border-green-300',
+    softClass: 'bg-green-100 text-green-800',
+    dotClass: 'bg-green-500',
   },
 };
 

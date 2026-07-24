@@ -95,68 +95,61 @@ export default function WeekView({
 
   const uniqueRooms = Array.from(new Set(shifts.map(s => s.room))).sort();
 
+  // Couleur de fond de la cellule = STATUT de la garde (le coordinateur trie
+  // du regard). Aligne sur l'app d'origine : vert franc = assigne/valide,
+  // blanc = libre. Pre-valide -> marine, demandes -> degrade d'ocre.
   const getShiftBackgroundClass = (shift: Shift) => {
-    // Priority 1: Check if shift is already assigned or validated
     if (shift.status === 'assigned' || shift.status === 'validated') {
-      return isCoordinator
-        ? 'bg-green-100 border-green-300 hover:bg-green-200 cursor-pointer'
-        : 'bg-green-100 border-green-300';
+      return 'bg-green-100 border-green-300 hover:bg-green-200 cursor-pointer';
     }
 
-    // Priority 2: Check for on_hold requests (blue - pre-validation)
     const onHoldCount = (shift as any).onHoldRequestsCount || 0;
     if (onHoldCount > 0) {
-      return 'bg-blue-100 border-blue-300 hover:bg-blue-150 cursor-pointer';
+      return 'bg-marine/10 border-marine/30 hover:bg-marine/20 cursor-pointer';
     }
 
-    // Priority 3: For unassigned shifts, show gradient based on pending requests count
     const pendingCount = shift.pendingRequestsCount || 0;
     if (pendingCount > 0) {
-      if (pendingCount === 1) {
-        return 'bg-yellow-50 border-yellow-200 hover:bg-yellow-100';
-      } else if (pendingCount === 2) {
-        return 'bg-yellow-100 border-yellow-300 hover:bg-yellow-150';
-      } else if (pendingCount === 3) {
-        return 'bg-yellow-200 border-yellow-400 hover:bg-yellow-250';
-      } else {
-        return 'bg-yellow-300 border-yellow-500 hover:bg-yellow-350';
-      }
+      if (pendingCount === 1) return 'bg-ocre/15 border-ocre/25 hover:bg-ocre/25';
+      if (pendingCount === 2) return 'bg-ocre/30 border-ocre/40 hover:bg-ocre/40';
+      if (pendingCount === 3) return 'bg-ocre/45 border-ocre/55 hover:bg-ocre/55';
+      return 'bg-ocre/65 border-ocre/75 hover:bg-ocre/75';
     }
 
-    // Priority 4: Default status-based colors for free shifts
+    // Libre : pas de couleur (blanc), simple bordure.
     if (shift.status === 'free') {
-      return 'bg-gray-100 border-gray-400 hover:bg-gray-200';
+      return 'bg-carte border-border hover:bg-fond';
     } else if (shift.status === 'pending') {
-      return 'bg-yellow-100 border-yellow-300 hover:bg-yellow-200';
+      return 'bg-ocre/15 border-ocre/25 hover:bg-ocre/25';
     } else {
-      return 'bg-gray-100 border-gray-300';
+      return 'bg-carte border-border';
     }
   };
 
   if (isMobile) {
     return (
       <div className="space-y-4">
-        <div className="bg-gray-50 rounded-lg">
+        <div className="rounded-input bg-fond">
           <div className="flex items-center justify-between p-3">
             <button
               onClick={() => onWeekChange('prev')}
-              className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+              className="rounded-pill p-2 transition-colors hover:bg-carte"
             >
-              <ChevronLeft className="w-5 h-5" />
+              <ChevronLeft className="h-5 w-5 text-marine" />
             </button>
-            <span className="font-semibold text-gray-900">{getWeekRange()}</span>
+            <span className="text-body-l font-semibold capitalize text-ink">{getWeekRange()}</span>
             <button
               onClick={() => onWeekChange('next')}
-              className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+              className="rounded-pill p-2 transition-colors hover:bg-carte"
             >
-              <ChevronRight className="w-5 h-5" />
+              <ChevronRight className="h-5 w-5 text-marine" />
             </button>
           </div>
           {rotationInfo && (
             <div className="px-3 pb-3 pt-1">
-              <div className="flex items-center justify-center gap-2 text-sm bg-blue-100 text-blue-800 py-1 px-3 rounded-lg">
-                <Repeat className="w-4 h-4" />
-                <span className="font-semibold">Semaine de roulement n°{rotationInfo.week} / {rotationInfo.total}</span>
+              <div className="flex items-center justify-center gap-2 rounded-input bg-marine/10 px-3 py-1 text-marine">
+                <Repeat className="h-4 w-4" />
+                <span className="text-body-m font-semibold">Semaine de roulement n°{rotationInfo.week} / {rotationInfo.total}</span>
               </div>
             </div>
           )}
@@ -165,12 +158,12 @@ export default function WeekView({
         {weekDays.map((day) => {
           const dayShifts = getShiftsForDay(day);
           return (
-            <div key={day.toISOString()} className="bg-white rounded-lg border border-gray-200 p-4">
-              <h3 className="font-semibold text-gray-900 mb-3 pb-2 border-b border-gray-200">
+            <div key={day.toISOString()} className="rounded-card border border-border bg-carte p-4">
+              <h3 className="mb-3 border-b border-border pb-2 font-semibold capitalize text-ink">
                 {formatDayHeader(day)}
               </h3>
               {dayShifts.length === 0 ? (
-                <p className="text-sm text-gray-500 text-center py-4">Aucune garde</p>
+                <p className="py-4 text-center text-caption">Aucune garde</p>
               ) : (
                 <div className="space-y-2">
                   {dayShifts.map((shift) => (
@@ -178,24 +171,24 @@ export default function WeekView({
                       key={shift.id}
                       onClick={() => onShiftClick(shift)}
                       disabled={!isCoordinator && shift.status !== 'free'}
-                      className={`w-full text-left p-3 rounded-lg border-2 transition-all cursor-pointer ${getShiftBackgroundClass(shift)}`}
+                      className={`w-full cursor-pointer rounded-card border-2 p-3 text-left transition-all ${getShiftBackgroundClass(shift)}`}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-gray-900">
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <span className="text-body-m font-medium text-ink">
                           {shift.shift_type_data?.name || shift.shift_type}
                         </span>
                         {getStatusBadge(shift.status, shift)}
                       </div>
-                      <div className="text-xs text-gray-600">
+                      <div className="text-caption">
                         {shift.location} - {shift.room}
                       </div>
                       {shift.assigned_doctor && (
-                        <div className="text-xs text-gray-600 mt-1">
+                        <div className="mt-1 text-caption">
                           {shift.assigned_doctor.full_name}
                         </div>
                       )}
                       {isCoordinator && shift.coordinator_note && (
-                        <div className="text-[10px] text-gray-500 mt-1 italic truncate" title={shift.coordinator_note}>
+                        <div className="mt-1 truncate text-[10px] italic text-faint" title={shift.coordinator_note}>
                           {shift.coordinator_note}
                         </div>
                       )}
@@ -212,70 +205,70 @@ export default function WeekView({
 
   return (
     <div className="space-y-4">
-      <div className="bg-gray-50 rounded-lg">
+      <div className="rounded-input bg-fond">
         <div className="flex items-center justify-between p-4">
           <button
             onClick={() => onWeekChange('prev')}
-            className="flex items-center gap-2 px-4 py-2 hover:bg-gray-200 rounded-lg transition-colors font-medium text-gray-700"
+            className="flex items-center gap-2 rounded-pill px-4 py-2 text-body-m font-medium text-marine transition-colors hover:bg-carte"
           >
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft className="h-5 w-5" />
             Précédent
           </button>
-          <h3 className="text-lg font-semibold text-gray-900">{getWeekRange()}</h3>
+          <h3 className="text-h2 capitalize text-ink">{getWeekRange()}</h3>
           <button
             onClick={() => onWeekChange('next')}
-            className="flex items-center gap-2 px-4 py-2 hover:bg-gray-200 rounded-lg transition-colors font-medium text-gray-700"
+            className="flex items-center gap-2 rounded-pill px-4 py-2 text-body-m font-medium text-marine transition-colors hover:bg-carte"
           >
             Suivant
-            <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="h-5 w-5" />
           </button>
         </div>
         {rotationInfo && (
           <div className="px-4 pb-4">
-            <div className="flex items-center justify-center gap-2 bg-blue-100 text-blue-800 py-2 px-4 rounded-lg">
-              <Repeat className="w-5 h-5" />
-              <span className="font-semibold text-base">Semaine de roulement n°{rotationInfo.week} / {rotationInfo.total}</span>
+            <div className="flex items-center justify-center gap-2 rounded-input bg-marine/10 px-4 py-2 text-marine">
+              <Repeat className="h-5 w-5" />
+              <span className="text-body-l font-semibold">Semaine de roulement n°{rotationInfo.week} / {rotationInfo.total}</span>
             </div>
           </div>
         )}
         {isCoordinator && onSaveAsTemplate && onDeleteTemplate && onDuplicateTemplate && (
-          <div className="px-4 pb-4 flex items-center gap-3 justify-center flex-wrap">
+          <div className="flex flex-wrap items-center justify-center gap-3 px-4 pb-4">
             <button
               onClick={onSaveAsTemplate}
-              className="flex items-center gap-2 px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg transition-colors font-medium"
+              className="flex items-center gap-2 rounded-input bg-canard px-4 py-2 text-button text-white transition-colors hover:bg-canard/90"
             >
-              <Save className="w-4 h-4" />
+              <Save className="h-4 w-4" />
               Sauvegarder comme modèle
             </button>
             <button
-              onClick={onDeleteTemplate}
-              className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors font-medium"
+              onClick={onDuplicateTemplate}
+              className="flex items-center gap-2 rounded-input bg-marine px-4 py-2 text-button text-white transition-colors hover:bg-marine/90"
             >
-              <Trash2 className="w-4 h-4" />
-              Supprimer un modèle
+              <Copy className="h-4 w-4" />
+              Dupliquer un modèle
             </button>
             <button
-              onClick={onDuplicateTemplate}
-              className="flex items-center gap-2 px-4 py-2 bg-pink-500 hover:bg-pink-600 text-white rounded-lg transition-colors font-medium"
+              onClick={onDeleteTemplate}
+              className="flex items-center gap-2 rounded-input border border-brique/30 bg-brique/10 px-4 py-2 text-button text-brique transition-colors hover:bg-brique/20"
             >
-              <Copy className="w-4 h-4" />
-              Dupliquer un modèle
+              <Trash2 className="h-4 w-4" />
+              Supprimer un modèle
             </button>
           </div>
         )}
       </div>
 
-      <div className="overflow-x-auto -mx-2">
-        <table className="w-full border-collapse min-w-[1400px]">
+      <div className="-mx-2 overflow-x-auto">
+        <table className="w-full min-w-[1400px] border-collapse">
           <thead>
-            <tr className="bg-gray-50 border-b-2 border-gray-300">
-              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300 sticky left-0 bg-gray-50 z-10 w-[140px]">
+            <tr className="border-b border-border bg-fond">
+              <th className="sticky left-0 z-10 w-[140px] border-r border-border bg-fond px-3 py-3 text-left text-caption font-semibold">
                 Salle
               </th>
               {weekDays.map((day) => (
                 <th
                   key={day.toISOString()}
-                  className="px-3 py-3 text-center text-xs font-semibold text-gray-700 border-r border-gray-200 w-[200px]"
+                  className="w-[200px] border-r border-border px-3 py-3 text-center text-caption font-semibold capitalize"
                 >
                   <div>{formatDayHeader(day)}</div>
                 </th>
@@ -284,8 +277,8 @@ export default function WeekView({
           </thead>
           <tbody>
             {uniqueRooms.map((room) => (
-              <tr key={room} className="border-b border-gray-200">
-                <td className="px-3 py-2 font-medium text-gray-900 border-r border-gray-300 sticky left-0 bg-white z-10 w-[140px]">
+              <tr key={room} className="border-b border-border">
+                <td className="sticky left-0 z-10 w-[140px] border-r border-border bg-carte px-3 py-2 font-medium text-ink">
                   {room}
                 </td>
                 {weekDays.map((day) => {
@@ -293,7 +286,7 @@ export default function WeekView({
                   return (
                     <td
                       key={`${room}-${day.toISOString()}`}
-                      className="px-2 py-2 border-r border-gray-200 align-top w-[200px]"
+                      className="w-[200px] border-r border-border px-2 py-2 align-top"
                     >
                       <div className="space-y-1">
                         {dayShifts.map((shift) => (
@@ -301,21 +294,21 @@ export default function WeekView({
                             key={shift.id}
                             onClick={() => onShiftClick(shift)}
                             disabled={!isCoordinator && shift.status !== 'free'}
-                            className={`w-full text-left p-2 rounded text-xs border transition-all cursor-pointer ${getShiftBackgroundClass(shift)}`}
+                            className={`w-full cursor-pointer rounded-pill border p-2 text-left text-xs transition-all ${getShiftBackgroundClass(shift)}`}
                           >
-                            <div className="font-semibold text-gray-900 mb-0.5">
+                            <div className="mb-0.5 font-semibold text-ink">
                               {shift.shift_type_data?.name || shift.shift_type}
                             </div>
-                            <div className="text-gray-600">
+                            <div className="text-muted">
                               {shift.location}
                             </div>
                             {shift.assigned_doctor && (
-                              <div className="text-gray-700 font-medium mt-0.5 truncate">
+                              <div className="mt-0.5 truncate font-medium text-ink">
                                 {shift.assigned_doctor.full_name}
                               </div>
                             )}
                             {isCoordinator && shift.coordinator_note && (
-                              <div className="text-[9px] text-gray-500 mt-0.5 italic truncate leading-tight" title={shift.coordinator_note}>
+                              <div className="mt-0.5 truncate text-[9px] italic leading-tight text-faint" title={shift.coordinator_note}>
                                 {shift.coordinator_note}
                               </div>
                             )}

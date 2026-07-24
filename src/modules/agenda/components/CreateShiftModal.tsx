@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase, Site, Room, ShiftType } from '../lib/supabase';
-import { X, Calendar, MapPin, Clock, Home, Repeat } from 'lucide-react';
+import { Calendar, MapPin, Clock, Home, Repeat } from 'lucide-react';
 import { applyRotationRulesToShifts } from '../lib/rotationUtils';
+import BottomSheet from './ui/BottomSheet';
 
 type CreateShiftModalProps = {
   coordinatorId: string;
@@ -18,6 +19,11 @@ const WEEKDAYS = [
   { value: 5, label: 'Sam', fullLabel: 'Samedi' },
   { value: 6, label: 'Dim', fullLabel: 'Dimanche' }
 ];
+
+// Champ date / select a la charte Omnes (focus canard).
+const fieldClass =
+  'w-full rounded-input border border-border bg-carte px-4 py-3 text-body-m text-ink ' +
+  'focus:border-canard focus:outline-none focus:ring-2 focus:ring-canard/30';
 
 export default function CreateShiftModal({ coordinatorId, onClose, onSuccess }: CreateShiftModalProps) {
   const [date, setDate] = useState('');
@@ -204,206 +210,198 @@ export default function CreateShiftModal({ coordinatorId, onClose, onSuccess }: 
 
   if (dataLoading) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8">
-          <div className="text-center py-8 text-gray-500">Chargement...</div>
-        </div>
-      </div>
+      <BottomSheet title="Créer une nouvelle garde" onClose={onClose}>
+        <div className="py-8 text-center text-muted">Chargement…</div>
+      </BottomSheet>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-teal-900">Créer une nouvelle garde</h2>
+    <BottomSheet
+      title="Créer une nouvelle garde"
+      onClose={onClose}
+      busy={loading}
+      footer={
+        <>
           <button
+            type="button"
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            disabled={loading}
+            className="h-12 flex-1 rounded-input border border-border text-button text-marine disabled:opacity-50"
           >
-            <X className="w-6 h-6 text-gray-600" />
+            Annuler
           </button>
+          <button
+            type="submit"
+            form="create-shift-form"
+            disabled={loading || availableRooms.length === 0}
+            className="h-12 flex-1 rounded-input bg-marine text-button text-white shadow-button transition-colors hover:bg-marine/90 disabled:opacity-50"
+          >
+            {loading ? 'Création…' : isSeries ? 'Créer la série' : 'Créer la garde'}
+          </button>
+        </>
+      }
+    >
+      <form id="create-shift-form" onSubmit={handleSubmit} className="space-y-5">
+        <div>
+          <label className="mb-2 flex items-center gap-2 text-field-label">
+            <Calendar className="h-4 w-4 text-muted" />
+            Date de début <span className="text-brique">*</span>
+          </label>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            required
+            min={new Date().toISOString().split('T')[0]}
+            className={fieldClass}
+          />
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-              <Calendar className="w-4 h-4" />
-              Date de début <span className="text-red-500">*</span>
-            </label>
+        <div className="rounded-card border border-border bg-fond p-4">
+          <label className="flex cursor-pointer items-center gap-3">
             <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-              min={new Date().toISOString().split('T')[0]}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+              type="checkbox"
+              checked={isSeries}
+              onChange={(e) => {
+                setIsSeries(e.target.checked);
+                if (!e.target.checked) {
+                  setSelectedWeekdays([]);
+                  setSeriesEndDate('');
+                }
+              }}
+              className="h-5 w-5 accent-canard"
             />
-          </div>
-
-          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isSeries}
-                onChange={(e) => {
-                  setIsSeries(e.target.checked);
-                  if (!e.target.checked) {
-                    setSelectedWeekdays([]);
-                    setSeriesEndDate('');
-                  }
-                }}
-                className="w-5 h-5 text-pink-500 rounded focus:ring-2 focus:ring-pink-500"
-              />
-              <div className="flex items-center gap-2">
-                <Repeat className="w-5 h-5 text-teal-600" />
-                <span className="font-medium text-gray-700">Créer une série récurrente</span>
-              </div>
-            </label>
-          </div>
-
-          {isSeries && (
-            <>
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-3">
-                  <Calendar className="w-4 h-4" />
-                  Jours de la semaine <span className="text-red-500">*</span>
-                </label>
-                <div className="grid grid-cols-7 gap-2">
-                  {WEEKDAYS.map((day) => (
-                    <button
-                      key={day.value}
-                      type="button"
-                      onClick={() => toggleWeekday(day.value)}
-                      className={`py-3 px-2 rounded-lg font-medium text-sm transition-all ${
-                        selectedWeekdays.includes(day.value)
-                          ? 'bg-teal-500 text-white shadow-md'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                      title={day.fullLabel}
-                    >
-                      {day.label}
-                    </button>
-                  ))}
-                </div>
-                {selectedWeekdays.length > 0 && (
-                  <p className="mt-2 text-sm text-gray-600">
-                    {selectedWeekdays.length} jour{selectedWeekdays.length > 1 ? 's' : ''} sélectionné{selectedWeekdays.length > 1 ? 's' : ''}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                  <Calendar className="w-4 h-4" />
-                  Date de fin <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  value={seriesEndDate}
-                  onChange={(e) => setSeriesEndDate(e.target.value)}
-                  required={isSeries}
-                  min={date || new Date().toISOString().split('T')[0]}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                />
-              </div>
-            </>
-          )}
-
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-              <MapPin className="w-4 h-4" />
-              Site <span className="text-red-500">*</span>
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              {sites.map((site) => (
-                <button
-                  key={site.id}
-                  type="button"
-                  onClick={() => setSelectedSiteId(site.id)}
-                  className={`py-3 px-4 rounded-lg font-medium transition-all ${
-                    selectedSiteId === site.id
-                      ? 'bg-cyan-500 text-white shadow-md'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                  style={{
-                    borderColor: selectedSiteId === site.id ? site.color || undefined : undefined,
-                    borderWidth: selectedSiteId === site.id ? '2px' : undefined
-                  }}
-                >
-                  {site.name}
-                </button>
-              ))}
+            <div className="flex items-center gap-2">
+              <Repeat className="h-5 w-5 text-canard" />
+              <span className="font-medium text-ink">Créer une série récurrente</span>
             </div>
-          </div>
+          </label>
+        </div>
 
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-              <Home className="w-4 h-4" />
-              Salle <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={selectedRoomId}
-              onChange={(e) => setSelectedRoomId(e.target.value)}
-              required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-            >
-              {availableRooms.length === 0 ? (
-                <option value="">Aucune salle disponible</option>
-              ) : (
-                availableRooms.map((room) => (
-                  <option key={room.id} value={room.id}>
-                    {room.name}
-                  </option>
-                ))
+        {isSeries && (
+          <>
+            <div>
+              <label className="mb-3 flex items-center gap-2 text-field-label">
+                <Calendar className="h-4 w-4 text-muted" />
+                Jours de la semaine <span className="text-brique">*</span>
+              </label>
+              <div className="grid grid-cols-7 gap-2">
+                {WEEKDAYS.map((day) => (
+                  <button
+                    key={day.value}
+                    type="button"
+                    onClick={() => toggleWeekday(day.value)}
+                    className={`rounded-pill px-2 py-3 text-sm font-medium transition-all ${
+                      selectedWeekdays.includes(day.value)
+                        ? 'bg-canard text-white shadow-card'
+                        : 'bg-carte text-muted hover:bg-border/40'
+                    }`}
+                    title={day.fullLabel}
+                  >
+                    {day.label}
+                  </button>
+                ))}
+              </div>
+              {selectedWeekdays.length > 0 && (
+                <p className="mt-2 text-caption">
+                  {selectedWeekdays.length} jour{selectedWeekdays.length > 1 ? 's' : ''} sélectionné{selectedWeekdays.length > 1 ? 's' : ''}
+                </p>
               )}
-            </select>
-          </div>
-
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-              <Clock className="w-4 h-4" />
-              Horaire <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={selectedShiftTypeId}
-              onChange={(e) => setSelectedShiftTypeId(e.target.value)}
-              required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-            >
-              {shiftTypes.map((type) => (
-                <option key={type.id} value={type.id}>
-                  {type.name} ({type.time_range})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-              {error}
             </div>
-          )}
 
-          <div className="flex gap-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading}
-              className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              disabled={loading || availableRooms.length === 0}
-              className="flex-1 px-6 py-3 bg-pink-500 hover:bg-pink-600 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
-            >
-              {loading ? 'Création...' : isSeries ? 'Créer la série' : 'Créer la garde'}
-            </button>
+            <div>
+              <label className="mb-2 flex items-center gap-2 text-field-label">
+                <Calendar className="h-4 w-4 text-muted" />
+                Date de fin <span className="text-brique">*</span>
+              </label>
+              <input
+                type="date"
+                value={seriesEndDate}
+                onChange={(e) => setSeriesEndDate(e.target.value)}
+                required={isSeries}
+                min={date || new Date().toISOString().split('T')[0]}
+                className={fieldClass}
+              />
+            </div>
+          </>
+        )}
+
+        <div>
+          <label className="mb-2 flex items-center gap-2 text-field-label">
+            <MapPin className="h-4 w-4 text-muted" />
+            Site <span className="text-brique">*</span>
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            {sites.map((site) => (
+              <button
+                key={site.id}
+                type="button"
+                onClick={() => setSelectedSiteId(site.id)}
+                className={`rounded-input px-4 py-3 font-medium transition-all ${
+                  selectedSiteId === site.id
+                    ? 'bg-canard text-white shadow-card'
+                    : 'bg-fond text-ink hover:bg-border/40'
+                }`}
+                style={{
+                  borderColor: selectedSiteId === site.id ? site.color || undefined : undefined,
+                  borderWidth: selectedSiteId === site.id ? '2px' : undefined
+                }}
+              >
+                {site.name}
+              </button>
+            ))}
           </div>
-        </form>
-      </div>
-    </div>
+        </div>
+
+        <div>
+          <label className="mb-2 flex items-center gap-2 text-field-label">
+            <Home className="h-4 w-4 text-muted" />
+            Salle <span className="text-brique">*</span>
+          </label>
+          <select
+            value={selectedRoomId}
+            onChange={(e) => setSelectedRoomId(e.target.value)}
+            required
+            className={fieldClass}
+          >
+            {availableRooms.length === 0 ? (
+              <option value="">Aucune salle disponible</option>
+            ) : (
+              availableRooms.map((room) => (
+                <option key={room.id} value={room.id}>
+                  {room.name}
+                </option>
+              ))
+            )}
+          </select>
+        </div>
+
+        <div>
+          <label className="mb-2 flex items-center gap-2 text-field-label">
+            <Clock className="h-4 w-4 text-muted" />
+            Horaire <span className="text-brique">*</span>
+          </label>
+          <select
+            value={selectedShiftTypeId}
+            onChange={(e) => setSelectedShiftTypeId(e.target.value)}
+            required
+            className={fieldClass}
+          >
+            {shiftTypes.map((type) => (
+              <option key={type.id} value={type.id}>
+                {type.name} ({type.time_range})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {error && (
+          <div className="rounded-input border border-brique/20 bg-brique/10 px-4 py-3 text-body-m text-brique">
+            {error}
+          </div>
+        )}
+      </form>
+    </BottomSheet>
   );
 }
