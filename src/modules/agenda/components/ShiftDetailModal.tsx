@@ -27,6 +27,47 @@ type ShiftDetailModalProps = {
   hideSeriesInfo?: boolean;
 };
 
+// Quand on (pre)valide un nouveau medecin sur une garde deja assignee a un autre,
+// on rend sa demande a l'ancien medecin : sa demande existante repasse en pending,
+// ou on la recree si elle n'existe plus. Utilise par handleApprove et handleSetOnHold.
+async function revertPreviousDoctorRequest(
+  shiftId: string,
+  previousDoctorId: string | null | undefined,
+  newDoctorId: string
+): Promise<void> {
+  if (!previousDoctorId || previousDoctorId === newDoctorId) return;
+
+  const { data: existingRequest } = await supabase
+    .from('requests')
+    .select('id, status')
+    .eq('shift_id', shiftId)
+    .eq('doctor_id', previousDoctorId)
+    .maybeSingle();
+
+  if (existingRequest) {
+    const { error: revertError } = await supabase
+      .from('requests')
+      .update({
+        status: 'pending',
+        reviewed_at: null
+      })
+      .eq('id', existingRequest.id);
+
+    if (revertError) throw revertError;
+  } else {
+    const { error: createError } = await supabase
+      .from('requests')
+      .insert({
+        shift_id: shiftId,
+        doctor_id: previousDoctorId,
+        status: 'pending',
+        requested_at: new Date().toISOString()
+      });
+
+    if (createError) throw createError;
+  }
+}
+
 export default function ShiftDetailModal({ shift, onClose, onSuccess, readOnlyMode = false, hideValidation = false, onAssignDoctor, isCoordinator = false, hideSeriesInfo = false }: ShiftDetailModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -136,39 +177,7 @@ export default function ShiftDetailModal({ shift, onClose, onSuccess, readOnlyMo
     setError('');
 
     try {
-      const previousDoctorId = shift.assigned_doctor_id;
-
-      if (previousDoctorId && previousDoctorId !== doctorId) {
-        const { data: existingRequest } = await supabase
-          .from('requests')
-          .select('id, status')
-          .eq('shift_id', shift.id)
-          .eq('doctor_id', previousDoctorId)
-          .maybeSingle();
-
-        if (existingRequest) {
-          const { error: revertError } = await supabase
-            .from('requests')
-            .update({
-              status: 'pending',
-              reviewed_at: null
-            })
-            .eq('id', existingRequest.id);
-
-          if (revertError) throw revertError;
-        } else {
-          const { error: createError } = await supabase
-            .from('requests')
-            .insert({
-              shift_id: shift.id,
-              doctor_id: previousDoctorId,
-              status: 'pending',
-              requested_at: new Date().toISOString()
-            });
-
-          if (createError) throw createError;
-        }
-      }
+      await revertPreviousDoctorRequest(shift.id, shift.assigned_doctor_id, doctorId);
 
       const { error: approveError } = await supabase
         .from('requests')
@@ -220,39 +229,7 @@ export default function ShiftDetailModal({ shift, onClose, onSuccess, readOnlyMo
         return;
       }
 
-      const previousDoctorId = shift.assigned_doctor_id;
-
-      if (previousDoctorId && previousDoctorId !== doctorId) {
-        const { data: existingRequest } = await supabase
-          .from('requests')
-          .select('id, status')
-          .eq('shift_id', shift.id)
-          .eq('doctor_id', previousDoctorId)
-          .maybeSingle();
-
-        if (existingRequest) {
-          const { error: revertError } = await supabase
-            .from('requests')
-            .update({
-              status: 'pending',
-              reviewed_at: null
-            })
-            .eq('id', existingRequest.id);
-
-          if (revertError) throw revertError;
-        } else {
-          const { error: createError } = await supabase
-            .from('requests')
-            .insert({
-              shift_id: shift.id,
-              doctor_id: previousDoctorId,
-              status: 'pending',
-              requested_at: new Date().toISOString()
-            });
-
-          if (createError) throw createError;
-        }
-      }
+      await revertPreviousDoctorRequest(shift.id, shift.assigned_doctor_id, doctorId);
 
       const { error: updateError } = await supabase
         .from('requests')
