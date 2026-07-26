@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase, Shift } from '../lib/supabase';
 import { Repeat } from 'lucide-react';
-import { getRotationSettings, getRotationWeek } from '../lib/rotationUtils';
+import { getRotationSettings, getRotationWeek, getRotationSlot } from '../lib/rotationUtils';
 import { checkDoctorDailyConflict } from '../lib/shiftValidation';
 import ConflictErrorModal from './ConflictErrorModal';
 import BottomSheet from './ui/BottomSheet';
@@ -174,13 +174,11 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
         return;
       }
 
-      const currentDate = new Date(shift.date);
-      const currentRotationWeek = getRotationWeek(
-        currentDate,
+      const { rotationWeek: currentRotationWeek, weekday: currentWeekday } = getRotationSlot(
+        new Date(shift.date),
         settings,
         { componentName: 'AssignDoctorModal.handleApplyToRotation', inputOrigin: `shift.date: "${shift.date}"` }
       );
-      const currentWeekday = currentDate.getDay();
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Utilisateur non authentifié');
@@ -215,13 +213,11 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
 
       if (allShifts && allShifts.length > 0) {
         const matchingShifts = allShifts.filter(s => {
-          const shiftDate = new Date(s.date);
-          const shiftRotationWeek = getRotationWeek(
-            shiftDate,
+          const { rotationWeek: shiftRotationWeek, weekday: shiftWeekday } = getRotationSlot(
+            new Date(s.date),
             settings,
             { componentName: 'AssignDoctorModal.handleApplyToRotation(filter)', inputOrigin: `s.date: "${s.date}"` }
           );
-          const shiftWeekday = shiftDate.getDay();
           return shiftRotationWeek === currentRotationWeek && shiftWeekday === currentWeekday;
         });
 

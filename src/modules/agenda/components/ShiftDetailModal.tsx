@@ -12,7 +12,7 @@ import PendingRequestsList from './shiftDetail/PendingRequestsList';
 import CancelAssignmentModal from './shiftDetail/CancelAssignmentModal';
 import ApplyToRotationWeekModal from './shiftDetail/ApplyToRotationWeekModal';
 import DeletionBlockedModal from './shiftDetail/DeletionBlockedModal';
-import { getRotationSettings, getRotationWeek } from '../lib/rotationUtils';
+import { getRotationSettings, getRotationWeek, getRotationSlot } from '../lib/rotationUtils';
 import { saveUndoAction, getCurrentUserId } from '../lib/undoUtils';
 import { checkDoctorDailyConflict } from '../lib/shiftValidation';
 
@@ -480,13 +480,11 @@ export default function ShiftDetailModal({ shift, onClose, onSuccess, readOnlyMo
         return;
       }
 
-      const currentDate = new Date(shift.date);
-      const currentRotationWeek = getRotationWeek(
-        currentDate,
+      const { rotationWeek: currentRotationWeek, weekday: currentWeekday } = getRotationSlot(
+        new Date(shift.date),
         settings,
         { componentName: 'ShiftDetailModal.handleApplyToRotationWeek', inputOrigin: `shift.date: "${shift.date}"` }
       );
-      const currentWeekday = currentDate.getDay();
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Utilisateur non authentifié');
@@ -521,13 +519,11 @@ export default function ShiftDetailModal({ shift, onClose, onSuccess, readOnlyMo
 
       if (allShifts && allShifts.length > 0) {
         const matchingShifts = allShifts.filter(s => {
-          const shiftDate = new Date(s.date);
-          const shiftRotationWeek = getRotationWeek(
-            shiftDate,
+          const { rotationWeek: shiftRotationWeek, weekday: shiftWeekday } = getRotationSlot(
+            new Date(s.date),
             settings,
             { componentName: 'ShiftDetailModal.handleApplyToRotationWeek(filter)', inputOrigin: `s.date: "${s.date}"` }
           );
-          const shiftWeekday = shiftDate.getDay();
           return shiftRotationWeek === currentRotationWeek && shiftWeekday === currentWeekday;
         });
 

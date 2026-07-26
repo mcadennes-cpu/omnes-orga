@@ -90,6 +90,21 @@ export function getRotationWeek(date: Date, settings: RotationSettings, debugCon
   return rotationWeek;
 }
 
+// Calcul repete a l'identique partout ou l'on place une garde dans le roulement :
+// la semaine de roulement (via getRotationWeek) et le jour de la semaine (0-6).
+// Le weekday est lu sur la meme date que celle passee a getRotationWeek, pour
+// rester strictement iso-comportement avec les appels inline d'origine.
+export function getRotationSlot(
+  date: Date,
+  settings: RotationSettings,
+  debugContext?: { componentName?: string; inputOrigin?: string }
+): { rotationWeek: number; weekday: number } {
+  return {
+    rotationWeek: getRotationWeek(date, settings, debugContext),
+    weekday: date.getDay(),
+  };
+}
+
 export function getWeekDates(date: Date): { start: Date; end: Date } {
   const d = new Date(date);
   const day = d.getDay();
