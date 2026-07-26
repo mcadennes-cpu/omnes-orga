@@ -30,6 +30,7 @@ export default function ShiftDetailModal({ shift, onClose, onSuccess, readOnlyMo
     error,
     rotationInfo,
     hasRotationRule,
+    rotationCancelCount,
     pendingRequests,
     isPartOfSeries,
     showSeriesModal,
@@ -212,6 +213,7 @@ export default function ShiftDetailModal({ shift, onClose, onSuccess, readOnlyMo
       {showCancelAssignmentModal && (
         <CancelAssignmentModal
           hasRotationRule={hasRotationRule}
+          rotationCancelCount={rotationCancelCount}
           isPartOfSeries={isPartOfSeries}
           loading={loading}
           onSingle={() => handleCancelAssignment('single')}

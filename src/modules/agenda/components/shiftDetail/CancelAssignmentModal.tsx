@@ -2,6 +2,7 @@ import BottomSheet from '../ui/BottomSheet';
 
 type CancelAssignmentModalProps = {
   hasRotationRule: boolean;
+  rotationCancelCount?: number | null;
   isPartOfSeries: boolean;
   loading: boolean;
   onSingle: () => void;
@@ -14,6 +15,7 @@ type CancelAssignmentModalProps = {
 // roulement selon le contexte de la garde.
 export default function CancelAssignmentModal({
   hasRotationRule,
+  rotationCancelCount,
   isPartOfSeries,
   loading,
   onSingle,
@@ -21,6 +23,11 @@ export default function CancelAssignmentModal({
   onRotation,
   onClose,
 }: CancelAssignmentModalProps) {
+  const countLabel =
+    rotationCancelCount != null
+      ? `${rotationCancelCount} garde${rotationCancelCount > 1 ? 's' : ''} future${rotationCancelCount > 1 ? 's' : ''}`
+      : null;
+
   return (
     <BottomSheet title="Annuler l'assignation" onClose={onClose} busy={loading}>
       <p className="mb-4 text-body-m text-ink">
@@ -28,6 +35,12 @@ export default function CancelAssignmentModal({
           ? "Cette assignation provient d'une règle de roulement. Que souhaitez-vous faire ?"
           : "Souhaitez-vous annuler l'assignation uniquement pour cette date, ou pour toute la série ?"}
       </p>
+
+      {hasRotationRule && countLabel && (
+        <div className="mb-4 rounded-input border border-brique/20 bg-brique/10 px-4 py-3 text-body-m text-brique">
+          Supprimer la règle libérera <strong>{countLabel}</strong> déjà attribuées ou demandées (à partir de cette date). Cette action est irréversible.
+        </div>
+      )}
       <div className="space-y-3">
         <button
           onClick={onSingle}

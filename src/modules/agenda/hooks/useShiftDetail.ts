@@ -71,6 +71,9 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
   const [pendingActionRequest, setPendingActionRequest] = useState<{id: string, doctorId: string, action: 'approve' | 'setOnHold'} | null>(null);
   const [showConflictError, setShowConflictError] = useState(false);
   const [conflictErrorMessage, setConflictErrorMessage] = useState('');
+  // Nombre de gardes futures qui seront liberees par "Supprimer la regle de
+  // roulement" (compte a titre d'avertissement, calcule a l'ouverture de la modale).
+  const [rotationCancelCount, setRotationCancelCount] = useState<number | null>(null);
 
   const isPartOfSeries = !!shift.series_id;
 
@@ -364,8 +367,21 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
     }
   };
 
-  const handleCancelAssignmentClick = () => {
+  const handleCancelAssignmentClick = async () => {
     if (isPartOfSeries || hasRotationRule) {
+      if (hasRotationRule) {
+        // Avant d'ouvrir la modale, compter les gardes attribuees/demandees que
+        // "Supprimer la regle de roulement" libererait, pour l'afficher en garde-fou.
+        const { count } = await supabase
+          .from('shifts')
+          .select('id', { count: 'exact', head: true })
+          .eq('site_id', shift.site_id)
+          .eq('room_id', shift.room_id)
+          .eq('shift_type_id', shift.shift_type_id)
+          .gte('date', shift.date)
+          .in('status', ['assigned', 'pending']);
+        setRotationCancelCount(count ?? null);
+      }
       setShowCancelAssignmentModal(true);
     } else {
       if (confirm('Êtes-vous sûr de vouloir annuler cette assignation ? La garde redeviendra libre.')) {
@@ -572,6 +588,7 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
     error,
     rotationInfo,
     hasRotationRule,
+    rotationCancelCount,
     pendingRequests,
     isPartOfSeries,
     // flags des modales
