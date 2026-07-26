@@ -1,9 +1,8 @@
 // Helpers partages pour les categories multiples de l'annuaire.
 //
-// Depuis le script SQL 5A-3, une entree porte un tableau "categories" (text[]).
-// L'ancienne colonne "categorie" (singulier) existe encore le temps de la
-// transition : les fonctions ci-dessous font le repli dessus pour que tout
-// continue de marcher tant qu'elle n'est pas supprimee (script 5A-4).
+// Depuis le script SQL 5A-3, une entree porte un tableau "categories" (text[]),
+// NOT NULL DEFAULT '{}'. L'ancienne colonne "categorie" (singulier) a ete
+// supprimee (script 5A-4).
 
 // Nettoie une liste de categories : trim, retire les vides, dedoublonne
 // (insensible a la casse, en gardant la premiere orthographe rencontree).
@@ -21,14 +20,9 @@ export function cleanCategories(list) {
   return out
 }
 
-// Categories d'une entree, sous forme de tableau, avec repli sur l'ancienne
-// colonne "categorie" tant qu'elle existe.
+// Categories d'une entree, toujours sous forme de tableau (jamais null).
 export function entreeCategories(entree) {
-  if (Array.isArray(entree?.categories) && entree.categories.length > 0) {
-    return entree.categories
-  }
-  if (entree?.categorie) return [entree.categorie]
-  return []
+  return Array.isArray(entree?.categories) ? entree.categories : []
 }
 
 // Liste triee et dedoublonnee de toutes les categories presentes dans
