@@ -4,6 +4,7 @@ import { ChevronLeft, Plus, Search, X, BookOpen, ChevronRight } from 'lucide-rea
 import AppLayout from '../components/layout/AppLayout'
 import Pill from '../components/common/Pill'
 import { useEntreesAnnuaire } from '../hooks/useEntreesAnnuaire'
+import { collectCategories, entreeCategories } from '../lib/annuaireCategories'
 import HeaderWatermark from '../components/common/HeaderWatermark'
 
 export default function Annuaire() {
@@ -12,23 +13,19 @@ export default function Annuaire() {
   const [search, setSearch] = useState('')
   const [activeCat, setActiveCat] = useState(null)
 
-  // Categories presentes dans l'annuaire, triees alphabetiquement (sensible aux accents francais).
-  const presentCats = useMemo(() => {
-    const set = new Set(
-      entrees
-        .map((e) => e.categorie)
-        .filter((c) => c && c.trim() !== '')
-    )
-    return Array.from(set).sort((a, b) => a.localeCompare(b, 'fr'))
-  }, [entrees])
+  // Categories presentes dans l'annuaire, aplaties (multi-categories), triees
+  // alphabetiquement (sensible aux accents francais).
+  const presentCats = useMemo(() => collectCategories(entrees), [entrees])
 
-  // Filtrage : par recherche texte (nom, categorie, note) et par categorie active.
+  // Filtrage : par recherche texte (nom, categories, note) et par categorie
+  // active. Une entree matche des qu'UNE de ses categories est la categorie
+  // active — c'est ce qui permet de la retrouver sous plusieurs categories.
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return entrees.filter((e) => {
-      if (activeCat && e.categorie !== activeCat) return false
+      if (activeCat && !entreeCategories(e).includes(activeCat)) return false
       if (q) {
-        const haystack = [e.nom ?? '', e.categorie ?? '', e.note ?? '']
+        const haystack = [e.nom ?? '', ...entreeCategories(e), e.note ?? '']
           .join(' ')
           .toLowerCase()
         if (!haystack.includes(q)) return false
@@ -186,6 +183,7 @@ function CategoryPill({ active, onClick, label }) {
 }
 
 function EntryRow({ entree, onClick }) {
+  const cats = entreeCategories(entree)
   return (
     <button
       type="button"
@@ -196,18 +194,20 @@ function EntryRow({ entree, onClick }) {
         <p className="text-body-l font-semibold text-marine truncate">
           {entree.nom}
         </p>
-        <div className="flex items-center gap-2 mt-1 min-w-0">
-          {entree.categorie && (
-            <Pill color="ocre" variant="soft" size="sm">
-              {entree.categorie}
-            </Pill>
-          )}
-          {entree.telephone && (
-            <span className="text-caption text-faint truncate">
-              · {entree.telephone}
-            </span>
-          )}
-        </div>
+        {(cats.length > 0 || entree.telephone) && (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 min-w-0">
+            {cats.map((c) => (
+              <Pill key={c} color="ocre" variant="soft" size="sm">
+                {c}
+              </Pill>
+            ))}
+            {entree.telephone && (
+              <span className="text-caption text-faint">
+                · {entree.telephone}
+              </span>
+            )}
+          </div>
+        )}
       </div>
       <ChevronRight size={18} strokeWidth={1.8} className="text-faint shrink-0" />
     </button>
