@@ -8,7 +8,7 @@ import ConfirmDialog from '../components/common/ConfirmDialog'
 import { supabase } from '../lib/supabaseClient'
 import { useEntreeAnnuaire } from '../hooks/useEntreeAnnuaire'
 import { useEntreesAnnuaire } from '../hooks/useEntreesAnnuaire'
-import { collectCategories } from '../lib/annuaireCategories'
+import { collectCategories, entreeCategories } from '../lib/annuaireCategories'
 import { useRole } from '../hooks/useRole'
 import { useAuth } from '../hooks/useAuth'
 import {
@@ -195,11 +195,13 @@ export default function EntreeAnnuaireDetail() {
                 <h2 className="font-display font-extrabold text-marine text-[22px] tracking-[-0.01em] break-words">
                   {entree.nom}
                 </h2>
-                {entree.categorie && (
-                  <div className="mt-2">
-                    <Pill color="ocre" variant="soft" size="sm">
-                      {entree.categorie}
-                    </Pill>
+                {entreeCategories(entree).length > 0 && (
+                  <div className="mt-2 flex flex-wrap justify-center gap-1.5">
+                    {entreeCategories(entree).map((c) => (
+                      <Pill key={c} color="ocre" variant="soft" size="sm">
+                        {c}
+                      </Pill>
+                    ))}
                   </div>
                 )}
               </div>
