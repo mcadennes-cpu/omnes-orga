@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase, Shift, Profile, Request } from '../lib/supabase';
-import { CalendarCheck, Calendar, MapPin, Clock, AlertCircle, X, ChevronDown, ChevronUp, FileText } from 'lucide-react';
+import { CalendarCheck, Calendar, MapPin, Clock, AlertCircle, X, FileText } from 'lucide-react';
 import CancelRequestModal from './CancelRequestModal';
 import Segmented from './ui/Segmented';
 import { getHoraireStyle } from '../lib/horaireStyles';
@@ -23,7 +23,6 @@ export default function MyScheduleView({ currentUser }: MyScheduleViewProps) {
   const [selectedRequest, setSelectedRequest] = useState<PendingRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('confirmed');
-  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadMyShifts();
@@ -136,34 +135,10 @@ export default function MyScheduleView({ currentUser }: MyScheduleViewProps) {
     }).format(date);
   };
 
-  const toggleDayExpansion = (dateStr: string) => {
-    const newExpanded = new Set(expandedDays);
-    if (newExpanded.has(dateStr)) {
-      newExpanded.delete(dateStr);
-    } else {
-      newExpanded.add(dateStr);
-    }
-    setExpandedDays(newExpanded);
-  };
-
-  const groupShiftsByDate = (shiftsToGroup: Shift[]) => {
-    return shiftsToGroup.reduce((acc, shift) => {
-      if (!acc[shift.date]) {
-        acc[shift.date] = [];
-      }
-      acc[shift.date].push(shift);
-      return acc;
-    }, {} as Record<string, Shift[]>);
-  };
-
-  const groupedConfirmedShifts = groupShiftsByDate(shifts);
-  const groupedPendingShifts = groupShiftsByDate(
-    pendingRequests
-      .filter(req => req.shift !== null)
-      .map(req => req.shift)
+  // Demandes en attente reellement affichables (garde encore existante).
+  const visiblePending = pendingRequests.filter(
+    (req) => req.shift !== null && req.status === 'pending'
   );
-  const confirmedDates = Object.keys(groupedConfirmedShifts).sort();
-  const pendingDates = Object.keys(groupedPendingShifts).sort();
 
   // Lignes lieu / salle / horaire d'une garde, communes aux deux vues.
   const shiftInfoGrid = (shift: Shift) => (
@@ -210,55 +185,24 @@ export default function MyScheduleView({ currentUser }: MyScheduleViewProps) {
     </div>
   );
 
-  // Rend une journee (une ou plusieurs gardes), coloriee par horaire. Chaque
-  // garde porte sa propre couleur (une meme journee peut melanger les creneaux).
-  const renderDay = (
-    date: string,
-    dayShifts: Shift[],
-    renderExtra?: (shift: Shift) => JSX.Element | null,
-  ) => {
-    const isExpanded = expandedDays.has(date);
-    const hasMultipleShifts = dayShifts.length > 1;
-
-    const shiftCard = (shift: Shift, withDate: boolean) => {
-      const style = getHoraireStyle(shift.shift_type, shift.date);
-      return (
-        <div key={shift.id} className={`rounded-card p-4 ${style.cardClass}`}>
-          {withDate && (
-            <div className="mb-3 font-semibold capitalize text-ink">{formatDate(date)}</div>
-          )}
+  // Carte de garde : date sur bande couleur (selon le creneau) en tete, puis
+  // lieu / salle / horaire sur fond blanc. Une carte par garde (le cas normal
+  // etant une garde par jour ; d'eventuels doublons apparaissent en deux cartes).
+  const shiftCard = (shift: Shift, extra?: JSX.Element | null) => {
+    const style = getHoraireStyle(shift.shift_type, shift.date);
+    return (
+      <div
+        key={shift.id}
+        className="overflow-hidden rounded-card border border-border bg-carte shadow-card"
+      >
+        <div className={`px-4 py-2.5 ${style.bandClass}`}>
+          <span className="text-body-l font-semibold capitalize">{formatDate(shift.date)}</span>
+        </div>
+        <div className="bg-carte px-4 py-3">
           {shiftInfoGrid(shift)}
           {shift.coordinator_note && coordinatorNote(shift.coordinator_note)}
-          {renderExtra && <div className="mt-3">{renderExtra(shift)}</div>}
+          {extra && <div className="mt-3">{extra}</div>}
         </div>
-      );
-    };
-
-    if (!hasMultipleShifts) {
-      return <div key={date}>{shiftCard(dayShifts[0], true)}</div>;
-    }
-
-    return (
-      <div key={date} className="overflow-hidden rounded-card border border-border">
-        <button
-          onClick={() => toggleDayExpansion(date)}
-          className="flex w-full items-center justify-between bg-fond p-4 text-left transition-colors hover:bg-border/40"
-        >
-          <div>
-            <span className="font-semibold capitalize text-ink">{formatDate(date)}</span>
-            <span className="ml-2 text-caption">({dayShifts.length} gardes)</span>
-          </div>
-          {isExpanded ? (
-            <ChevronUp className="h-5 w-5 text-muted" />
-          ) : (
-            <ChevronDown className="h-5 w-5 text-muted" />
-          )}
-        </button>
-        {isExpanded && (
-          <div className="space-y-2 bg-carte p-2">
-            {dayShifts.map((shift) => shiftCard(shift, false))}
-          </div>
-        )}
       </div>
     );
   };
@@ -307,7 +251,7 @@ export default function MyScheduleView({ currentUser }: MyScheduleViewProps) {
         {loading ? (
           <div className="py-12 text-center text-muted">Chargement…</div>
         ) : viewMode === 'confirmed' ? (
-          confirmedDates.length === 0 ? (
+          shifts.length === 0 ? (
             emptyState(
               <CalendarCheck className="h-8 w-8 text-faint" />,
               'Aucune garde confirmée',
@@ -315,11 +259,11 @@ export default function MyScheduleView({ currentUser }: MyScheduleViewProps) {
             )
           ) : (
             <div className="space-y-3">
-              {confirmedDates.map((date) => renderDay(date, groupedConfirmedShifts[date]))}
+              {shifts.map((shift) => shiftCard(shift))}
             </div>
           )
         ) : (
-          pendingDates.length === 0 ? (
+          visiblePending.length === 0 ? (
             emptyState(
               <Calendar className="h-8 w-8 text-faint" />,
               'Aucune garde en attente',
@@ -327,17 +271,7 @@ export default function MyScheduleView({ currentUser }: MyScheduleViewProps) {
             )
           ) : (
             <div className="space-y-3">
-              {pendingDates.map((date) => {
-                const dayShifts = groupedPendingShifts[date].filter(shift => {
-                  const request = pendingRequests.find(req => req.shift_id === shift.id);
-                  return request && request.status === 'pending';
-                });
-                if (dayShifts.length === 0) return null;
-                return renderDay(date, dayShifts, (shift) => {
-                  const request = pendingRequests.find(r => r.shift_id === shift.id);
-                  return request ? removeButton(request) : null;
-                });
-              })}
+              {visiblePending.map((request) => shiftCard(request.shift, removeButton(request)))}
             </div>
           )
         )}

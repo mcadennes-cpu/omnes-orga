@@ -104,18 +104,12 @@ export default function DailyScheduleView() {
     ? shifts
     : shifts.filter(shift => shift.location === selectedSite);
 
-  const groupedShifts = filteredShifts.reduce((acc, shift) => {
-    if (!shift.assigned_doctor) return acc;
-
-    const doctorName = shift.assigned_doctor.full_name;
-    if (!acc[doctorName]) {
-      acc[doctorName] = [];
-    }
-    acc[doctorName].push(shift);
-    return acc;
-  }, {} as Record<string, ShiftWithDoctor[]>);
-
-  const doctorNames = Object.keys(groupedShifts).sort();
+  // Une pastille par garde (le cas normal etant une seule garde par medecin ;
+  // en cas d'erreur de saisie, le medecin apparait sur deux pastilles). Tri par
+  // nom de medecin pour regrouper visuellement d'eventuels doublons.
+  const sortedShifts = filteredShifts
+    .filter((s): s is ShiftWithDoctor & { assigned_doctor: Profile } => s.assigned_doctor !== null)
+    .sort((a, b) => a.assigned_doctor.full_name.localeCompare(b.assigned_doctor.full_name, 'fr'));
 
   return (
     <div className="space-y-6">
@@ -180,7 +174,7 @@ export default function DailyScheduleView() {
 
         {loading ? (
           <div className="py-12 text-center text-muted">Chargement…</div>
-        ) : doctorNames.length === 0 ? (
+        ) : sortedShifts.length === 0 ? (
           <div className="py-12 text-center">
             <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-fond">
               <Users className="h-8 w-8 text-faint" />
@@ -189,48 +183,48 @@ export default function DailyScheduleView() {
             <p className="text-caption">Il n'y a pas de gardes assignées pour cette date</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {doctorNames.map((doctorName) => {
-              const doctorShifts = groupedShifts[doctorName];
+          <div className="space-y-3">
+            {sortedShifts.map((shift) => {
+              const doctorName = shift.assigned_doctor.full_name;
+              const style = getHoraireStyle(shift.shift_type, shift.date);
               return (
-                <div key={doctorName} className="overflow-hidden rounded-card border border-border">
-                  <div className="flex items-center gap-3 bg-fond px-4 py-3">
-                    <Avatar profile={toAvatarProfile(doctorName)} size={40} />
-                    <div>
-                      <h4 className="text-body-l font-semibold text-ink">{doctorName}</h4>
-                      <p className="text-caption">
-                        {doctorShifts.length} garde{doctorShifts.length > 1 ? 's' : ''}
-                      </p>
+                <div
+                  key={shift.id}
+                  className="overflow-hidden rounded-card border border-border bg-carte shadow-card"
+                >
+                  <div className="flex items-stretch">
+                    {/* Avatar seul a gauche (pattern trombinoscope). */}
+                    <div className="flex flex-shrink-0 items-center px-4">
+                      <Avatar profile={toAvatarProfile(doctorName)} size={52} />
                     </div>
-                  </div>
-                  <div className="space-y-2 p-3">
-                    {doctorShifts.map((shift) => {
-                      const style = getHoraireStyle(shift.shift_type, shift.date);
-                      return (
-                        <div key={shift.id} className={`rounded-card p-3 ${style.cardClass}`}>
-                          <div className="flex flex-wrap items-center gap-4">
-                            <div className="flex min-w-[120px] items-center gap-2">
-                              <MapPin className="h-4 w-4 flex-shrink-0 text-muted" />
-                              <span className="text-body-m font-medium text-ink">{shift.location}</span>
-                            </div>
-                            <div className="flex min-w-[100px] items-center gap-2">
-                              <Calendar className="h-4 w-4 flex-shrink-0 text-muted" />
-                              <span className="text-body-m text-ink">{shift.room}</span>
-                            </div>
-                            <div className="flex min-w-[120px] items-center gap-2">
-                              <Clock className="h-4 w-4 flex-shrink-0 text-muted" />
-                              <span className="text-body-m text-ink">{shift.shift_type}</span>
-                            </div>
+                    {/* Colonne droite : nom (bande couleur du creneau) + infos (blanc). */}
+                    <div className="min-w-0 flex-1">
+                      <div className={`px-4 py-2.5 ${style.bandClass}`}>
+                        <h4 className="text-body-l font-semibold">{doctorName}</h4>
+                      </div>
+                      <div className="bg-carte px-4 py-3">
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4 flex-shrink-0 text-muted" />
+                            <span className="text-body-m font-medium text-ink">{shift.location}</span>
                           </div>
-                          {shift.coordinator_note && (
-                            <div className="mt-2 flex items-start gap-2 border-t border-border pt-2">
-                              <FileText className="mt-0.5 h-4 w-4 flex-shrink-0 text-canard" />
-                              <p className="text-body-m text-ink">{shift.coordinator_note}</p>
-                            </div>
-                          )}
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 flex-shrink-0 text-muted" />
+                            <span className="text-body-m text-ink">{shift.room}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4 flex-shrink-0 text-muted" />
+                            <span className="text-body-m text-ink">{shift.shift_type}</span>
+                          </div>
                         </div>
-                      );
-                    })}
+                        {shift.coordinator_note && (
+                          <div className="mt-2 flex items-start gap-2 border-t border-border pt-2">
+                            <FileText className="mt-0.5 h-4 w-4 flex-shrink-0 text-canard" />
+                            <p className="text-body-m text-ink">{shift.coordinator_note}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               );
