@@ -16,6 +16,7 @@ import MedecinCard from '../components/trombinoscope/MedecinCard'
 import { useMedecins } from '../hooks/useMedecins'
 import { useEntreesAnnuaire } from '../hooks/useEntreesAnnuaire'
 import { useRole } from '../hooks/useRole'
+import { entreeCategories } from '../lib/annuaireCategories'
 import { normalizeForSearch } from '../lib/profileFormat'
 import { supabase } from '../lib/supabaseClient'
 import HeaderWatermark from '../components/common/HeaderWatermark'
@@ -92,13 +93,13 @@ export default function Recherche() {
   }, [trimmed, medecins])
 
   // Filtrage Annuaire : memes champs que la recherche locale de la page
-  // Annuaire (nom, categorie, note), mais avec normalizeForSearch pour
+  // Annuaire (nom, categories, note), mais avec normalizeForSearch pour
   // rester insensible aux accents comme le reste de la recherche globale.
   const filteredAnnuaire = useMemo(() => {
     if (trimmed === '') return []
     return annuaireEntrees.filter((e) => {
       const text = normalizeForSearch(
-        `${e.nom ?? ''} ${e.categorie ?? ''} ${e.note ?? ''}`
+        [e.nom ?? '', ...entreeCategories(e), e.note ?? ''].join(' ')
       )
       return text.includes(trimmed)
     })
@@ -268,10 +269,10 @@ export default function Recherche() {
                     className="w-full text-left bg-carte rounded-card shadow-card border border-border p-3 hover:shadow-button transition-shadow"
                   >
                     <p className="text-body-l text-ink font-medium">{e.nom}</p>
-                    {(e.categorie || e.telephone) && (
+                    {(entreeCategories(e).length > 0 || e.telephone) && (
                       <p className="text-caption text-muted mt-0.5">
-                        {e.categorie}
-                        {e.categorie && e.telephone ? ' · ' : ''}
+                        {entreeCategories(e).join(', ')}
+                        {entreeCategories(e).length > 0 && e.telephone ? ' · ' : ''}
                         {e.telephone}
                       </p>
                     )}
