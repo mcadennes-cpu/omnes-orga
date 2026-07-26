@@ -8,6 +8,7 @@ import ConfirmDialog from '../components/common/ConfirmDialog'
 import { supabase } from '../lib/supabaseClient'
 import { useEntreeAnnuaire } from '../hooks/useEntreeAnnuaire'
 import { useEntreesAnnuaire } from '../hooks/useEntreesAnnuaire'
+import { collectCategories } from '../lib/annuaireCategories'
 import { useRole } from '../hooks/useRole'
 import { useAuth } from '../hooks/useAuth'
 import {
@@ -57,14 +58,10 @@ export default function EntreeAnnuaireDetail() {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
   const [deleteSubmitting, setDeleteSubmitting] = useState(false)
 
-  const existingCategories = useMemo(() => {
-    const set = new Set(
-      allEntrees
-        .map((e) => e.categorie)
-        .filter((c) => c && c.trim() !== '')
-    )
-    return Array.from(set).sort((a, b) => a.localeCompare(b, 'fr'))
-  }, [allEntrees])
+  const existingCategories = useMemo(
+    () => collectCategories(allEntrees),
+    [allEntrees]
+  )
 
   const canEdit = canEditEntreeAnnuaire({
     role,
