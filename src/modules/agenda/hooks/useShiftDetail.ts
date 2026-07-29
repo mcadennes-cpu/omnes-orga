@@ -55,6 +55,59 @@ async function revertPreviousDoctorRequest(
   }
 }
 
+// Gardes futures qui occupent la MEME case de roulement que `shift` : meme
+// site, salle et creneau, meme medecin, meme jour de la semaine et meme
+// semaine de cycle, a partir de la date de `shift` incluse.
+//
+// Pourquoi un filtre en deux temps : la semaine de roulement n'est pas une
+// colonne, elle se calcule a partir de la date (getRotationSlot). Impossible
+// donc de l'exprimer en SQL. On restreint au maximum cote base (site, salle,
+// creneau, medecin, date), puis on ne garde que les gardes qui retombent sur
+// la meme case. Meme demarche que handleApplyToRotationWeek.
+//
+// C'est ce filtrage qui manquait : la version precedente libererait toutes les
+// gardes futures du creneau, tous jours et toutes semaines confondus.
+async function findRotationSlotShifts(shift: Shift): Promise<{
+  weekday: number;
+  rotationWeek: number;
+  shiftIds: string[];
+}> {
+  const settings = await getRotationSettings();
+  if (!settings) {
+    throw new Error('Paramètres de roulement non configurés');
+  }
+
+  const { rotationWeek, weekday } = getRotationSlot(
+    new Date(shift.date),
+    settings,
+    { componentName: 'useShiftDetail.findRotationSlotShifts', inputOrigin: `shift.date: "${shift.date}"` }
+  );
+
+  const { data, error } = await supabase
+    .from('shifts')
+    .select('id, date')
+    .eq('site_id', shift.site_id)
+    .eq('room_id', shift.room_id)
+    .eq('shift_type_id', shift.shift_type_id)
+    .eq('assigned_doctor_id', shift.assigned_doctor_id)
+    .gte('date', shift.date);
+
+  if (error) throw error;
+
+  const shiftIds = (data ?? [])
+    .filter(candidate => {
+      const slot = getRotationSlot(
+        new Date(candidate.date),
+        settings,
+        { componentName: 'useShiftDetail.findRotationSlotShifts(filter)', inputOrigin: `candidate.date: "${candidate.date}"` }
+      );
+      return slot.rotationWeek === rotationWeek && slot.weekday === weekday;
+    })
+    .map(candidate => candidate.id);
+
+  return { weekday, rotationWeek, shiftIds };
+}
+
 export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () => void) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -370,17 +423,16 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
   const handleCancelAssignmentClick = async () => {
     if (isPartOfSeries || hasRotationRule) {
       if (hasRotationRule) {
-        // Avant d'ouvrir la modale, compter les gardes attribuees/demandees que
-        // "Supprimer la regle de roulement" libererait, pour l'afficher en garde-fou.
-        const { count } = await supabase
-          .from('shifts')
-          .select('id', { count: 'exact', head: true })
-          .eq('site_id', shift.site_id)
-          .eq('room_id', shift.room_id)
-          .eq('shift_type_id', shift.shift_type_id)
-          .gte('date', shift.date)
-          .in('status', ['assigned', 'pending']);
-        setRotationCancelCount(count ?? null);
+        // Avant d'ouvrir la modale, compter les gardes que "Supprimer la regle
+        // de roulement" libererait, pour l'afficher en garde-fou. On passe par
+        // le meme helper que l'action elle-meme : le compteur annonce donc
+        // exactement ce qui sera libere, sans risque de divergence.
+        try {
+          const { shiftIds } = await findRotationSlotShifts(shift);
+          setRotationCancelCount(shiftIds.length);
+        } catch {
+          setRotationCancelCount(null);
+        }
       }
       setShowCancelAssignmentModal(true);
     } else {
@@ -399,18 +451,9 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
       const userId = await getCurrentUserId();
 
       if (scope === 'rotation') {
-        const settings = await getRotationSettings();
-        if (!settings) {
-          throw new Error('Paramètres de roulement non configurés');
-        }
-
-        const shiftDate = new Date(shift.date);
-        const rotationWeek = getRotationWeek(
-          shiftDate,
-          settings,
-          { componentName: 'ShiftDetailModal.handleDelete(rotation)', inputOrigin: `shift.date: "${shift.date}"` }
-        );
-        const weekday = shiftDate.getDay();
+        // Les gardes a liberer sont calculees AVANT la suppression de la regle :
+        // meme case de roulement (jour + semaine de cycle) et meme medecin.
+        const { weekday, rotationWeek, shiftIds } = await findRotationSlotShifts(shift);
 
         const { error: deleteRuleError } = await supabase
           .from('rotation_assignment_rules')
@@ -424,21 +467,22 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
 
         if (deleteRuleError) throw deleteRuleError;
 
-        const { error: updateError } = await supabase
-          .from('shifts')
-          .update({
-            status: 'free',
-            assigned_doctor_id: null,
-            updated_at: new Date().toISOString()
-          })
-          .eq('site_id', shift.site_id)
-          .eq('room_id', shift.room_id)
-          .eq('shift_type_id', shift.shift_type_id)
-          .gte('date', shift.date);
+        if (shiftIds.length > 0) {
+          const { error: updateError } = await supabase
+            .from('shifts')
+            .update({
+              status: 'free',
+              assigned_doctor_id: null,
+              updated_at: new Date().toISOString()
+            })
+            .in('id', shiftIds);
 
-        if (updateError) throw updateError;
+          if (updateError) throw updateError;
+        }
 
-        alert('Règle de roulement supprimée. Toutes les futures gardes correspondantes ont été libérées.');
+        alert(
+          `Règle de roulement supprimée. ${shiftIds.length} garde${shiftIds.length > 1 ? 's' : ''} future${shiftIds.length > 1 ? 's' : ''} libérée${shiftIds.length > 1 ? 's' : ''}.`
+        );
       } else if (scope === 'series' && shift.series_id) {
         const { error: updateError } = await supabase
           .from('shifts')

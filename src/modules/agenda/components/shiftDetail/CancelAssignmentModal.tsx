@@ -38,7 +38,7 @@ export default function CancelAssignmentModal({
 
       {hasRotationRule && countLabel && (
         <div className="mb-4 rounded-input border border-brique/20 bg-brique/10 px-4 py-3 text-body-m text-brique">
-          Supprimer la règle libérera <strong>{countLabel}</strong> déjà attribuées ou demandées (à partir de cette date). Cette action est irréversible.
+          Supprimer la règle libérera <strong>{countLabel}</strong> placées sur cette même case du roulement — même médecin, même jour de la semaine, même semaine de cycle. Les autres gardes de ce créneau ne sont pas touchées. Cette action est irréversible.
         </div>
       )}
       <div className="space-y-3">
@@ -55,7 +55,7 @@ export default function CancelAssignmentModal({
             disabled={loading}
             className="w-full rounded-input bg-brique px-4 py-3 text-button text-white shadow-button transition-colors hover:bg-brique/90 disabled:opacity-50"
           >
-            Supprimer la règle de roulement (toutes les futures gardes)
+            Supprimer la règle de roulement
           </button>
         ) : isPartOfSeries && (
           <button
