@@ -516,6 +516,78 @@ Le circuit se comporte exactement comme le workflow décrit ci-dessus.
 
 ---
 
+## 7C-3 — Policies RLS (FAIT le 30/07/2026)
+
+Script `docs/sql/22-7C-3-agenda-rls-policies.sql`. **57 policies** sur les 14
+tables — les 61 de Planning (65 moins les 4 de `profiles`, devenue une vue qui
+hérite des RLS de `public.profiles`), moins **4 doublons `SELECT`** fusionnés.
+
+### Deux fonctions plutôt que le même test recopié 57 fois
+
+L'inventaire a montré que **29 policies sur 65** disaient exactement la même
+chose : « je suis coordinateur », sous la forme d'un `EXISTS` de quatre lignes
+répété à l'identique. Le mapping vers Orga aurait donc consisté à recopier 57
+fois la même traduction.
+
+À la place, deux fonctions centralisent les conditions :
+
+```sql
+agenda.peut_acceder()      -- compte actif + agenda_beta_access
+agenda.est_coordinateur()  -- + is_agenda_coordinator
+```
+
+Les policies deviennent lisibles (`using (agenda.peut_acceder())`), et surtout
+**la sortie de bêta devient une seule ligne à retirer dans une fonction**, au
+lieu de reprendre 57 policies. Les fonctions sont `stable` (évaluées une fois par
+requête et non par ligne) et `security definer` (elles lisent `public.profiles`
+sans dépendre des policies de cette table, ce qui écarte tout risque de
+récursion entre policies).
+
+### Décisions
+
+**Le filtre bêta est dans la base, pas seulement dans l'interface.** À partir de
+7D, les données vivent dans la base que les 10 associés utilisent quotidiennement
+avec leur session : ce n'est plus la tuile masquée qui protège l'agenda, ce sont
+les policies. Ce qui serait exposé sans ce filtre : non pas le planning (que tout
+le monde voit de toute façon), mais les **demandes des autres médecins** et les
+**notes du coordinateur**.
+
+**Les comptes désactivés sont bloqués par la base** (choix de Matthieu) —
+durcissement par rapport à Planning, qui ne vérifiait pas ce point. Concerne
+directement les 26 remplaçants créés en 7B-2, et tout départ futur.
+
+**Le faux filtre `is_active` est conservé tel quel.** Les policies d'origine
+nommées « voir les sites/salles/créneaux **actifs** » avaient pour condition
+`is_active = true OR auth.uid() IS NOT NULL` — toujours vraie pour un utilisateur
+connecté. Elles ne filtraient donc rien, et c'est heureux : un vrai filtre
+masquerait le lieu des gardes passées rattachées à un site depuis désactivé.
+Reconduit en `peut_acceder()`, avec le commentaire qui l'explique.
+
+**Simplification à la création d'une demande** : la policy d'origine exigeait en
+plus `role = 'doctor'`. Redondant — un coordinateur est déjà couvert par sa
+propre policy. Résultat identique.
+
+### Test par usurpation d'identité
+
+Policies testées en se faisant passer pour quatre profils réels (données
+jetables, supprimées ensuite ; tables vérifiées vides) :
+
+| Profil | Gardes | Demandes | Modèles de semaine | |
+|---|---:|---:|---:|---|
+| **Charlotte** (coordinatrice) | 2 | 2 | 1 | voit tout |
+| **Matthieu** (médecin, bêta) | 2 | **1** | **0** | ne voit que **sa** demande, pas les modèles |
+| **Associé hors bêta** | **0** | **0** | — | `peut_acceder()` = faux |
+| **Remplaçant désactivé** | **0** | — | — | `peut_acceder()` = faux |
+
+Les quatre comportements attendus sont vérifiés : planning ouvert à tous,
+demandes cloisonnées par médecin, outils de coordination réservés, et double
+verrou bêta + compte actif effectif au niveau de la base.
+
+**Charlotte Franzino** est désignée coordinatrice (`is_agenda_coordinator`), et
+elle dispose bien de l'accès bêta.
+
+---
+
 ## Suite du découpage
 
 | | Contenu | Écrit en base ? |
@@ -525,7 +597,7 @@ Le circuit se comporte exactement comme le workflow décrit ci-dessus.
 | **7B-2** | ✓ Création des 26 comptes de remplaçants dans Orga (inactifs, sans invitation). | Fait |
 | **7C-1** | ✓ Schéma `agenda`, 14 tables, contraintes, 75 index, vue `profiles`, colonne `is_agenda_coordinator`. | Fait |
 | **7C-2** | ✓ 2 fonctions, 10 triggers, circuit métier testé de bout en bout. | Fait |
-| **7C-3** | Les 65 policies RLS réécrites + désignation de Charlotte comme coordinatrice. | Oui, Orga |
+| **7C-3** | ✓ 57 policies RLS via 2 fonctions centralisées, testées par usurpation. Charlotte désignée coordinatrice. | Fait |
 | **7D** | Import des données avec remappage des identifiants + vérifications. | Oui, Orga |
 | **7E** | Bascule du module sur le client unique, suppression de l'écran de liaison. | Non |
 | **7F** | Script de re-synchronisation rejouable pour le soir de la bascule. | Préparé |
