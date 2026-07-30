@@ -322,13 +322,79 @@ comptes à créer.
 
 ---
 
+## 7B-2 — Création des comptes de remplaçants (FAIT le 30/07/2026)
+
+**26 comptes créés dans Omnès-Orga, 0 échec.** Le mapping est désormais complet :
+les 35 lignes à migrer ont toutes un identifiant cible, seules les 4 lignes
+`ECARTE_TEST` restent sans correspondance, volontairement.
+
+### Pourquoi maintenant et pas à l'étape 8
+
+`profiles.id` est une clé étrangère vers `auth.users` : **on ne peut pas créer un
+profil sans compte d'authentification**. Or les 2 684 gardes et 2 493 demandes à
+importer référencent ces médecins. Sans ces comptes, l'import échoue. L'étape 8
+se limitera donc à les **activer** et à envoyer les invitations.
+
+### Procédé
+
+Pour chacun des 26 (script `creer-remplacants.py`) :
+
+1. `POST /auth/v1/admin/users` avec un mot de passe aléatoire et
+   `email_confirm: false` — **aucun email envoyé, personne n'est notifié**. Le
+   mot de passe n'est conservé nulle part : l'accès se fera par réinitialisation
+   à l'étape 8.
+2. Le trigger `handle_new_user` crée le profil, mais avec **nom et prénom vides**
+   et `actif = true` — d'où la troisième étape.
+3. `UPDATE profiles` : `nom`, `prenom` et `actif = false`.
+
+Le découpage `full_name` → prénom/nom applique la règle « les mots en majuscules
+sont le nom » après retrait du préfixe `Dr`. Vérifiée sur les 26, particules
+comprises (`LE MOUËLLE`, `DE CONTENSON`, `DE MONTAIGNE DE PONCINS`) et prénoms
+composés (`Marie-Fleur`, `Anne-Eugénie`). Zéro cas douteux.
+
+**Garde-fou** exécuté avant toute écriture : aucun des 26 emails ne devait déjà
+exister dans `auth.users`. Vérifié, le script s'arrêtait sinon.
+
+### Contrôles après création
+
+| Contrôle | Résultat |
+|---|---|
+| Profils au total | 38 (12 + 26) |
+| Remplaçants créés, tous `actif = false` | 26 |
+| Profils sans nom | 0 |
+| **Médecins visibles au trombinoscope** | **10 — inchangé** |
+| Nouveaux comptes confirmés à tort | 0 |
+| Nouveaux comptes déjà connectés | 0 |
+
+**Aucun effet visible pour les associés** : les cinq endroits de l'appli
+principale qui lisent `profiles` (trombinoscope, sélecteur de membres,
+destinataires des sondages d'événements…) filtrent tous sur `actif = true`.
+
+**Réversibilité** : tant que l'import 7D n'a pas eu lieu, un `DELETE` sur les
+comptes `auth.users` correspondants supprime tout en cascade.
+
+### Constat annexe — 8 comptes d'authentification orphelins
+
+Relevé au passage, **sans rapport avec l'agenda** : la base Orga contient
+8 comptes `auth.users` **sans profil associé**, créés entre mai et juin 2026.
+Ce sont manifestement des comptes de test du développement de l'appli principale
+(`dr.martin@fictif.local`, `mireille@hello.com`, `mcadennes+1@gmail.com`…) dont
+le profil a été supprimé sans supprimer le compte. Deux d'entre eux se sont
+connectés en juin.
+
+Ils sont sans effet sur la migration, mais un utilisateur qui se connecterait
+avec l'un d'eux se retrouverait sans profil, dans un état non prévu par l'appli.
+**À nettoyer un jour, hors périmètre de l'étape 7** — aucune action prise.
+
+---
+
 ## Suite du découpage
 
 | | Contenu | Écrit en base ? |
 |---|---|---|
 | **7A** | ✓ Inventaire du schéma réel, écarts, décisions d'architecture. | Non |
 | **7B-1** | ✓ Correspondance des comptes, `mapping-comptes-agenda.csv`, arbitrages. | Non |
-| **7B-2** | Création des 26 comptes de remplaçants dans Orga (inactifs, sans invitation). | Oui, Orga |
+| **7B-2** | ✓ Création des 26 comptes de remplaçants dans Orga (inactifs, sans invitation). | Fait |
 | **7C** | Création du schéma `agenda` : tables, index, contraintes, fonctions, triggers, 65 policies RLS réécrites, vue `profiles`, `is_agenda_coordinator`. | Oui, Orga |
 | **7D** | Import des données avec remappage des identifiants + vérifications. | Oui, Orga |
 | **7E** | Bascule du module sur le client unique, suppression de l'écran de liaison. | Non |
