@@ -1,0 +1,40 @@
+statut,old_profile_id,new_profile_id,full_name,email_planning,email_orga,nb_gardes,nb_demandes,nb_regles
+ASSOCIE_MAPPE,0e11f4f4-3be5-41d0-b504-851b10b9ba10,64700032-1529-4d80-8bd2-ce34a62a52e0,Dr Mireille YUAN,yuan.mireille@gmail.com,yuan.mireille@gmail.com,142,0,36
+ASSOCIE_MAPPE,96dc3a83-31e0-4245-bb8c-5c00ef99e098,03ad0440-76ae-4ca7-96d1-b0e3a9557227,Dr Thomas ETIENNE,etienne.thomas04@gmail.com,etienne.thomas04@gmail.com,178,0,32
+ASSOCIE_MAPPE_MANUEL,e8f2c046-f4a6-40a1-b970-7ae00658eb0b,e099d757-7097-4642-8dc7-4cb4b9606b99,Dr Xavier BAUDRILLART,xavier.baudrillart@icloud.com,xavier.baudrillart@hotmail.fr,165,0,32
+ASSOCIE_MAPPE,016347eb-78b6-4b17-ad65-eecc2690acbb,5eef5c5f-fd92-4fe0-be40-b0e61ee8482a,Dr Imane EL GARI,imane.elgari@hotmail.com,imane.elgari@hotmail.com,195,3,31
+ASSOCIE_MAPPE,9fc7d8bf-1294-4494-9875-5d3f2f6a1581,1e6a73c0-df26-46c8-9c16-710238fd9d2f,Dr Christophe BERTRAND,christophe.bertrand3@gmail.com,christophe.bertrand3@gmail.com,161,0,31
+ASSOCIE_MAPPE,e7e07c22-dc55-441c-a917-29a7e3ac1b73,fad62100-0e6e-46b9-bf13-f69bc0c4a584,Dr Airelle SAUVAGE,airellesauvage@gmail.com,airellesauvage@gmail.com,155,0,31
+ASSOCIE_MAPPE,977dcbfb-51c9-447e-88b3-b676685652cb,3d062ad8-76bc-41da-a075-9ef1a128535f,Dr Laurene DAUDIN,laurene.d71@hotmail.fr,laurene.d71@hotmail.fr,174,0,30
+ASSOCIE_MAPPE,afde3102-050f-4d0b-ba03-7f2a9bff6f00,f00302cd-e01e-4991-b70f-944f9a4d5070,Dr Caroline CHAUVET,cjm.chauvet@gmail.com,cjm.chauvet@gmail.com,158,5,30
+ASSOCIE_MAPPE,72509561-ade7-4385-bdc4-bd8d609ed598,b43659df-fcd8-4d32-a915-efa2e580fbbd,Dr Matthieu CADENNES,mcadennes@gmail.com,mcadennes@gmail.com,156,11,29
+REMPLACANT_A_CREER,b9a660fb-d6bb-499a-98b6-ea138d87c7bd,,Dr Anne DEMONGEOT,demongeot.a@gmail.com,,111,431,0
+REMPLACANT_A_CREER,8a0b686a-f217-4a22-8251-228264d45f51,,Dr Louis BERTRAND,louisbertrand@outlook.com,,81,214,0
+REMPLACANT_A_CREER,2aea0688-7682-4a48-8fab-fea7583c5e25,,Dr Marie ZEHR,marie.zehr@hotmail.fr,,66,424,0
+REMPLACANT_A_CREER,d9f18eaf-5030-4bd1-b2b7-576553163090,,Dr Charly BILOTTA,charly.bilotta@gmail.com,,59,279,0
+REMPLACANT_A_CREER,67318a7a-6310-45ad-bba0-3de862754d3a,,Dr Marc JARRAUD,marc-jarraud@hotmail.fr,,58,276,0
+REMPLACANT_A_CREER,0573fcd7-0d5c-40ca-8846-d00e903a35ff,,Dr Hortense NAUDION,hortense.naudion@gmail.com,,42,226,0
+REMPLACANT_A_CREER,12fd14aa-9316-4efd-8367-af5b7a89f4dd,,Dr Fanny ERNOUF,ernouf.fanny@gmail.com,,40,120,0
+REMPLACANT_A_CREER,7c15e195-173d-42bb-a706-25cfba741fc9,,Dr Laurie-Anne BATISSE,laurieanne.batisse@gmail.com,,27,20,0
+REMPLACANT_A_CREER,18c919a1-a7db-4564-8a20-cd4280900755,,Dr Aymeric LE MOUËLLE,lemouelle.aymeric@yahoo.fr,,22,80,0
+REMPLACANT_A_CREER,5a4b2975-4888-490d-a134-f5d669d44bf8,,Dr Marie-Fleur PLOMINSKA,mf.plominska@gmail.com,,20,68,0
+REMPLACANT_A_CREER,09d6b593-df93-4e50-8314-f49277793db0,,Dr Florence STEINKAMP,flo.steinkamp@gmail.com,,19,32,0
+REMPLACANT_A_CREER,b9c8eab7-1fc5-445c-b4a0-bf468247ba81,,Dr Anne-Eugénie CHAUSSENOT,aechaussenot@gmail.com,,13,53,0
+REMPLACANT_A_CREER,275c8776-2af5-4c59-a030-5d9b18b1c348,,Dr Dylan THEBAULT,dylan.thebault@outlook.fr,,13,11,0
+REMPLACANT_A_CREER,fda2fb01-0f07-4ddb-8cee-0c8b05933ea8,,Dr Céline KRÄTTLI,celine.krattli2@gmail.com,,11,13,0
+REMPLACANT_A_CREER,d9f127ee-41d4-41d1-86b5-6b3513fdeb56,,Dr Caroline DE CONTENSON,carolinedecontenson@ymail.com,,10,39,0
+REMPLACANT_A_CREER,8f44b512-e24c-4217-b8a0-b0be7963ae5c,,Dr Elise RENAUDINEAU,elise.renaudineau@gmail.com,,10,31,0
+REMPLACANT_A_CREER,12332b47-74b3-40ea-8dc2-461d47c82302,,Dr Prescilia PHILIPS,presciliaphilips.pp@gmail.com,,10,40,0
+REMPLACANT_A_CREER,04d7f0af-d3a9-4421-b65f-69f5fdd98fcd,,Dr Célyne DUPONT,dupontcelyne@gmail.com,,9,12,0
+REMPLACANT_A_CREER,00eccaff-5378-4caa-969b-2d985876e8ee,,Dr Sarah GUARAGNA,sarahguaragna@gmail.com,,9,14,0
+REMPLACANT_A_CREER,94e79eb2-62e2-4f33-ad9b-9a132ffc2b08,,Dr Théo MARSALA,marsala.theo@gmail.com,,9,15,0
+REMPLACANT_A_CREER,c8423d95-6ec0-40b7-be7d-d98a9d2b74c1,,Dr Louis DE MONTAIGNE DE PONCINS,louis1911@orange.fr,,8,11,0
+REMPLACANT_A_CREER,3fe117ff-715e-47f7-bd73-6f0b8a2332fb,,Dr Yitian LUCOT,yitianlucot@gmail.com,,6,21,0
+REMPLACANT_A_CREER,2cdf632e-2194-491c-9367-0efc65e80d3b,,Dr Mathilde GAIMARD,gaimard.mat@gmail.com,,4,18,0
+REMPLACANT_A_CREER,98f26fb6-4c7a-4bfe-ab89-27cef74ea788,,Dr Aymeric GOUVERNEUR,gouverneur.aymeric@gmail.com,,3,20,0
+ECARTE_TEST,e881368e-4209-4700-a282-8311cfb5d516,,Dr 3,dr3@dr.fr,,1,0,0
+ECARTE_TEST,475666e0-a4d9-4973-b681-81a0530680e6,,Coordinateur Admin,contact@omnesmedecins.fr,,0,0,0
+REMPLACANT_A_CREER,ef436358-58f9-49cb-9038-96b00a0331ce,,Dr Claire VIGNE,claire.maubeuge@hotmail.fr,,0,2,0
+REMPLACANT_A_CREER,48d5db37-48ed-48f1-be20-3c716805a743,,Dr Mathilde LEDOUX,ledouxm@hotmail.fr,,0,0,0
+ECARTE_TEST,1d42081a-1cf9-417e-9591-a4c11f2b4b69,,Dr One,drone@dr.fr,,0,4,0
+ECARTE_TEST,83ae82a1-8ab7-4ac9-8505-27a3a471e4a0,,Dr two,drtwo@dr.fr,,0,0,0

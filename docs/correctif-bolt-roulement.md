@@ -1,8 +1,11 @@
 # Correctif à reporter dans l'appli Bolt (OMNÈS PLANNING)
 
+> ✓ **APPLIQUÉ ET VÉRIFIÉ LE 30/07/2026.** Ce document est conservé comme
+> trace de l'incident et du correctif. Les deux applications sont alignées.
+
 > Incident du 29/07/2026 — 100 gardes libérées par erreur.
-> Le même défaut existe dans les deux applications ; corriger Omnès-Orga ne
-> protège pas le cabinet tant que Bolt tourne en production.
+> Le même défaut existait dans les deux applications ; corriger Omnès-Orga ne
+> protégeait pas le cabinet tant que Bolt tournait en production.
 
 ## Le problème en une phrase
 

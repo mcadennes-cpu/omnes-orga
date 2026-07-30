@@ -135,10 +135,27 @@ ALTER TABLE profiles ADD COLUMN agenda_beta_access boolean DEFAULT false;
 2. ✓ **Étape 2 — FAITE (23/07/2026)** — Colonne `agenda_beta_access`, tuile « Planning » conditionnelle sur la grille d'accueil, route `/planning` vers le module (chargement lazy). Détail dans « Suivi d'avancement » ci-dessous.
 3. ✓ **Étape 3 — FAITE (23/07/2026)** — Supprimer du module tout ce qui est listé en "à SUPPRIMER", brancher l'utilisateur connecté d'Omnès-Orga (adaptateur : profil Orga → format attendu par le module, mapping des rôles). Détail dans « Suivi d'avancement » ci-dessous.
 4. ✓ **Étape 4 — FAITE (23-24/07/2026)** — Refonte UI complète vue par vue + découpage de `ShiftDetailModal`. Détail dans « Suivi d'avancement » ci-dessous.
-5. **Étape 5** — Tests en bêta à 2 utilisateurs pendant l'usage réel (les données sont partagées avec l'appli Bolt : tout ce qui se passe dans l'une se voit dans l'autre).
-6. **Étape 6** — Modifications fonctionnelles souhaitées (liste à compléter).
-7. **Étape 7** — Migration des données vers le projet Supabase principal (voir section Migration), remplacement de `supabaseAgenda` par le client unique.
-8. **Étape 8** — Ouverture à tous, création des comptes remplaçants, extinction de l'appli Bolt.
+5. ✓ **Étape 5 — FAITE (24-29/07/2026)** — Tests en bêta à 2 utilisateurs pendant l'usage réel (les données sont partagées avec l'appli Bolt : tout ce qui se passe dans l'une se voit dans l'autre). Principal résultat : l'incident « des gardes sautent » du 29/07, diagnostiqué et corrigé des deux côtés.
+6. **Étape 6** — Modifications fonctionnelles souhaitées : MOD-1 (roulement) et MOD-2 (annulation). **⚠️ Exécutée APRÈS l'étape 7** — voir l'encadré ci-dessous.
+7. **Étape 7 — EN COURS (à partir du 30/07/2026)** — Migration des données vers le projet Supabase principal (voir section Migration), remplacement de `supabaseAgenda` par le client unique.
+8. **Étape 8** — Ouverture à tous, activation des comptes remplaçants, extinction de l'appli Bolt.
+
+> **⚠️ Inversion de l'ordre d'exécution des étapes 6 et 7 (décidée le 30/07/2026).**
+> Les numéros sont conservés (MOD-1 et MOD-2 restent « l'étape 6 » dans toute la
+> doc), mais **l'étape 7 est réalisée en premier**.
+>
+> **Pourquoi** : MOD-1 exige deux nouvelles tables (`rotation_plans` /
+> `rotation_plan_rules`) et la suppression d'une contrainte `UNIQUE` ; MOD-2
+> exige un journal d'activité et une colonne `deleted_at`. Or la règle du projet
+> interdit toute migration structurelle sur la base Planning tant que l'appli
+> Bolt tourne dessus en production. **Les deux chantiers de l'étape 6 supposent
+> donc la maîtrise du schéma, que seule l'étape 7 apporte.** Le plan initial les
+> avait mis dans le mauvais ordre.
+>
+> **Conséquences** : la bêta cesse de s'exercer sur les données vivantes (le
+> module travaillera sur une copie dans la base Orga) ; il faut prévoir une
+> **re-synchronisation du delta** le soir de la bascule, puisque Bolt continue
+> d'être utilisé pendant tout le développement (sous-étape 7F).
 
 ### Suivi d'avancement
 
@@ -198,8 +215,12 @@ ALTER TABLE profiles ADD COLUMN agenda_beta_access boolean DEFAULT false;
     - **Correctif** (commit `120c798`) : helper `findRotationSlotShifts` dans `useShiftDetail`, partagé par l'action **et** par le compteur d'avertissement (plus de divergence possible entre ce qui est annoncé et ce qui est fait). Il restreint au maximum côté base puis ne retient que les gardes de la **même case** du roulement ; l'écriture porte sur une **liste d'identifiants explicite** (`.in('id', …)`), plus sur un filtre ouvert. Vérifié sur les données réelles : le clic à l'origine de l'incident libère désormais **2 gardes au lieu de 67**. Libellé du bouton corrigé au passage (il annonçait « toutes les futures gardes »).
     - **Réparation des données** (script `docs/sql/23-1-agenda-restaure-gardes-liberees.sql`) : 8 gardes rendues aux remplaçants + 2 sans conflit (trace = demande `approved`), 6 gardes de roulement rendues au Dr Mireille YUAN, **1 règle de roulement recréée** (lundi S8 — supprimée par l'incident, son existence prouvée par les gardes passées), 42 gardes remises en `pending` (le déclencheur `update_shift_status` ne réagit qu'aux écritures sur `requests` : l'`UPDATE` en masse sur `shifts` avait laissé les demandes en attente invisibles au coordinateur), et 15 demandes approuvées fantômes closes en `cancelled` (médecin déjà affecté ailleurs ce jour-là — arbitré avec Matthieu). Contrôles finaux : 0 orphelines, 0 incohérence de statut, 0 double réservation.
     - **Limite assumée** : ~46 gardes libérées n'ont **aucune trace** en base (ni demande, ni règle de roulement) — soit elles étaient déjà libres, soit assignées en direct par le coordinateur, chemin qui n'écrit rien d'exploitable. Elles n'ont pas pu être reconstituées.
-    - **⚠️ Reste à faire — l'appli Bolt** : le **même défaut** existe dans `reference-agenda/src/components/ShiftDetailModal.tsx` (ligne 450), et Bolt est toujours en production. Corriger Omnès-Orga ne protège pas le cabinet. Marche à suivre détaillée dans `docs/correctif-bolt-roulement.md` (le code y est en ligne, pas dans un hook, et sa lib n'expose pas `getRotationSlot` : version adaptée fournie).
+    - ✓ **Appli Bolt corrigée (30/07/2026)** : le **même défaut** existait dans `src/components/ShiftDetailModal.tsx` de l'appli Bolt (ligne 450), toujours en production. Matthieu a reporté le correctif et vérifié le comportement sur le Site TEST. Les deux applications sont désormais alignées ; le point est clos. Marche à suivre conservée dans `docs/correctif-bolt-roulement.md` à titre de trace.
     - **Leçon pour MOD-2** : cet incident valide la priorité du **journal d'activité** et de la **suppression douce** (`deleted_at`). Le diagnostic n'a été possible qu'en recoupant `updated_at` à la seconde près avec les demandes et les règles de roulement — un journal aurait donné la réponse en une requête. Toujours reporté à MOD-2 / étape 7 (interdit de créer une table dans la base Planning tant qu'on en est client).
+
+- ⏳ **Étape 7 — EN COURS (à partir du 30/07/2026)** — Migration vers la base Omnès-Orga, réalisée **avant** l'étape 6 (justification dans l'encadré du plan ci-dessus). Le suivi détaillé de cette étape vit dans un document dédié : **`docs/migration-agenda-etape7.md`** (inventaire du schéma réel, écarts relevés, décisions d'architecture, découpage 7A → 7F).
+  - ✓ **7B-1 — FAITE (30/07/2026)** — Correspondance des comptes établie : 9 associés rapprochés (dont Xavier Baudrillart, arbitré manuellement — double adresse), **26 comptes de remplaçants à créer**, 4 comptes de test écartés (1 garde et 4 demandes de test abandonnées). Fichier `docs/mapping-comptes-agenda.csv`. Deux questions ouvertes de la checklist sont tranchées au passage : la correspondance initiales → comptes pour MOD-1, et le fait que **les associés gérants n'ont pas les droits coordinateur** (Charlotte Franzino sera la seule coordinatrice).
+  - ✓ **7A — FAITE (30/07/2026)** — Inventaire du schéma Planning de production relevé en lecture seule via l'API Management, recoupé avec les 34 migrations d'origine. 15 tables à migrer (~5 700 lignes), 65 policies RLS à réécrire, 58 index, 5 fonctions, 9 triggers. **8 écarts ou défauts** documentés avec leur décision (table `events` orpheline écartée, `shifts` dénormalisée conservée en l'état, `CHECK` figeant les sites à Dijon/Beaune supprimé, clés étrangères vers `auth.users` uniformisées vers `profiles`, triggers `updated_at` manquants ajoutés, policies en double dédupliquées). **Architecture retenue** : schéma dédié `agenda` + vue `agenda.profiles` traduisant `public.profiles` au format attendu par le module + colonne `is_agenda_coordinator`. Découverte annexe : les `shift_types` ne correspondent pas aux codes du fichier Excel (voir la checklist plus bas).
 
 ---
 
@@ -430,10 +451,10 @@ Autres améliorations à prévoir quelle que soit la piste retenue : remplacer `
 - [x] ~~Signification des codes J1 à J8~~ — documentée dans `desiderata.yaml`, reprise dans le tableau ci-dessus. **Placer `desiderata.yaml` dans `docs/`** : il fait autorité sur les contraintes.
 - [x] ~~Noms complets des 9 associés~~ — connus (`analyse-planning-actuel.md`).
 - [ ] **⚠️ Date réelle de démarrage du roulement V2** : quelle semaine calendaire correspond à `S1` ? Aucun fichier ne le précise, et c'est la valeur `start_date` du plan — sans elle, l'application ne peut pas placer le roulement sur le calendrier.
-- [ ] **Emails des 9 associés** dans Omnès-Orga, pour relier les initiales aux comptes. (Attention à l'orthographe variable *Laurene / Laurène Daudin* selon les fichiers.)
-- [ ] **État des `shift_types` déjà déclarés dans l'agenda** : correspondent-ils aux codes J1–J8 et à leurs horaires réels ? À vérifier dans l'onglet Paramètres avant l'import.
+- [x] ~~**Emails des 9 associés** dans Omnès-Orga, pour relier les initiales aux comptes~~ — établi le 30/07/2026 en 7B-1, et mieux : **la correspondance initiales → comptes est résolue** (`MY` Mireille YUAN, `TE` Thomas ETIENNE, `XB` Xavier BAUDRILLART, `AS` Airelle SAUVAGE, `CB` Christophe BERTRAND, `IEG` Imane EL GARI, `CC` Caroline CHAUVET, `LD` Laurène DAUDIN, `MC` Matthieu CADENNES). Déduite des règles de roulement présentes en base, pas d'une saisie manuelle. Détail dans `migration-agenda-etape7.md`, table de correspondance complète dans `docs/mapping-comptes-agenda.csv`.
+- [x] ~~**État des `shift_types` déjà déclarés dans l'agenda**~~ — vérifié le 30/07/2026 en 7A : **ils ne correspondent pas**. 15 créneaux déclarés, dont le nom inclut le site (`J1 Beaune`, `J2 Dijon`…), aucun `J6`, trois écarts d'horaire avec `desiderata.yaml` et des irrégularités de saisie. Détail et conséquences pour MOD-1 dans `migration-agenda-etape7.md`. **Reste à arbitrer** : la source de vérité des horaires est-elle la base ou `desiderata.yaml` ?
 - [ ] Décision sur la piste d'annulation retenue (A, B ou C).
-- [ ] Confirmation : les associés gérants ont-ils les droits coordinateur sur l'agenda ?
+- [x] ~~Confirmation : les associés gérants ont-ils les droits coordinateur sur l'agenda ?~~ — **NON**, tranché par Matthieu le 30/07/2026. **Charlotte Franzino est la seule coordinatrice** (`is_agenda_coordinator = true` sur son compte). Caroline Chauvet, Thomas Étienne et Xavier Baudrillart restent `doctor` sur l'agenda malgré leur rôle `associe_gerant`. Le compte générique `Coordinateur Admin` de Planning, avec lequel Charlotte se connecte aujourd'hui, n'est pas migré.
 
 ---
 
