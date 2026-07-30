@@ -588,6 +588,93 @@ elle dispose bien de l'accès bêta.
 
 ---
 
+## 7D — Import des données (FAIT le 30/07/2026)
+
+**5 664 lignes importées** dans le schéma `agenda` de la base Orga, avec
+remappage complet des identifiants de profils. Script `import-7d.py`.
+
+| Table | Lignes | | Table | Lignes |
+|---|---:|---|---|---:|
+| `shifts` | 2 681 | | `rooms` | 12 |
+| `requests` | 2 481 | | `fixed_duty_series` | 9 |
+| `rotation_assignment_rules` | 282 | | `sites` | 2 |
+| `opening_week_template_items` | 101 | | `week_templates` | 2 |
+| `week_template_items` | 76 | | `opening_week_templates` | 2 |
+| `shift_types` | 15 | | `rotation_settings` | 1 |
+
+`undo_buffer` n'est pas importée (données jetables, structure seule).
+`fixed_duty_patterns` était déjà vide.
+
+### Contrôles préalables — historique sain
+
+Avant tout import, vérifié côté Planning : **aucun** doublon médecin/jour (qui
+aurait fait échouer `unique_doctor_per_day`), **aucun** doublon de demande
+active, **aucun** doublon `unique_shift`, **aucune** demande orpheline, **aucune**
+garde sans site, salle ou créneau. La réparation du 29/07 a laissé une base
+propre.
+
+### Le trigger métier désactivé pendant l'import
+
+`trigger_update_shift_status` a été **désactivé** le temps d'insérer `requests`,
+puis réactivé (état vérifié : `ACTIF`). Sans cela, chaque demande insérée aurait
+réécrit le statut de la garde correspondante — l'import se serait « corrigé »
+lui-même et aurait produit un état différent de l'original.
+
+### Découverte : `Coordinateur Admin` est le compte de travail de Charlotte
+
+Prévu comme compte de test à écarter en 7B-1, l'inventaire des références a
+montré qu'il est en réalité l'auteur de :
+
+- **259 gardes**
+- **282 règles de roulement — la totalité**
+- **2 modèles de semaine**
+
+Et `week_templates.created_by` étant `NOT NULL`, l'écarter aurait fait **échouer**
+l'import des modèles. Décision de Matthieu : **tout rattacher à Charlotte
+Franzino**. Son travail est ainsi conservé et attribué nominativement, tandis que
+le compte générique disparaît. Vérifié après import : 259 gardes et 282 règles
+portent bien son nom.
+
+Restent écartés : `Dr One`, `Dr two`, `Dr 3` — avec **1 garde** (assignée à
+`Dr 3`) et **6 demandes** (4 de `Dr One`, 2 portant sur la garde écartée).
+
+### Autre constat : `reviewed_by` n'est jamais renseigné
+
+**Aucune** des 2 487 demandes ne porte de validateur. La colonne existe et le
+trigger sait la remplir, mais l'interface ne la transmet jamais. On ne peut donc
+pas savoir qui a validé quoi — un manque que le journal d'activité de MOD-2
+comblerait.
+
+### Vérifications après import
+
+| Contrôle | Résultat |
+|---|---|
+| Gardes `assigned` sans médecin | 0 |
+| Gardes `free` avec un médecin | 0 |
+| Demandes orphelines | 0 |
+| Gardes sans site, salle ou créneau | 0 |
+| Médecins distincts sur les gardes | 33 |
+| Médecins distincts sur les demandes | 28 |
+| Trigger métier | ACTIF |
+| Amplitude des données | 29/12/2025 → 03/01/2027 |
+| Gardes à venir | 1 149, dont 137 libres |
+
+### ⚠️ La photo est déjà périmée — et c'est beaucoup plus rapide que prévu
+
+La comparaison des statuts après import montre des écarts (gardes `assigned`
+−6, demandes `pending` +15…). Vérification faite, ils **ne viennent pas de
+l'import** mais de l'activité réelle : au moment de la copie, Planning
+enregistrait **199 demandes validées et 109 gardes modifiées dans les 30
+dernières minutes** — Charlotte était en pleine session de validation du
+planning.
+
+**Enseignement pour la bascule** : le delta n'est pas un détail. Une session de
+travail de la coordinatrice produit plusieurs centaines de modifications en une
+demi-heure. Le script 7F doit donc être une vraie resynchronisation, et la
+bascule doit se faire à un moment où personne ne travaille dans Bolt.
+
+---
+
 ## Suite du découpage
 
 | | Contenu | Écrit en base ? |
@@ -598,7 +685,7 @@ elle dispose bien de l'accès bêta.
 | **7C-1** | ✓ Schéma `agenda`, 14 tables, contraintes, 75 index, vue `profiles`, colonne `is_agenda_coordinator`. | Fait |
 | **7C-2** | ✓ 2 fonctions, 10 triggers, circuit métier testé de bout en bout. | Fait |
 | **7C-3** | ✓ 57 policies RLS via 2 fonctions centralisées, testées par usurpation. Charlotte désignée coordinatrice. | Fait |
-| **7D** | Import des données avec remappage des identifiants + vérifications. | Oui, Orga |
+| **7D** | ✓ 5 664 lignes importées et vérifiées, identifiants remappés. | Fait |
 | **7E** | Bascule du module sur le client unique, suppression de l'écran de liaison. | Non |
 | **7F** | Script de re-synchronisation rejouable pour le soir de la bascule. | Préparé |
 
