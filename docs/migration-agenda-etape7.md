@@ -146,13 +146,17 @@ remappage des identifiants devrait suivre deux chemins différents lors de
 l'import, pour un résultat identique. Aucune perte : dans Planning, `profiles.id`
 *est* `auth.users.id`.
 
-### 6. Triggers `updated_at` manquants sur 4 tables
+### 6. Triggers `updated_at` manquants sur 3 tables
 
-`rotation_assignment_rules`, `rotation_settings`, `week_templates` et
-`week_template_items` ont une colonne `updated_at` avec un `DEFAULT now()`, mais
-**aucun trigger ne la met à jour**. Elle reste donc figée à la date de création.
-À ajouter en 7C — c'est précisément ce type d'horodatage qui a permis de
-reconstituer l'incident du 29/07.
+`rotation_assignment_rules`, `rotation_settings` et `week_templates` ont une
+colonne `updated_at` avec un `DEFAULT now()`, mais **aucun trigger ne la met à
+jour**. Elle reste donc figée à la date de création. Ajoutés en 7C-2 — c'est
+précisément ce type d'horodatage qui a permis de reconstituer l'incident du
+29/07.
+
+*(Rectification : ce point annonçait 4 tables au relevé initial.
+`week_template_items` n'a pas de colonne `updated_at` du tout, il n'y avait donc
+rien à corriger de ce côté.)*
 
 ### 7. Policies RLS en double
 
@@ -433,6 +437,85 @@ Charlotte Franzino. Sans policy, la colonne n'a encore aucun effet.
 
 ---
 
+## 7C-2 — Fonctions et triggers (FAIT le 30/07/2026)
+
+Script `docs/sql/22-7C-2-agenda-fonctions-triggers.sql`. **2 fonctions, 10
+triggers.** Principe appliqué : **iso-comportement**.
+
+### Le workflow de pré-validation, expliqué par Matthieu
+
+Explication métier recueillie le 30/07/2026, absente de toute documentation
+jusque-là — elle éclaire le « pourquoi » de tout le circuit :
+
+> La pré-validation est **le brouillon de travail de la coordinatrice**.
+> Charlotte voit toutes les demandes sur un ou deux mois et pré-valide au fur et
+> à mesure (la case passe en bleu). **Le médecin n'est pas prévenu.** Elle peut
+> revenir en arrière et remplacer un médecin par un autre — parce qu'il a moins
+> de gardes, ou pour éviter une série trop longue. Tout cela est invisible des
+> médecins, sinon ils recevraient des notifications d'assignation et
+> d'annulation en permanence. Quand le planning entier lui convient, elle valide
+> définitivement en une fois : c'est seulement à ce moment que les médecins
+> voient leurs gardes.
+
+Conséquence directe : **pendant toute la phase de brouillon, la garde reste en
+`pending`**. Elle ne passe en `assigned` qu'à la validation finale.
+
+### Pourquoi migrer à l'identique plutôt que corriger
+
+L'analyse du trigger a fait apparaître une **asymétrie** : le retrait d'une
+pré-validation libère la garde **sans vérifier** qu'elle est encore en `pending`,
+alors que le refus et l'annulation, eux, le vérifient.
+
+L'explication du workflow montre que c'est **sans effet dans le flux réel** : au
+moment où Charlotte retire une pré-validation, la garde est forcément encore en
+attente. Le cas ne devient atteignable que par un chemin de traverse — une
+**attribution directe** qui croiserait une pré-validation encore active sur la
+même garde. Rare, mais réel, et c'est le même schéma que l'incident du 29/07 :
+une action dont le périmètre dépasse ce qu'elle annonce.
+
+Décision : **conservé tel quel**, et documenté en commentaire dans le SQL. Une
+migration à comportement constant est vérifiable — toute différence constatée
+après la bascule est un vrai problème, et non un changement qu'on aurait
+introduit soi-même. La correction relève de MOD-2, qui prévoit déjà le journal
+d'activité et le garde-fou de cohérence.
+
+### Écarts assumés, sans effet observable
+
+- Les **3 fonctions `updated_at` d'origine étaient strictement identiques**
+  (même corps, caractère pour caractère) : une seule est reprise,
+  `agenda.set_updated_at()`.
+- **3 triggers `updated_at` ajoutés** (voir écart n°6).
+- `create_profile_for_user` **non reprise** : gestion des comptes, du ressort de
+  l'appli principale depuis l'étape 3A.
+- `search_path` passé de `'public'` à `'agenda'` — indispensable, la fonction
+  référence `shifts` et `requests` sans qualifier leur schéma.
+- `SECURITY DEFINER` **conservé** : un médecin qui crée une demande n'a pas le
+  droit d'écrire dans `shifts`. C'est la fonction, exécutée avec les droits de
+  son propriétaire, qui fait basculer la garde. Sans cela le circuit se bloque
+  dès la première demande.
+- La note de rejet automatique reste en anglais (`Another doctor was assigned to
+  this shift`, 962 occurrences en base). Elle n'est **affichée nulle part** dans
+  l'interface ; la traduire créerait deux formulations dans l'historique.
+
+### Test de bout en bout
+
+Le circuit complet a été rejoué sur des données jetables, puis effacé (tables
+vérifiées vides ensuite) :
+
+| Étape | Résultat |
+|---|---|
+| Garde créée | `free` |
+| Le Dr A demande | garde → `pending` |
+| Le Dr B demande aussi | les deux demandes coexistent |
+| Pré-validation du Dr A | garde reste `pending`, Dr A posé dessus |
+| Retrait de la pré-validation | garde reste `pending` (demande du Dr B active), plus aucun médecin posé |
+| Validation du Dr B | garde → `assigned`, attribuée au Dr B |
+| Demande concurrente du Dr A | passée en `rejected` automatiquement |
+
+Le circuit se comporte exactement comme le workflow décrit ci-dessus.
+
+---
+
 ## Suite du découpage
 
 | | Contenu | Écrit en base ? |
@@ -441,7 +524,7 @@ Charlotte Franzino. Sans policy, la colonne n'a encore aucun effet.
 | **7B-1** | ✓ Correspondance des comptes, `mapping-comptes-agenda.csv`, arbitrages. | Non |
 | **7B-2** | ✓ Création des 26 comptes de remplaçants dans Orga (inactifs, sans invitation). | Fait |
 | **7C-1** | ✓ Schéma `agenda`, 14 tables, contraintes, 75 index, vue `profiles`, colonne `is_agenda_coordinator`. | Fait |
-| **7C-2** | Fonctions et triggers, dont `update_shift_status` et les 4 `updated_at` manquants. | Oui, Orga |
+| **7C-2** | ✓ 2 fonctions, 10 triggers, circuit métier testé de bout en bout. | Fait |
 | **7C-3** | Les 65 policies RLS réécrites + désignation de Charlotte comme coordinatrice. | Oui, Orga |
 | **7D** | Import des données avec remappage des identifiants + vérifications. | Oui, Orga |
 | **7E** | Bascule du module sur le client unique, suppression de l'écran de liaison. | Non |
