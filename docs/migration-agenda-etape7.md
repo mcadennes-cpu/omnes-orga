@@ -36,7 +36,8 @@ l'API Management, comme pour tous les scripts `docs/sql/`.
 
 ### Objets à recréer
 
-- **15 tables** (la 16e, `events`, est écartée — voir plus bas)
+- **14 tables** + 1 vue (sur les 16 tables d'origine : `events` est écartée et
+  `profiles` devient une vue sur `public.profiles` — voir plus bas)
 - **65 policies RLS** (69 moins les 4 d'`events`) — **toutes à réécrire**, elles
   reposent sur `profiles.role = 'coordinator'` qui n'existe plus côté Orga
 - **58 index** hors clés primaires et contraintes d'unicité
@@ -172,7 +173,7 @@ désignation explicite (`is_agenda_coordinator`, voir ci-dessous).
 
 ### Un schéma PostgreSQL dédié `agenda`
 
-Les 15 tables sont créées dans un schéma `agenda`, pas dans `public`.
+Les 14 tables sont créées dans un schéma `agenda`, pas dans `public`.
 
 **Pourquoi** : les noms `shifts`, `sites`, `rooms`, `requests` sont trop
 génériques pour cohabiter avec les tables de l'appli principale. Surtout, le
@@ -388,6 +389,50 @@ avec l'un d'eux se retrouverait sans profil, dans un état non prévu par l'appl
 
 ---
 
+## 7C-1 — Création du schéma et des tables (FAIT le 30/07/2026)
+
+Script `docs/sql/22-7C-1-agenda-schema-tables.sql`, exécuté sur le projet Orga.
+
+| Objet | Résultat |
+|---|---|
+| Tables créées dans `agenda` | 14 |
+| Vue `agenda.profiles` | 1 |
+| Index | 75 |
+| Tables avec RLS activée | 14 |
+| Colonne `is_agenda_coordinator` | créée |
+
+**Contrôle par comparaison directe avec le schéma Planning** : les 14 tables sont
+identiques **colonne par colonne** (types compris), et le nombre d'index
+correspond **table par table**, 75 des deux côtés. La vue renvoie bien le format
+attendu par le module (`full_name` concaténé, `role` calculé, `is_active`).
+
+### Choix d'implémentation
+
+**Les clés étrangères pointent vers `public.profiles`, pas vers la vue** —
+PostgreSQL n'autorise pas de clé étrangère vers une vue. La vue sert à la lecture
+par le module ; l'intégrité référentielle s'appuie sur la table réelle. C'est
+exactement la configuration validée par le test PostgREST de 7A.
+
+**RLS activée dès la création, sans aucune policy** : tout est fermé jusqu'à
+7C-3. À aucun moment une table n'est ouverte en grand.
+
+**Droits accordés à `authenticated` seulement, pas à `anon`.** Supabase accorde
+par défaut aux deux sur `public`, en s'en remettant à la RLS ; ici le module
+exige une session, autant ne pas ouvrir un accès anonyme inutile.
+
+**Index** : 55 index explicites (les 58 d'origine moins les 3 de `profiles`,
+devenue vue), auxquels s'ajoutent 14 clés primaires et 6 contraintes d'unicité
+en ligne — soit les 75 relevés.
+
+Le script **n'est pas idempotent** : le rejouer échouerait. Volontaire. Les
+instructions étant envoyées en un seul appel, PostgreSQL les traite comme une
+transaction unique — un échec en cours de route annule tout.
+
+**Reste à faire en 7C-3** : poser `is_agenda_coordinator = true` sur le compte de
+Charlotte Franzino. Sans policy, la colonne n'a encore aucun effet.
+
+---
+
 ## Suite du découpage
 
 | | Contenu | Écrit en base ? |
@@ -395,7 +440,9 @@ avec l'un d'eux se retrouverait sans profil, dans un état non prévu par l'appl
 | **7A** | ✓ Inventaire du schéma réel, écarts, décisions d'architecture. | Non |
 | **7B-1** | ✓ Correspondance des comptes, `mapping-comptes-agenda.csv`, arbitrages. | Non |
 | **7B-2** | ✓ Création des 26 comptes de remplaçants dans Orga (inactifs, sans invitation). | Fait |
-| **7C** | Création du schéma `agenda` : tables, index, contraintes, fonctions, triggers, 65 policies RLS réécrites, vue `profiles`, `is_agenda_coordinator`. | Oui, Orga |
+| **7C-1** | ✓ Schéma `agenda`, 14 tables, contraintes, 75 index, vue `profiles`, colonne `is_agenda_coordinator`. | Fait |
+| **7C-2** | Fonctions et triggers, dont `update_shift_status` et les 4 `updated_at` manquants. | Oui, Orga |
+| **7C-3** | Les 65 policies RLS réécrites + désignation de Charlotte comme coordinatrice. | Oui, Orga |
 | **7D** | Import des données avec remappage des identifiants + vérifications. | Oui, Orga |
 | **7E** | Bascule du module sur le client unique, suppression de l'écran de liaison. | Non |
 | **7F** | Script de re-synchronisation rejouable pour le soir de la bascule. | Préparé |
