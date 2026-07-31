@@ -1,57 +1,50 @@
-// Client Supabase du module Agenda — pointe vers le projet Supabase PLANNING
-// (celui de l'appli Bolt), distinct du projet principal Omnès-Orga.
+// Client Supabase du module Agenda.
 //
-// Ce fichier est TEMPORAIRE : à l'étape 7 (migration des données vers le
-// projet principal), il sera supprimé et le module utilisera le client
-// unique src/lib/supabaseClient.js. Tout ce qui touche au projet Planning
-// doit rester cloisonné dans src/modules/agenda/.
+// Depuis l'étape 7E, le module lit et écrit dans le schéma `agenda` du projet
+// principal Omnès-Orga. Il n'y a plus de second projet Supabase, plus de
+// session séparée, plus d'écran de liaison : l'utilisateur connecté à
+// Omnès-Orga est l'utilisateur de l'agenda.
 //
-// L'alias `export const supabase` permet aux composants copiés depuis
-// reference-agenda/ de fonctionner sans modifier leurs imports.
+// `.schema('agenda')` scope toutes les requêtes du module au bon schéma sans
+// toucher aux quelque 40 fichiers qui font `.from('shifts')`, `.from('sites')`…
+// La table `profiles` du module pointe ainsi vers la vue `agenda.profiles`,
+// qui traduit `public.profiles` au format attendu (full_name reconstitué,
+// rôle calculé depuis is_agenda_coordinator).
 
-import { createClient } from '@supabase/supabase-js';
+import { supabase as clientOrga } from '../../../lib/supabaseClient';
 
-const supabaseUrl = import.meta.env.VITE_AGENDA_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_AGENDA_SUPABASE_ANON_KEY;
+// Requêtes de données : scopées au schéma `agenda`.
+// Attention : `.schema()` renvoie un client PostgREST — il porte `.from()`
+// et `.rpc()`, mais NI `.auth` NI `.channel()`. Tout ce qui touche à la
+// session ou au temps réel doit passer par `supabaseOrga` ci-dessous.
+export const supabase = clientOrga.schema('agenda');
 
-// Si les variables manquent, on crée un client factice plutôt que de faire
-// planter tout le bundle au chargement : le composant App du module détecte
-// hasValidConfig=false et affiche une erreur de configuration.
-// (Comportement repris de l'agenda d'origine.)
-export const supabaseAgenda =
-  supabaseUrl && supabaseAnonKey
-    ? createClient(supabaseUrl, supabaseAnonKey, {
-        auth: {
-          // Clé de stockage dédiée : la session auth du projet Planning ne
-          // partage pas l'entrée localStorage du client principal.
-          storageKey: 'sb-agenda-auth',
-        },
-      })
-    : createClient('https://placeholder.supabase.co', 'placeholder-key');
-
-export const supabase = supabaseAgenda;
-
-export const hasValidConfig = !!(supabaseUrl && supabaseAnonKey);
+// Client complet du projet Orga : authentification et abonnements temps réel.
+export const supabaseOrga = clientOrga;
 
 // ---------------------------------------------------------------------------
-// Types du domaine agenda — copiés tels quels depuis reference-agenda
-// (src/lib/supabase.ts). Ils décrivent les tables du projet Planning.
+// Types du domaine agenda.
 // ---------------------------------------------------------------------------
 
 export type UserRole = 'coordinator' | 'doctor';
 
+// Reflète la vue `agenda.profiles` — et non la table `public.profiles`.
+// Les champs propres à l'ancienne base Planning (temp_password,
+// must_change_password, deleted_at, created_by…) ont disparu avec elle ;
+// aucun n'était utilisé par le module.
 export type Profile = {
   id: string;
   email: string;
   full_name: string;
   role: UserRole;
-  temp_password: boolean;
-  must_change_password: boolean;
-  is_active?: boolean;
-  deleted_at?: string | null;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
+  is_active: boolean;
+  // Exposés par la vue depuis 7E-1 : alimentent <Avatar> (initiales et
+  // vraie photo). Optionnels — l'utilisateur courant est construit par
+  // buildAgendaUser, qui ne les renseigne pas tous.
+  prenom?: string | null;
+  nom?: string | null;
+  photo_url?: string | null;
+  updated_at?: string | null;
 };
 
 export type ShiftStatus = 'free' | 'pending' | 'assigned';

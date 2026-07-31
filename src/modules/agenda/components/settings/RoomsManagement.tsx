@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, Room, Site } from '../../lib/supabase';
+import { supabase, supabaseOrga, Room, Site } from '../../lib/supabase';
 import { DoorOpen, Plus, Edit2, Trash2, Check, X, AlertCircle } from 'lucide-react';
 import BottomSheet from '../ui/BottomSheet';
 
@@ -20,16 +20,16 @@ export default function RoomsManagement() {
   useEffect(() => {
     loadData();
 
-    const roomsSub = supabase
+    const roomsSub = supabaseOrga
       .channel('rooms_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'agenda', table: 'rooms' }, () => {
         loadData();
       })
       .subscribe();
 
-    const sitesSub = supabase
+    const sitesSub = supabaseOrga
       .channel('sites_changes_rooms')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sites' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'agenda', table: 'sites' }, () => {
         loadData();
       })
       .subscribe();

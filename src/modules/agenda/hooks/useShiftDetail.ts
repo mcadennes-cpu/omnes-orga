@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Shift, supabase } from '../lib/supabase';
+import { Shift, supabase, supabaseOrga } from '../lib/supabase';
 import { getRotationSettings, getRotationWeek, getRotationSlot } from '../lib/rotationUtils';
 import { saveUndoAction, getCurrentUserId } from '../lib/undoUtils';
 import { checkDoctorDailyConflict } from '../lib/shiftValidation';
@@ -548,7 +548,7 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
         { componentName: 'ShiftDetailModal.handleApplyToRotationWeek', inputOrigin: `shift.date: "${shift.date}"` }
       );
 
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await supabaseOrga.auth.getUser();
       if (!user) throw new Error('Utilisateur non authentifié');
 
       const { error: ruleError } = await supabase

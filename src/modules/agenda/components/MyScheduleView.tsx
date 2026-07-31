@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, Shift, Profile, Request } from '../lib/supabase';
+import { supabase, supabaseOrga, Shift, Profile, Request } from '../lib/supabase';
 import { CalendarCheck, Calendar, MapPin, Clock, AlertCircle, X, FileText } from 'lucide-react';
 import CancelRequestModal from './CancelRequestModal';
 import Segmented from './ui/Segmented';
@@ -28,16 +28,16 @@ export default function MyScheduleView({ currentUser }: MyScheduleViewProps) {
     loadMyShifts();
     loadPendingRequests();
 
-    const shiftsSubscription = supabase
+    const shiftsSubscription = supabaseOrga
       .channel('my_shifts_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'shifts' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'agenda', table: 'shifts' }, () => {
         loadMyShifts();
       })
       .subscribe();
 
-    const requestsSubscription = supabase
+    const requestsSubscription = supabaseOrga
       .channel('my_requests_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'agenda', table: 'requests' }, () => {
         loadPendingRequests();
       })
       .subscribe();

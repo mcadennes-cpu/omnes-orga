@@ -5,7 +5,6 @@ import {
   CalendarDays,
   ChevronLeft,
   ClipboardList,
-  Link2Off,
   Settings,
 } from 'lucide-react';
 import HeaderWatermark from '../../../components/common/HeaderWatermark';
@@ -38,15 +37,12 @@ type AgendaHeaderProps = {
   currentUser: Profile;
   currentView: AgendaView;
   onViewChange: (view: AgendaView) => void;
-  // Délie le compte Planning de ce navigateur (retour à l'écran de liaison).
-  onUnlink: () => void;
 };
 
 export default function AgendaHeader({
   currentUser,
   currentView,
   onViewChange,
-  onUnlink,
 }: AgendaHeaderProps) {
   const navigate = useNavigate();
   const tabs = TABS.filter((tab) => tab.roles.includes(currentUser.role));
@@ -63,14 +59,6 @@ export default function AgendaHeader({
         </button>
         <h1 className="text-h2 text-ink flex-1">Planning</h1>
         <span className="text-caption hidden sm:block">{currentUser.full_name}</span>
-        <button
-          onClick={onUnlink}
-          title="Délier le compte Planning"
-          aria-label="Délier le compte Planning"
-          className="p-2 rounded-pill text-muted hover:bg-fond hover:text-brique transition-colors"
-        >
-          <Link2Off size={18} strokeWidth={2} />
-        </button>
       </div>
 
       <nav className="relative z-10 px-4 pb-3 pt-1 flex gap-2 overflow-x-auto hide-scrollbar">

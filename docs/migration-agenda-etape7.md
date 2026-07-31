@@ -675,6 +675,108 @@ bascule doit se faire à un moment où personne ne travaille dans Bolt.
 
 ---
 
+## 7E — Bascule du module sur la base Orga (FAIT le 31/07/2026)
+
+Le module ne parle plus au projet Planning. Il lit et écrit dans le schéma
+`agenda` du projet principal, avec la session Omnès-Orga de l'utilisateur.
+
+### Exposition du schéma — le redémarrage annoncé
+
+`db_schema` est passé de `public,graphql_public` à
+`public,graphql_public,agenda` via l'API Management. Vérifié juste après :
+l'appli principale répond toujours (HTTP 200 sur `public.profiles`).
+
+**Le rôle `anon` est refusé sur le schéma `agenda`** (`permission denied`) —
+conforme à la conception de 7C-1, qui n'accorde `usage` qu'à `authenticated`.
+
+### Le point PostgREST resté ouvert depuis 7A est résolu
+
+Les trois formes de jointure utilisées par le module ont été testées sur les
+données réelles :
+
+| Requête | Résultat |
+|---|---|
+| `shifts` → `assigned_doctor:profiles!assigned_doctor_id(...)` | ✓ « Hortense NAUDION » |
+| `shifts` → `sites`, `rooms`, `shift_types` imbriqués | ✓ Beaune / Salle 1 / J1 Beaune |
+| `requests` → `doctor:profiles!doctor_id(...)` + `shifts!inner(...)` | ✓ |
+
+**Aucune ambiguïté `PGRST201`** malgré la coexistence de `public.profiles` et
+`agenda.profiles` : le client étant scopé sur `agenda`, c'est la vue qui prime.
+Et le `full_name` est bien reconstitué à la volée depuis les colonnes d'Orga.
+
+Les hints du module sont des **noms de colonnes** (`profiles!assigned_doctor_id`)
+et non des noms de contraintes : rien ne dépendait donc des noms générés par
+PostgreSQL.
+
+### Bascule du client en un point unique
+
+`lib/supabase.ts` n'instancie plus de second client : il réexporte celui de
+l'appli principale, scopé au schéma.
+
+```ts
+export const supabase = clientOrga.schema('agenda');  // requêtes de données
+export const supabaseOrga = clientOrga;               // auth et temps réel
+```
+
+Les ~40 fichiers qui font `.from('shifts')` sont **inchangés** — c'était tout
+l'intérêt du schéma dédié (décision de 7A).
+
+**Piège rencontré** : `.schema()` renvoie un client PostgREST, qui porte
+`.from()` et `.rpc()` mais **ni `.auth` ni `.channel()`**. Les 4 appels
+d'authentification et les 12 abonnements temps réel ont donc été redirigés vers
+le client complet. Sans cela, le module plantait au premier rendu de chaque vue.
+
+**Deux imports manquants** (`AssignDoctorModal`, `useShiftDetail`) ont été
+attrapés par un contrôle systématique des symboles utilisés sans import : le
+build ne les signale pas, faute de vérification de types. Illustration concrète
+de la dette « pas de `tsc` sur le module » identifiée à l'étape 4 — ces deux
+oublis auraient produit une erreur au premier clic.
+
+### Le temps réel n'a jamais fonctionné
+
+Les 12 abonnements écoutaient `schema: 'public'` alors que les tables sont
+maintenant dans `agenda` — corrigé. Mais en vérifiant la publication
+`supabase_realtime`, **côté Planning aucune table n'y a jamais été ajoutée** :
+ces abonnements n'ont donc jamais rien reçu, ni dans Bolt ni dans le module. Les
+vues se rafraîchissent uniquement à la navigation ou après une action.
+
+**Non activé pour l'instant** : ce serait un changement de comportement au
+milieu d'une migration. Mais le travail est fait — les abonnements pointent
+désormais sur le bon schéma, et l'activer ne demandera qu'une ligne SQL
+(`alter publication supabase_realtime add table agenda.shifts, agenda.requests;`).
+Gain attendu : Charlotte verrait les demandes arriver en direct, les médecins
+verraient les gardes se libérer. **À proposer en étape 8.**
+
+### Les vraies photos des médecins
+
+La vue de 7C-1 n'exposait que le format strict de Planning : `<Avatar>` ne
+pouvait donc afficher que des initiales, alors que les vraies photos étaient
+annoncées comme un bénéfice de l'étape 7. Corrigé par
+`docs/sql/22-7E-1-agenda-vue-profiles-avatars.sql`, qui ajoute `prenom`, `nom`,
+`photo_url` et `updated_at` à la vue. `DailyScheduleView` passe désormais le
+profil réel à `<Avatar>` au lieu de le reconstruire depuis le nom.
+
+Sur les **33 médecins** présents au planning, **9 ont une photo** (les associés)
+et 24 gardent leurs initiales colorées — les remplaçants, dont les comptes
+viennent d'être créés.
+
+### Supprimé
+
+- `hooks/useAgendaSession.ts` et `components/PlanningLinkPage.tsx` — l'écran de
+  liaison et la session Planning n'ont plus d'objet.
+- Le bouton « Délier le compte Planning » du header.
+- Les variables `VITE_AGENDA_SUPABASE_URL` / `VITE_AGENDA_SUPABASE_ANON_KEY`
+  du `.env`, et l'écran d'erreur de configuration qui les mentionnait.
+- `mapOrgaRoleToAgenda()` — le mapping depuis le rôle applicatif, remplacé par
+  la désignation explicite `is_agenda_coordinator`.
+
+`buildAgendaUser()` construit maintenant l'utilisateur à partir du seul profil
+Orga, dans exactement le même format que la vue `agenda.profiles`.
+
+**Build** : 2 003 modules, aucune erreur.
+
+---
+
 ## Suite du découpage
 
 | | Contenu | Écrit en base ? |
@@ -686,7 +788,7 @@ bascule doit se faire à un moment où personne ne travaille dans Bolt.
 | **7C-2** | ✓ 2 fonctions, 10 triggers, circuit métier testé de bout en bout. | Fait |
 | **7C-3** | ✓ 57 policies RLS via 2 fonctions centralisées, testées par usurpation. Charlotte désignée coordinatrice. | Fait |
 | **7D** | ✓ 5 664 lignes importées et vérifiées, identifiants remappés. | Fait |
-| **7E** | Bascule du module sur le client unique, suppression de l'écran de liaison. | Non |
+| **7E** | ✓ Schéma exposé, module basculé sur la base Orga, écran de liaison supprimé, vraies photos. | Fait |
 | **7F** | Script de re-synchronisation rejouable pour le soir de la bascule. | Préparé |
 
 ---

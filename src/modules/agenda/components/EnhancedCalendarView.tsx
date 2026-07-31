@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, Shift, Profile } from '../lib/supabase';
+import { supabase, supabaseOrga, Shift, Profile } from '../lib/supabase';
 import { Calendar as CalendarIcon, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import CalendarFilters from './calendar/CalendarFilters';
 import WeekView from './calendar/WeekView';
@@ -42,12 +42,12 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
     loadShifts();
     loadDoctors();
 
-    const subscription = supabase
+    const subscription = supabaseOrga
       .channel('shifts_and_requests_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'shifts' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'agenda', table: 'shifts' }, () => {
         loadShifts();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'agenda', table: 'requests' }, () => {
         loadShifts();
       })
       .subscribe();

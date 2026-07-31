@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase, supabaseOrga } from '../../lib/supabase';
 import { Repeat, Save } from 'lucide-react';
 import { clearRotationCache } from '../../lib/rotationUtils';
 
@@ -61,7 +61,7 @@ export default function RotationManagement() {
     setSuccess('');
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await supabaseOrga.auth.getUser();
       if (!user) throw new Error('Non authentifié');
 
       const settingsData = {

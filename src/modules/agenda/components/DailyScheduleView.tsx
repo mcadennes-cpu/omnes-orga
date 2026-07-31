@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, Shift, Profile } from '../lib/supabase';
+import { supabase, supabaseOrga, Shift, Profile } from '../lib/supabase';
 import { Calendar, MapPin, Clock, Users, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import Avatar from '../../../components/common/Avatar';
 import { getHoraireStyle } from '../lib/horaireStyles';
@@ -18,14 +18,9 @@ const fieldClass =
   'rounded-input border border-border bg-carte px-4 py-2 text-body-m text-ink ' +
   'focus:border-canard focus:outline-none focus:ring-2 focus:ring-canard/30';
 
-// Le module lit la base Planning : les profils n'ont pas de photo (elles vivent
-// cote Orga, cf. etape 7). On decoupe donc juste le nom complet pour alimenter
-// <Avatar> : initiales + couleur deterministe. Quand les donnees seront
-// unifiees, il suffira de passer photo_url pour afficher la vraie photo.
-function toAvatarProfile(fullName: string) {
-  const parts = (fullName || '').trim().split(/\s+/);
-  return { prenom: parts[0] || '', nom: parts.slice(1).join(' ') };
-}
+// Depuis l'etape 7E, le module lit les profils d'Omnes-Orga via la vue
+// agenda.profiles : <Avatar> recoit directement le profil du medecin et
+// affiche sa vraie photo quand il en a une, ses initiales sinon.
 
 export default function DailyScheduleView() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -41,9 +36,9 @@ export default function DailyScheduleView() {
   useEffect(() => {
     loadDailySchedule();
 
-    const subscription = supabase
+    const subscription = supabaseOrga
       .channel('daily_schedule_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'shifts' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'agenda', table: 'shifts' }, () => {
         loadDailySchedule();
       })
       .subscribe();
@@ -195,7 +190,7 @@ export default function DailyScheduleView() {
                   <div className="flex items-stretch">
                     {/* Avatar seul a gauche (pattern trombinoscope). */}
                     <div className="flex flex-shrink-0 items-center px-4">
-                      <Avatar profile={toAvatarProfile(doctorName)} size={52} />
+                      <Avatar profile={shift.assigned_doctor} size={52} alt={doctorName} />
                     </div>
                     {/* Colonne droite : nom (bande couleur du creneau) + infos (blanc). */}
                     <div className="min-w-0 flex-1">

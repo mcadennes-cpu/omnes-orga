@@ -1,51 +1,43 @@
-import { Profile, UserRole } from './supabase';
+import { Profile } from './supabase';
 
 // ---------------------------------------------------------------------------
 // Adaptateur utilisateur : profil Omnès-Orga → utilisateur du module agenda.
 //
-// PENDANT LA BÊTA (étapes 3 à 6), les données vivent dans le projet Supabase
-// Planning : ses policies RLS ne connaissent que auth.uid() et le rôle du
-// profil PLANNING. L'identité effective (id, rôle) vient donc obligatoirement
-// du profil Planning. Le mapping Orga → agenda défini ici ne prendra le
-// relais qu'à l'étape 7, quand les données et les RLS auront migré vers le
-// projet principal. D'ici là, l'adaptateur sert de point de bascule unique
-// et signale toute divergence entre les deux profils.
+// Depuis l'étape 7E, l'utilisateur du module EST l'utilisateur connecté à
+// Omnès-Orga : les données vivent dans le schéma `agenda` du projet principal
+// et les policies RLS s'appuient sur son `auth.uid()`. Il n'y a plus de
+// second profil ni de session à relier.
+//
+// Le rôle coordinateur vient d'une désignation explicite
+// (`profiles.is_agenda_coordinator`) et NON du rôle applicatif : Matthieu et
+// Charlotte sont tous deux super_admin sur Orga, mais seule Charlotte est
+// coordinatrice de l'agenda. Les associés gérants n'ont pas ces droits
+// (décision du 30/07/2026).
 // ---------------------------------------------------------------------------
 
-// Champs du profil Orga (table profiles du projet principal) utiles au module.
+// Champs du profil Orga (table public.profiles) utiles au module.
 export type OrgaProfile = {
   id: string;
-  role: string; // 'super_admin' | 'associe_gerant' | 'associe' | 'remplacant' | 'poste_bureau'
+  role: string;
   prenom: string | null;
   nom: string | null;
   email: string | null;
+  actif?: boolean;
+  is_agenda_coordinator?: boolean;
 };
 
-// Mapping des rôles (doc integration-agenda.md, section « Mapping des rôles »).
-// Seul super_admin obtient les droits coordinateur — pour les associés
-// gérants, la décision par défaut est NON (à confirmer avant l'étape 7).
-export function mapOrgaRoleToAgenda(orgaRole: string): UserRole {
-  return orgaRole === 'super_admin' ? 'coordinator' : 'doctor';
-}
-
-// Construit l'utilisateur effectif passé aux vues du module.
-// Aujourd'hui : retourne le profil Planning tel quel (contrainte RLS) et
-// avertit en console si le rôle attendu d'après le profil Orga diverge.
-// Étape 7 : cette fonction deviendra la source unique de l'utilisateur
-// agenda, construite à partir du seul profil Orga.
-export function buildAgendaUser(
-  planningProfile: Profile,
-  orgaProfile?: OrgaProfile | null
-): Profile {
-  if (orgaProfile) {
-    const expectedRole = mapOrgaRoleToAgenda(orgaProfile.role);
-    if (expectedRole !== planningProfile.role) {
-      console.warn(
-        `[agenda] Divergence de roles : profil Orga "${orgaProfile.role}" ` +
-          `(attendu : ${expectedRole}) vs profil Planning "${planningProfile.role}". ` +
-          `Pendant la beta, le role Planning fait foi.`
-      );
-    }
-  }
-  return planningProfile;
+// Construit l'utilisateur passé aux vues du module.
+// Doit produire exactement ce que renvoie la vue `agenda.profiles`, pour que
+// l'utilisateur courant et les médecins lus en base aient la même forme.
+export function buildAgendaUser(orgaProfile: OrgaProfile): Profile {
+  return {
+    id: orgaProfile.id,
+    email: orgaProfile.email ?? '',
+    full_name: [orgaProfile.prenom, orgaProfile.nom]
+      .filter(Boolean)
+      .join(' ')
+      .trim(),
+    role: orgaProfile.is_agenda_coordinator ? 'coordinator' : 'doctor',
+    is_active: orgaProfile.actif ?? true,
+  };
 }

@@ -17,10 +17,9 @@ function Chargement() {
 
 // Page du module Planning (identifiant interne : agenda — cf. modules.js).
 // Phase beta : reservee aux profils agenda_beta_access = true ; les autres
-// sont renvoyes a l'accueil. Garde de confort d'interface uniquement : les
-// donnees vivent dans le projet Supabase Planning, protege par sa propre
-// auth et sa propre RLS (le module affiche d'ailleurs encore sa page de
-// login Planning jusqu'a l'etape 3).
+// sont renvoyes a l'accueil. Depuis l'etape 7E, ce n'est plus qu'un confort
+// d'interface : les donnees vivent dans le schema `agenda` du projet
+// principal, et ses policies RLS exigent elles aussi agenda_beta_access.
 export default function Agenda() {
   const { profile, loading } = useRole()
 
@@ -35,8 +34,8 @@ export default function Agenda() {
   return (
     <Suspense fallback={<Chargement />}>
       {/* Le profil Orga descend dans le module : l'adaptateur (userAdapter.ts)
-          s'en sert pour verifier la coherence des roles et pre-remplir
-          l'ecran de liaison. */}
+          en fait l'utilisateur de l'agenda, avec le role deduit de
+          is_agenda_coordinator. */}
       <AgendaApp orgaProfile={profile} />
     </Suspense>
   )

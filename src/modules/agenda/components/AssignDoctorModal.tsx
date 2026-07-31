@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, Shift } from '../lib/supabase';
+import { supabase, supabaseOrga, Shift } from '../lib/supabase';
 import { Repeat } from 'lucide-react';
 import { getRotationSettings, getRotationWeek, getRotationSlot } from '../lib/rotationUtils';
 import { checkDoctorDailyConflict } from '../lib/shiftValidation';
@@ -180,7 +180,7 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
         { componentName: 'AssignDoctorModal.handleApplyToRotation', inputOrigin: `shift.date: "${shift.date}"` }
       );
 
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await supabaseOrga.auth.getUser();
       if (!user) throw new Error('Utilisateur non authentifié');
 
       const { error: ruleError } = await supabase

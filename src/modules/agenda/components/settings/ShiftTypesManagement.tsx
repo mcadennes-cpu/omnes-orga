@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, ShiftType } from '../../lib/supabase';
+import { supabase, supabaseOrga, ShiftType } from '../../lib/supabase';
 import { Clock, Plus, Edit2, Check, X, MoveUp, MoveDown } from 'lucide-react';
 import BottomSheet from '../ui/BottomSheet';
 
@@ -18,9 +18,9 @@ export default function ShiftTypesManagement() {
   useEffect(() => {
     loadShiftTypes();
 
-    const subscription = supabase
+    const subscription = supabaseOrga
       .channel('shift_types_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'shift_types' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'agenda', table: 'shift_types' }, () => {
         loadShiftTypes();
       })
       .subscribe();
