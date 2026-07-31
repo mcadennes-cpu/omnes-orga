@@ -777,6 +777,80 @@ Orga, dans exactement le même format que la vue `agenda.profiles`.
 
 ---
 
+## 7F — Script de resynchronisation (FAIT le 31/07/2026)
+
+`docs/sql/22-7F-resynchronisation-agenda.py`. **Il remplace le script de 7D**,
+dont il reprend l'import en y ajoutant une purge préalable et des garde-fous.
+
+```
+python3 docs/sql/22-7F-resynchronisation-agenda.py        # simulation (défaut)
+python3 docs/sql/22-7F-resynchronisation-agenda.py --go   # exécute
+```
+
+Le mode **simulation est le comportement par défaut** : un script destructif ne
+doit pas s'exécuter par simple inadvertance. Il affiche le différentiel table
+par table sans rien toucher.
+
+### Recopie complète plutôt que différentiel
+
+Avec ~5 700 lignes et une minute d'exécution, tout recopier est **plus sûr** que
+calculer un delta : aucune suppression ne peut être oubliée, il n'y a pas de
+logique de comparaison à maintenir (et donc pas de bug possible dedans), et le
+script est idempotent — on peut le rejouer autant qu'on veut.
+
+### Le garde-fou qui compte
+
+Si Charlotte crée un compte de remplaçant dans Bolt d'ici la bascule, ce profil
+n'existera pas côté Orga. Ses gardes seraient alors importées **sans médecin,
+silencieusement**. Le script détecte ce cas, nomme les profils concernés et
+**s'arrête** :
+
+```
+Profils présents dans Planning mais absents du mapping :
+  - Dr Untel
+ARRET : créer ces comptes dans Omnès-Orga et compléter
+docs/mapping-comptes-agenda.csv avant de resynchroniser
+```
+
+Il refuse également de tourner si l'historique Planning présente une
+incohérence (doublon médecin/jour, demande orpheline), et vérifie après coup
+les comptages table par table ainsi que l'intégrité.
+
+La décision sur `Coordinateur Admin` a été inscrite **dans le mapping**
+(`COMPTE_GENERIQUE_RATTACHE`) plutôt qu'en dur dans le code.
+
+### Exécution réelle du 31/07/2026
+
+Le script a été exécuté pour de bon — à la fois pour le valider avant le jour J
+et pour rafraîchir la copie de travail. **5 669 lignes** réimportées, trigger
+métier désactivé puis réactivé, intégrité vérifiée (0 garde attribuée sans
+médecin, 0 garde libre avec médecin, 0 orpheline).
+
+**Comparaison finale des deux bases** :
+
+| | Planning | Orga | Écart |
+|---|---:|---:|---:|
+| Gardes attribuées | 2 309 | 2 308 | −1 |
+| Gardes libres | 255 | 255 | 0 |
+| Gardes en attente | 118 | 118 | 0 |
+| Demandes approuvées | 836 | 834 | −2 |
+| Demandes annulées | 366 | 363 | −3 |
+| Demandes refusées | 1 124 | 1 123 | −1 |
+| Demandes en attente | 166 | 166 | 0 |
+
+Les écarts correspondent **exactement** aux exclusions volontaires : la garde de
+`Dr 3`, les 4 demandes de `Dr One` (3 annulées, 1 approuvée) et les 2 demandes
+portant sur la garde écartée. **Aucune dérive** : la copie est fidèle à la ligne
+près.
+
+### ⚠️ Ne plus l'exécuter après la bascule
+
+Une fois Bolt éteint, la base Orga devient la référence et Planning cesse d'être
+à jour. Rejouer le script écraserait alors le travail fait dans la nouvelle
+application. Cet avertissement figure en tête du fichier.
+
+---
+
 ## Suite du découpage
 
 | | Contenu | Écrit en base ? |
@@ -789,7 +863,7 @@ Orga, dans exactement le même format que la vue `agenda.profiles`.
 | **7C-3** | ✓ 57 policies RLS via 2 fonctions centralisées, testées par usurpation. Charlotte désignée coordinatrice. | Fait |
 | **7D** | ✓ 5 664 lignes importées et vérifiées, identifiants remappés. | Fait |
 | **7E** | ✓ Schéma exposé, module basculé sur la base Orga, écran de liaison supprimé, vraies photos. | Fait |
-| **7F** | Script de re-synchronisation rejouable pour le soir de la bascule. | Préparé |
+| **7F** | ✓ Script de resynchronisation complet, testé en réel. Remplace celui de 7D. | Fait |
 
 ---
 
