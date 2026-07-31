@@ -775,6 +775,20 @@ Orga, dans exactement le même format que la vue `agenda.profiles`.
 
 **Build** : 2 003 modules, aucune erreur.
 
+### Validation par Matthieu (31/07/2026)
+
+**Vues médecin testées et validées** dans le navigateur après bascule :
+ouverture directe de `/planning` sans écran de liaison, calendrier, « Mes
+gardes » et « Planning du jour » corrects, photos affichées. La chaîne complète
+fonctionne — session Omnès-Orga, lecture du schéma `agenda`, jointures vers la
+vue `agenda.profiles`.
+
+**Reste à tester : les vues coordinateur** (Demandes, Paramètres). Elles ne
+s'affichent que pour un profil `is_agenda_coordinator`, et ce sont les écrans
+les plus complexes du module : validation en masse des pré-validations,
+roulement, modèles de semaine, export. Se poser temporairement le drapeau
+suffit — sans risque désormais, le module travaillant sur une copie.
+
 ---
 
 ## 7F — Script de resynchronisation (FAIT le 31/07/2026)
