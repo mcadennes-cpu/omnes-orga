@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Shift, supabase, supabaseOrga } from '../lib/supabase';
-import { getRotationSettings, getRotationWeek, getRotationSlot } from '../lib/rotationUtils';
+import { Shift, supabase } from '../lib/supabase';
+import {
+  getRotationPlans,
+  getPlanForDate,
+  getRotationWeek,
+  getRotationSlot,
+} from '../lib/rotationUtils';
 import { saveUndoAction, getCurrentUserId } from '../lib/undoUtils';
 import { checkDoctorDailyConflict } from '../lib/shiftValidation';
 
@@ -72,14 +77,15 @@ async function findRotationSlotShifts(shift: Shift): Promise<{
   rotationWeek: number;
   shiftIds: string[];
 }> {
-  const settings = await getRotationSettings();
-  if (!settings) {
-    throw new Error('Paramètres de roulement non configurés');
+  const plans = await getRotationPlans();
+  const plan = getPlanForDate(new Date(shift.date), plans);
+  if (!plan) {
+    throw new Error('Aucun plan de roulement ne couvre cette date');
   }
 
   const { rotationWeek, weekday } = getRotationSlot(
     new Date(shift.date),
-    settings,
+    plan,
     { componentName: 'useShiftDetail.findRotationSlotShifts', inputOrigin: `shift.date: "${shift.date}"` }
   );
 
@@ -96,9 +102,15 @@ async function findRotationSlotShifts(shift: Shift): Promise<{
 
   const shiftIds = (data ?? [])
     .filter(candidate => {
+      // Une garde regie par un AUTRE plan n'est pas dans la meme case : le
+      // roulement a change entre-temps. Sans ce test, une action passee sur
+      // decembre 2026 toucherait des gardes de 2027 relevant du V2.
+      const candidatePlan = getPlanForDate(new Date(candidate.date), plans);
+      if (!candidatePlan || candidatePlan.id !== plan.id) return false;
+
       const slot = getRotationSlot(
         new Date(candidate.date),
-        settings,
+        candidatePlan,
         { componentName: 'useShiftDetail.findRotationSlotShifts(filter)', inputOrigin: `candidate.date: "${candidate.date}"` }
       );
       return slot.rotationWeek === rotationWeek && slot.weekday === weekday;
@@ -160,16 +172,16 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
     };
 
     const loadRotationInfo = async () => {
-      const settings = await getRotationSettings();
+      const plan = getPlanForDate(new Date(shift.date), await getRotationPlans());
       if (cancelled) return;
 
-      if (settings) {
+      if (plan) {
         const week = getRotationWeek(
           new Date(shift.date),
-          settings,
+          plan,
           { componentName: 'ShiftDetailModal.loadRotationInfo', inputOrigin: `shift.date: "${shift.date}"` }
         );
-        setRotationInfo({ week, total: settings.cycle_length_weeks });
+        setRotationInfo({ week, total: plan.cycle_length_weeks });
       } else {
         setRotationInfo(null);
       }
@@ -181,10 +193,10 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
         return;
       }
 
-      const settings = await getRotationSettings();
+      const plan = getPlanForDate(new Date(shift.date), await getRotationPlans());
       if (cancelled) return;
 
-      if (!settings) {
+      if (!plan) {
         setHasRotationRule(false);
         return;
       }
@@ -192,17 +204,19 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
       const shiftDate = new Date(shift.date);
       const rotationWeek = getRotationWeek(
         shiftDate,
-        settings,
+        plan,
         { componentName: 'ShiftDetailModal.checkRotationRule', inputOrigin: `shift.date: "${shift.date}"` }
       );
       const weekday = shiftDate.getDay();
 
+      // Pas de filtre sur la salle depuis 6B-3 : elle appartient au creneau,
+      // pas au roulement.
       const { data: rule } = await supabase
-        .from('rotation_assignment_rules')
+        .from('rotation_plan_rules')
         .select('id')
+        .eq('plan_id', plan.id)
         .eq('doctor_id', shift.assigned_doctor_id)
         .eq('site_id', shift.site_id)
-        .eq('room_id', shift.room_id)
         .eq('shift_type_id', shift.shift_type_id)
         .eq('weekday', weekday)
         .eq('rotation_week', rotationWeek)
@@ -451,21 +465,17 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
       const userId = await getCurrentUserId();
 
       if (scope === 'rotation') {
-        // Les gardes a liberer sont calculees AVANT la suppression de la regle :
-        // meme case de roulement (jour + semaine de cycle) et meme medecin.
-        const { weekday, rotationWeek, shiftIds } = await findRotationSlotShifts(shift);
-
-        const { error: deleteRuleError } = await supabase
-          .from('rotation_assignment_rules')
-          .delete()
-          .eq('doctor_id', shift.assigned_doctor_id)
-          .eq('site_id', shift.site_id)
-          .eq('room_id', shift.room_id)
-          .eq('shift_type_id', shift.shift_type_id)
-          .eq('weekday', weekday)
-          .eq('rotation_week', rotationWeek);
-
-        if (deleteRuleError) throw deleteRuleError;
+        // Libere les gardes futures de la MEME case de roulement (jour +
+        // semaine de cycle + medecin).
+        //
+        // Depuis 6C-3, la REGLE du plan n'est plus supprimee : le plan vient
+        // du fichier de roulement valide et l'application ne le modifie
+        // jamais (principe de source unique, MOD-1). Consequence a assumer :
+        // les gardes deja ouvertes sont liberees, mais toute garde recreee
+        // plus tard sur cette case retrouvera le medecin du plan. Pour
+        // changer cela durablement, il faut passer par le fichier -- c'est
+        // l'objet des « modifications souhaitees » de 6G.
+        const { shiftIds } = await findRotationSlotShifts(shift);
 
         if (shiftIds.length > 0) {
           const { error: updateError } = await supabase
@@ -481,7 +491,7 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
         }
 
         alert(
-          `Règle de roulement supprimée. ${shiftIds.length} garde${shiftIds.length > 1 ? 's' : ''} future${shiftIds.length > 1 ? 's' : ''} libérée${shiftIds.length > 1 ? 's' : ''}.`
+          `${shiftIds.length} garde${shiftIds.length > 1 ? 's' : ''} future${shiftIds.length > 1 ? 's' : ''} libérée${shiftIds.length > 1 ? 's' : ''}. Le roulement, lui, n'est pas modifié : une garde recréée sur cette case retrouvera le même médecin.`
         );
       } else if (scope === 'series' && shift.series_id) {
         const { error: updateError } = await supabase
@@ -535,38 +545,26 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
     setError('');
 
     try {
-      const settings = await getRotationSettings();
-      if (!settings) {
-        setError('Paramètres de roulement non configurés');
+      // Applique ce medecin aux gardes futures de la meme case du roulement.
+      //
+      // Depuis 6C-3, cette action ne CREE plus de regle de roulement : elle
+      // n'agit que sur des gardes. Le plan vient du fichier valide et
+      // l'application ne l'ecrit jamais (principe de source unique, MOD-1).
+      // C'est precisement cette ecriture qui avait fait diverger la base du
+      // fichier -- 41 regles modifiees et 24 ajoutees en sept mois.
+      const plans = await getRotationPlans();
+      const plan = getPlanForDate(new Date(shift.date), plans);
+      if (!plan) {
+        setError('Aucun plan de roulement ne couvre cette date');
         setLoading(false);
         return;
       }
 
       const { rotationWeek: currentRotationWeek, weekday: currentWeekday } = getRotationSlot(
         new Date(shift.date),
-        settings,
+        plan,
         { componentName: 'ShiftDetailModal.handleApplyToRotationWeek', inputOrigin: `shift.date: "${shift.date}"` }
       );
-
-      const { data: { user } } = await supabaseOrga.auth.getUser();
-      if (!user) throw new Error('Utilisateur non authentifié');
-
-      const { error: ruleError } = await supabase
-        .from('rotation_assignment_rules')
-        .upsert({
-          doctor_id: shift.assigned_doctor_id,
-          site_id: shift.site_id,
-          room_id: shift.room_id,
-          shift_type_id: shift.shift_type_id,
-          weekday: currentWeekday,
-          rotation_week: currentRotationWeek,
-          created_by: user.id,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'site_id,room_id,shift_type_id,weekday,rotation_week'
-        });
-
-      if (ruleError) throw ruleError;
 
       const { data: allShifts, error: fetchError } = await supabase
         .from('shifts')
@@ -581,9 +579,14 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
 
       if (allShifts && allShifts.length > 0) {
         const matchingShifts = allShifts.filter(s => {
+          // Meme precaution que dans findRotationSlotShifts : une garde regie
+          // par un autre plan n'est pas dans la meme case.
+          const sPlan = getPlanForDate(new Date(s.date), plans);
+          if (!sPlan || sPlan.id !== plan.id) return false;
+
           const { rotationWeek: shiftRotationWeek, weekday: shiftWeekday } = getRotationSlot(
             new Date(s.date),
-            settings,
+            sPlan,
             { componentName: 'ShiftDetailModal.handleApplyToRotationWeek(filter)', inputOrigin: `s.date: "${s.date}"` }
           );
           return shiftRotationWeek === currentRotationWeek && shiftWeekday === currentWeekday;

@@ -16,7 +16,7 @@ export default function ApplyToRotationWeekModal({
 }: ApplyToRotationWeekModalProps) {
   return (
     <BottomSheet
-      title="Appliquer au roulement"
+      title="Appliquer aux gardes du roulement"
       onClose={onCancel}
       busy={loading}
       footer={
@@ -42,7 +42,11 @@ export default function ApplyToRotationWeekModal({
         <Repeat className="mt-0.5 h-5 w-5 flex-shrink-0 text-marine" />
         <p className="text-body-m text-ink">
           Vous allez assigner <strong>{doctorName}</strong> à toutes les gardes de la même
-          semaine de roulement, avec le même site, la même salle et le même horaire. Continuer ?
+          semaine de roulement, avec le même site, la même salle et le même horaire.
+          <span className="mt-2 block text-caption">
+            Le roulement lui-même n'est pas modifié : il vient du fichier de roulement
+            validé. Pour un changement durable, il faut passer par ce fichier.
+          </span>
         </p>
       </div>
     </BottomSheet>

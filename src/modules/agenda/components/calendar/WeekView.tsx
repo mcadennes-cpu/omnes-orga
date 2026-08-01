@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Shift } from '../../lib/supabase';
 import { ChevronLeft, ChevronRight, Repeat, Save, Copy, Trash2 } from 'lucide-react';
-import { getRotationSettings, getRotationWeek } from '../../lib/rotationUtils';
+import { getRotationPlans, getPlanForDate, getRotationWeek } from '../../lib/rotationUtils';
 
 type WeekViewProps = {
   shifts: Shift[];
@@ -49,18 +49,21 @@ export default function WeekView({
 
   useEffect(() => {
     const loadRotationInfo = async () => {
-      const settings = await getRotationSettings();
-      if (settings) {
+      const plan = getPlanForDate(mondayOfWeek, await getRotationPlans());
+      if (plan) {
         const week = getRotationWeek(
           mondayOfWeek,
-          settings,
+          plan,
           {
             componentName: 'WeekView',
             inputOrigin: `Monday of displayed week: ${mondayDateStr}`
           }
         );
-        setRotationInfo({ week, total: settings.cycle_length_weeks });
+        setRotationInfo({ week, total: plan.cycle_length_weeks });
       } else {
+        // Aucun plan ne couvre cette semaine : on n'affiche pas de numero
+        // plutot que d'en inventer un. Meme comportement qu'avant, quand
+        // rotation_settings pouvait etre absente.
         setRotationInfo(null);
       }
     };

@@ -1,101 +1,97 @@
 import { useState, useEffect } from 'react';
-import { supabase, supabaseOrga } from '../../lib/supabase';
-import { Repeat, Save } from 'lucide-react';
-import { clearRotationCache } from '../../lib/rotationUtils';
+import { supabase } from '../../lib/supabase';
+import { Repeat, FileSpreadsheet, Lock, ChevronDown, ChevronRight } from 'lucide-react';
+import RotationPlanGrid from './RotationPlanGrid';
 
-type RotationSettings = {
+// ---------------------------------------------------------------------------
+// Consultation des plans de roulement (MOD-1, etape 6C-3).
+//
+// Cet ecran permettait auparavant de modifier la date de debut et la duree du
+// cycle. C'etait le defaut n.2 de MOD-1 : la semaine de roulement etant un
+// modulo depuis une date globale, passer le cycle de 8 a 9 semaines decalait
+// RETROACTIVEMENT toutes les semaines, y compris les plannings deja publies.
+//
+// Depuis 6B, chaque plan porte son propre ancrage et sa propre periode. Et
+// depuis la decision du 01/08/2026 (« une seule verite »), le roulement vient
+// du fichier valide : l'application ne l'ecrit jamais. Les policies RLS
+// n'accordent d'ailleurs aucune ecriture, pas meme aux coordinateurs.
+//
+// Cet ecran est donc en lecture seule. Sa version complete -- import, ecran de
+// correspondance, differentiel, activation datee -- est l'objet de 6D a 6F.
+// ---------------------------------------------------------------------------
+
+type RotationPlanRow = {
   id: string;
+  name: string;
   start_date: string;
   cycle_length_weeks: number;
+  status: string;
+  effective_from: string | null;
+  effective_to: string | null;
+  source_file_name: string | null;
+  rotation_plan_rules: { count: number }[];
 };
 
-const fieldClass =
-  'w-full rounded-input border border-border bg-carte px-4 py-2 text-body-m text-ink ' +
-  'focus:border-canard focus:outline-none focus:ring-2 focus:ring-canard/30';
+// Parse en date LOCALE : new Date('2026-01-04') serait interprete en UTC et
+// pourrait afficher la veille selon le fuseau.
+function formatDate(iso: string | null): string {
+  if (!iso) return '—';
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('fr-FR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+const STATUT_LABEL: Record<string, string> = {
+  draft: 'Brouillon',
+  active: 'En vigueur',
+  archived: 'Archivé',
+};
+
+const STATUT_CLASS: Record<string, string> = {
+  draft: 'bg-ocre/15 text-ocre-fonce',
+  active: 'bg-canard/15 text-canard',
+  archived: 'bg-fond text-muted',
+};
 
 export default function RotationManagement() {
-  const [settings, setSettings] = useState<RotationSettings | null>(null);
-  const [startDate, setStartDate] = useState('');
-  const [cycleLength, setCycleLength] = useState(8);
-  const [loading, setLoading] = useState(false);
+  const [plans, setPlans] = useState<RotationPlanRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  // Grille depliee. La grille du plan en vigueur s'ouvre d'office : c'est
+  // l'information que la coordinatrice vient chercher ici.
+  const [planDeplie, setPlanDeplie] = useState<string | null>(null);
 
   useEffect(() => {
-    loadSettings();
+    loadPlans();
   }, []);
 
-  const loadSettings = async () => {
+  const loadPlans = async () => {
     try {
-      const { data, error } = await supabase
-        .from('rotation_settings')
-        .select('*')
-        .single();
+      const { data, error: queryError } = await supabase
+        .from('rotation_plans')
+        .select('id, name, start_date, cycle_length_weeks, status, effective_from, effective_to, source_file_name, rotation_plan_rules(count)')
+        .order('effective_from', { ascending: false, nullsFirst: false });
 
-      if (error && error.code !== 'PGRST116') throw error;
-
-      if (data) {
-        setSettings(data);
-        setStartDate(data.start_date);
-        setCycleLength(data.cycle_length_weeks);
-      } else {
-        const mondayDate = getNextMonday(new Date());
-        setStartDate(mondayDate.toISOString().split('T')[0]);
-      }
-    } catch (err: any) {
-      setError(err.message);
-    }
-  };
-
-  const getNextMonday = (date: Date): Date => {
-    const result = new Date(date);
-    const day = result.getDay();
-    const diff = day === 0 ? 1 : day === 1 ? 0 : 8 - day;
-    result.setDate(result.getDate() + diff);
-    return result;
-  };
-
-  const handleSave = async () => {
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      const { data: { user } } = await supabaseOrga.auth.getUser();
-      if (!user) throw new Error('Non authentifié');
-
-      const settingsData = {
-        start_date: startDate,
-        cycle_length_weeks: cycleLength,
-        updated_at: new Date().toISOString(),
-        updated_by: user.id
-      };
-
-      if (settings) {
-        const { error: updateError } = await supabase
-          .from('rotation_settings')
-          .update(settingsData)
-          .eq('id', settings.id);
-
-        if (updateError) throw updateError;
-      } else {
-        const { error: insertError } = await supabase
-          .from('rotation_settings')
-          .insert([settingsData]);
-
-        if (insertError) throw insertError;
-      }
-
-      setSuccess('Paramètres du roulement enregistrés avec succès');
-      clearRotationCache();
-      setTimeout(() => setSuccess(''), 3000);
-      loadSettings();
+      if (queryError) throw queryError;
+      const rows = data ?? [];
+      setPlans(rows);
+      setPlanDeplie((rows.find((p) => p.status === 'active') ?? rows[0])?.id ?? null);
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
+
+  const aujourdhui = new Date().toISOString().split('T')[0];
+  const estEnVigueur = (p: RotationPlanRow) =>
+    p.status === 'active' &&
+    !!p.effective_from &&
+    p.effective_from <= aujourdhui &&
+    (p.effective_to === null || aujourdhui <= p.effective_to);
 
   return (
     <div className="rounded-card border border-border bg-carte p-6 shadow-card">
@@ -104,61 +100,113 @@ export default function RotationManagement() {
           <Repeat className="h-6 w-6 text-canard" />
         </div>
         <div>
-          <h2 className="text-h2 text-ink">Paramètres du roulement</h2>
-          <p className="text-caption">Configuration du cycle de rotation des gardes</p>
+          <h2 className="text-h2 text-ink">Plans de roulement</h2>
+          <p className="text-caption">Cycle de rotation des associés</p>
         </div>
       </div>
 
-      <div className="space-y-6">
-        <div>
-          <label className="mb-2 block text-field-label">Début du roulement</label>
-          <p className="mb-2 text-caption">
-            Date de début de la semaine 1 du roulement (de préférence un lundi)
-          </p>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className={fieldClass}
-          />
-        </div>
-
-        <div>
-          <label className="mb-2 block text-field-label">Durée du roulement (en semaines)</label>
-          <p className="mb-2 text-caption">
-            Nombre de semaines dans un cycle complet de rotation (entre 1 et 52)
-          </p>
-          <input
-            type="number"
-            min="1"
-            max="52"
-            value={cycleLength}
-            onChange={(e) => setCycleLength(parseInt(e.target.value) || 1)}
-            className={fieldClass}
-          />
-        </div>
-
-        {error && (
-          <div className="rounded-input border border-brique/20 bg-brique/10 px-4 py-3 text-body-m text-brique">
-            {error}
-          </div>
-        )}
-
-        {success && (
-          <div className="rounded-input border border-green-300 bg-green-100 px-4 py-3 text-body-m text-green-800">
-            {success}
-          </div>
-        )}
-
-        <button
-          onClick={handleSave}
-          disabled={loading || !startDate || cycleLength < 1 || cycleLength > 52}
-          className="flex items-center gap-2 rounded-input bg-marine px-6 py-3 text-button text-white shadow-button transition-colors hover:bg-marine/90 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Save className="h-4 w-4" />
-          {loading ? 'Enregistrement…' : 'Enregistrer les paramètres'}
-        </button>
+      <div className="mb-6 flex items-start gap-3 rounded-card border border-marine/20 bg-marine/5 p-4">
+        <Lock className="mt-0.5 h-5 w-5 flex-shrink-0 text-marine" />
+        <p className="text-body-m text-ink">
+          Le roulement se modifie dans le <strong>fichier de roulement</strong>, jamais ici :
+          c'est la seule façon de garantir que le planning corresponde toujours au fichier
+          validé par les associés.
+          <span className="mt-2 block text-caption">
+            Pour faire évoluer le roulement, mettre le fichier à jour puis l'importer en
+            choisissant sa date d'entrée en vigueur. Le plan en cours est alors archivé et
+            reste consultable.
+          </span>
+        </p>
       </div>
+
+      {error && (
+        <div className="mb-4 rounded-input border border-brique/20 bg-brique/10 px-4 py-3 text-body-m text-brique">
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <p className="text-caption">Chargement…</p>
+      ) : plans.length === 0 ? (
+        <p className="text-caption">Aucun plan de roulement enregistré.</p>
+      ) : (
+        <div className="space-y-3">
+          {plans.map((plan) => (
+            <div
+              key={plan.id}
+              className={`rounded-card border p-4 ${
+                estEnVigueur(plan) ? 'border-canard/40 bg-canard/5' : 'border-border bg-carte'
+              }`}
+            >
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="text-body-l font-semibold text-ink">{plan.name}</span>
+                <span className={`rounded-pill px-2.5 py-1 text-caption ${STATUT_CLASS[plan.status] ?? ''}`}>
+                  {STATUT_LABEL[plan.status] ?? plan.status}
+                </span>
+                {estEnVigueur(plan) && (
+                  <span className="rounded-pill bg-canard px-2.5 py-1 text-caption text-white">
+                    Appliqué aujourd'hui
+                  </span>
+                )}
+              </div>
+
+              <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+                <div>
+                  <dt className="text-field-label">En vigueur</dt>
+                  <dd className="text-body-m text-ink">
+                    du {formatDate(plan.effective_from)}
+                    {plan.effective_to ? ` au ${formatDate(plan.effective_to)}` : ' — sans fin prévue'}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-field-label">Cycle</dt>
+                  <dd className="text-body-m text-ink">
+                    {plan.cycle_length_weeks} semaines, S1 = semaine du {formatDate(plan.start_date)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-field-label">Affectations</dt>
+                  <dd className="text-body-m text-ink">
+                    {plan.rotation_plan_rules?.[0]?.count ?? 0}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-field-label">Origine</dt>
+                  <dd className="flex items-center gap-1.5 text-body-m text-ink">
+                    {plan.source_file_name ? (
+                      <>
+                        <FileSpreadsheet className="h-4 w-4 flex-shrink-0 text-muted" />
+                        {plan.source_file_name}
+                      </>
+                    ) : (
+                      <span className="text-muted">Saisi dans l'application</span>
+                    )}
+                  </dd>
+                </div>
+              </dl>
+
+              <button
+                onClick={() => setPlanDeplie(planDeplie === plan.id ? null : plan.id)}
+                aria-expanded={planDeplie === plan.id}
+                className="mt-4 flex items-center gap-1.5 rounded-pill px-3 py-1.5 text-button text-canard transition-colors hover:bg-canard/10"
+              >
+                {planDeplie === plan.id ? (
+                  <ChevronDown size={17} strokeWidth={2} />
+                ) : (
+                  <ChevronRight size={17} strokeWidth={2} />
+                )}
+                {planDeplie === plan.id ? 'Masquer la grille' : 'Voir la grille'}
+              </button>
+
+              {planDeplie === plan.id && (
+                <div className="mt-4">
+                  <RotationPlanGrid planId={plan.id} cycleLength={plan.cycle_length_weeks} />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -151,7 +151,7 @@ export default function ShiftDetailModal({ shift, onClose, onSuccess, readOnlyMo
                   className="flex items-center gap-2 rounded-input bg-marine px-5 py-2.5 text-button text-white shadow-button transition-colors hover:bg-marine/90 disabled:opacity-50"
                 >
                   <Repeat className="h-4 w-4" />
-                  Appliquer à la semaine de roulement
+                  Appliquer aux gardes du roulement
                 </button>
               )}
               <button

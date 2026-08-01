@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react';
-import { supabase, supabaseOrga, Shift } from '../lib/supabase';
+import { supabase, Shift } from '../lib/supabase';
 import { Repeat } from 'lucide-react';
-import { getRotationSettings, getRotationWeek, getRotationSlot } from '../lib/rotationUtils';
+import {
+  getRotationPlans,
+  getPlanForDate,
+  getRotationWeek,
+  getRotationSlot,
+} from '../lib/rotationUtils';
 import { checkDoctorDailyConflict } from '../lib/shiftValidation';
 import ConflictErrorModal from './ConflictErrorModal';
 import BottomSheet from './ui/BottomSheet';
@@ -43,15 +48,15 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
 
   const loadRotationInfo = async () => {
     try {
-      const settings = await getRotationSettings();
-      if (settings) {
+      const plan = getPlanForDate(new Date(shift.date), await getRotationPlans());
+      if (plan) {
         const shiftDate = new Date(shift.date);
         const week = getRotationWeek(
           shiftDate,
-          settings,
+          plan,
           { componentName: 'AssignDoctorModal.loadRotationInfo', inputOrigin: `shift.date: "${shift.date}"` }
         );
-        setRotationInfo({ week, total: settings.cycle_length_weeks });
+        setRotationInfo({ week, total: plan.cycle_length_weeks });
       }
     } catch (error) {
       console.error('Error loading rotation info:', error);
@@ -167,38 +172,22 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
     setError('');
 
     try {
-      const settings = await getRotationSettings();
-      if (!settings) {
-        setError('Paramètres de roulement non configurés');
+      // Applique le medecin aux gardes futures de la meme case du roulement.
+      // Depuis 6C-3, ne cree plus de regle : le plan vient du fichier valide
+      // et l'application ne l'ecrit jamais (source unique, MOD-1).
+      const plans = await getRotationPlans();
+      const plan = getPlanForDate(new Date(shift.date), plans);
+      if (!plan) {
+        setError('Aucun plan de roulement ne couvre cette date');
         setLoading(false);
         return;
       }
 
       const { rotationWeek: currentRotationWeek, weekday: currentWeekday } = getRotationSlot(
         new Date(shift.date),
-        settings,
+        plan,
         { componentName: 'AssignDoctorModal.handleApplyToRotation', inputOrigin: `shift.date: "${shift.date}"` }
       );
-
-      const { data: { user } } = await supabaseOrga.auth.getUser();
-      if (!user) throw new Error('Utilisateur non authentifié');
-
-      const { error: ruleError } = await supabase
-        .from('rotation_assignment_rules')
-        .upsert({
-          doctor_id: selectedDoctorId,
-          site_id: shift.site_id,
-          room_id: shift.room_id,
-          shift_type_id: shift.shift_type_id,
-          weekday: currentWeekday,
-          rotation_week: currentRotationWeek,
-          created_by: user.id,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'site_id,room_id,shift_type_id,weekday,rotation_week'
-        });
-
-      if (ruleError) throw ruleError;
 
       const { data: allShifts, error: fetchError } = await supabase
         .from('shifts')
@@ -213,9 +202,13 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
 
       if (allShifts && allShifts.length > 0) {
         const matchingShifts = allShifts.filter(s => {
+          // Une garde regie par un autre plan n'est pas dans la meme case.
+          const sPlan = getPlanForDate(new Date(s.date), plans);
+          if (!sPlan || sPlan.id !== plan.id) return false;
+
           const { rotationWeek: shiftRotationWeek, weekday: shiftWeekday } = getRotationSlot(
             new Date(s.date),
-            settings,
+            sPlan,
             { componentName: 'AssignDoctorModal.handleApplyToRotation(filter)', inputOrigin: `s.date: "${s.date}"` }
           );
           return shiftRotationWeek === currentRotationWeek && shiftWeekday === currentWeekday;
@@ -326,7 +319,7 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
 
   if (showRotationPrompt) {
     return (
-      <BottomSheet title="Appliquer au roulement ?" onClose={onClose} busy={loading}>
+      <BottomSheet title="Appliquer aux gardes du roulement ?" onClose={onClose} busy={loading}>
         <div className="mb-4 flex items-start gap-3">
           <div className="rounded-pill bg-canard/10 p-2">
             <Repeat className="h-5 w-5 text-canard" />
@@ -334,6 +327,10 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
           <p className="text-body-m text-ink">
             Voulez-vous appliquer ce médecin à toutes les gardes correspondantes de la même
             semaine de roulement (même jour, même site, même salle, même horaire) ?
+            <span className="mt-2 block text-caption">
+              Le roulement lui-même n'est pas modifié : il vient du fichier de roulement
+              validé. Pour un changement durable, il faut passer par ce fichier.
+            </span>
           </p>
         </div>
 
@@ -356,7 +353,7 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
             disabled={loading}
             className="w-full rounded-input bg-marine px-4 py-3 text-button text-white shadow-button transition-colors hover:bg-marine/90 disabled:opacity-50"
           >
-            {loading ? 'Application…' : 'Assigner pour la semaine de roulement'}
+            {loading ? 'Application…' : 'Assigner sur toute la semaine de roulement'}
           </button>
           <button
             onClick={handleCancelAssignment}

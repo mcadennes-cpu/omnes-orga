@@ -6,8 +6,10 @@ import {
   ChevronLeft,
   ClipboardList,
   Settings,
+  Stethoscope,
 } from 'lucide-react';
 import HeaderWatermark from '../../../components/common/HeaderWatermark';
+import Segmented from './ui/Segmented';
 import { Profile, UserRole } from '../lib/supabase';
 
 // Navigation interne du module (remplace la Navigation.tsx d'origine).
@@ -37,12 +39,18 @@ type AgendaHeaderProps = {
   currentUser: Profile;
   currentView: AgendaView;
   onViewChange: (view: AgendaView) => void;
+  // Bascule d'affichage, rendue uniquement aux vrais coordinateurs (cf. App.tsx).
+  // Absente pour tous les autres : un medecin ne doit pas voir ce controle.
+  viewAs?: UserRole;
+  onViewAsChange?: (role: UserRole) => void;
 };
 
 export default function AgendaHeader({
   currentUser,
   currentView,
   onViewChange,
+  viewAs,
+  onViewAsChange,
 }: AgendaHeaderProps) {
   const navigate = useNavigate();
   const tabs = TABS.filter((tab) => tab.roles.includes(currentUser.role));
@@ -58,7 +66,19 @@ export default function AgendaHeader({
           <ChevronLeft size={22} strokeWidth={2} className="text-marine" />
         </button>
         <h1 className="text-h2 text-ink flex-1">Planning</h1>
-        <span className="text-caption hidden sm:block">{currentUser.full_name}</span>
+        {viewAs && onViewAsChange && (
+          <Segmented
+            options={[
+              { value: 'coordinator', label: 'Coordination', icon: <Settings size={15} strokeWidth={2} /> },
+              { value: 'doctor', label: 'Médecin', icon: <Stethoscope size={15} strokeWidth={2} /> },
+            ]}
+            value={viewAs}
+            onChange={onViewAsChange}
+            ariaLabel="Afficher l'agenda en tant que"
+            className="shrink-0"
+          />
+        )}
+        <span className="text-caption hidden lg:block">{currentUser.full_name}</span>
       </div>
 
       <nav className="relative z-10 px-4 pb-3 pt-1 flex gap-2 overflow-x-auto hide-scrollbar">

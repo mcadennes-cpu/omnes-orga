@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { getRotationSettings, getRotationWeek } from './rotationUtils';
+import { getRotationPlans, getPlanForDate, getRotationWeek } from './rotationUtils';
 import { saveUndoAction, getCurrentUserId } from './undoUtils';
 
 export async function saveWeekAsTemplate(
@@ -126,10 +126,10 @@ export async function duplicateWeekTemplate(
     throw new Error('Erreur lors du chargement du modèle');
   }
 
-  const rotationSettings = await getRotationSettings();
+  const rotationPlans = await getRotationPlans();
   const { data: rotationRules } = await supabase
-    .from('rotation_assignment_rules')
-    .select('doctor_id, site_id, room_id, shift_type_id, weekday, rotation_week');
+    .from('rotation_plan_rules')
+    .select('plan_id, doctor_id, site_id, shift_type_id, weekday, rotation_week');
 
   const { data: sites } = await supabase
     .from('sites')
@@ -182,17 +182,23 @@ export async function duplicateWeekTemplate(
       let assignedDoctorId = null;
       let status = 'free';
 
-      if (rotationSettings && rotationRules) {
+      // Chaque jour genere resout son propre plan : une periode a cheval sur
+      // deux roulements applique le bon de part et d'autre.
+      const plan = rotationRules ? getPlanForDate(currentDate, rotationPlans) : null;
+
+      if (plan && rotationRules) {
         const rotationWeek = getRotationWeek(
           currentDate,
-          rotationSettings,
+          plan,
           { componentName: 'weekTemplateUtils.applyWeekTemplate', inputOrigin: `generated shift date: ${currentDate.toString()}` }
         );
         const jsWeekday = localWeekday;
 
+        // Plus de comparaison de salle depuis 6B-3 : elle appartient au
+        // creneau, pas au roulement.
         const matchingRule = rotationRules.find(rule =>
+          rule.plan_id === plan.id &&
           rule.site_id === item.site_id &&
-          rule.room_id === item.room_id &&
           rule.shift_type_id === item.shift_type_id &&
           rule.weekday === jsWeekday &&
           rule.rotation_week === rotationWeek

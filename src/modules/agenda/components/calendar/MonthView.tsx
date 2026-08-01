@@ -1,7 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Shift } from '../../lib/supabase';
 import { ChevronLeft, ChevronRight, Repeat } from 'lucide-react';
-import { getRotationSettings, getRotationWeek, getWeekDates } from '../../lib/rotationUtils';
+import {
+  getRotationPlans,
+  getPlanForDate,
+  getRotationWeek,
+  getWeekDates,
+  RotationPlan,
+} from '../../lib/rotationUtils';
 import { STATUS_STYLES, resolveShiftStatus } from '../../lib/statusStyles';
 
 type MonthViewProps = {
@@ -20,30 +26,31 @@ export default function MonthView({
   onDayClick,
   isMobile = false
 }: MonthViewProps) {
-  const [rotationSettings, setRotationSettings] = useState<{ start_date: string; cycle_length_weeks: number } | null>(null);
+  // Les plans en vigueur sont charges une fois ; chaque cellule du mois resout
+  // ensuite le sien par date. Un mois a cheval sur deux plans affiche donc la
+  // bonne numerotation de part et d'autre, sans rien basculer a la main.
+  const [rotationPlans, setRotationPlans] = useState<RotationPlan[]>([]);
 
   useEffect(() => {
-    loadRotationSettings();
+    loadRotationPlans();
   }, []);
 
-  const loadRotationSettings = async () => {
-    const settings = await getRotationSettings();
-    if (settings) {
-      setRotationSettings(settings);
-    }
+  const loadRotationPlans = async () => {
+    setRotationPlans(await getRotationPlans());
   };
 
   const getRotationWeekForDate = (date: Date): { week: number; total: number } | null => {
-    if (!rotationSettings) return null;
+    const plan = getPlanForDate(date, rotationPlans);
+    if (!plan) return null;
     const week = getRotationWeek(
       date,
-      rotationSettings,
+      plan,
       {
         componentName: 'MonthView',
         inputOrigin: `calendar cell date (Date object): ${date.toString()}`
       }
     );
-    return { week, total: rotationSettings.cycle_length_weeks };
+    return { week, total: plan.cycle_length_weeks };
   };
 
   const getMonthDays = (date: Date) => {

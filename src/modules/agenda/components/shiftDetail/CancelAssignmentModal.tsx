@@ -32,13 +32,16 @@ export default function CancelAssignmentModal({
     <BottomSheet title="Annuler l'assignation" onClose={onClose} busy={loading}>
       <p className="mb-4 text-body-m text-ink">
         {hasRotationRule
-          ? "Cette assignation provient d'une règle de roulement. Que souhaitez-vous faire ?"
+          ? "Cette assignation vient du roulement. Que souhaitez-vous faire ?"
           : "Souhaitez-vous annuler l'assignation uniquement pour cette date, ou pour toute la série ?"}
       </p>
 
       {hasRotationRule && countLabel && (
         <div className="mb-4 rounded-input border border-brique/20 bg-brique/10 px-4 py-3 text-body-m text-brique">
-          Supprimer la règle libérera <strong>{countLabel}</strong> placées sur cette même case du roulement — même médecin, même jour de la semaine, même semaine de cycle. Les autres gardes de ce créneau ne sont pas touchées. Cette action est irréversible.
+          Cette action libérera <strong>{countLabel}</strong> placées sur cette même case du roulement — même médecin, même jour de la semaine, même semaine de cycle. Les autres gardes de ce créneau ne sont pas touchées. Cette action est irréversible.
+          <span className="mt-2 block">
+            Le roulement n'est pas modifié : une garde recréée sur cette case retrouvera le même médecin.
+          </span>
         </div>
       )}
       <div className="space-y-3">
@@ -55,7 +58,7 @@ export default function CancelAssignmentModal({
             disabled={loading}
             className="w-full rounded-input bg-brique px-4 py-3 text-button text-white shadow-button transition-colors hover:bg-brique/90 disabled:opacity-50"
           >
-            Supprimer la règle de roulement
+            Libérer les gardes de cette case
           </button>
         ) : isPartOfSeries && (
           <button
