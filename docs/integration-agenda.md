@@ -879,6 +879,69 @@ Laurène Daudin présents au fichier et absents de la base, 6 réattributions
 établi par un autre script, retrouvé par celui-ci : c'est la vérification qui
 comptait.
 
+##### 13. Sous-étape 6E-2 — FAITE (01/08/2026)
+
+**`docs/sql/22-6E-2-agenda-import-plan.sql`** — la porte d'entrée unique des
+plans. 6B avait posé le verrou (aucune policy d'écriture, pas même pour un
+coordinateur) ; ce script pose la seule serrure qui l'ouvre.
+
+**1. `agenda.rotation_import_mappings` — la mémoire des correspondances.**
+Le fichier ne contient que des codes (`CB`, `Beaune`, `J1`) : aucun nom
+complet, aucun identifiant. La correspondance se décide une fois à l'écran,
+puis se mémorise. Une table plutôt qu'une constante dans le code, pour que
+l'arrivée d'un dixième associé ou d'un troisième site ne demande pas de
+livraison — c'est le cas d'usage « association d'un nouveau médecin ».
+
+`target_id` désigne trois tables selon `kind` : une clé étrangère est donc
+impossible, et le contrôle passe par un trigger. Une référence polymorphe non
+vérifiée finit par pointer dans le vide, et l'erreur ne se verrait qu'à
+l'écran du roulement, longtemps après.
+
+**Amorçage — 29 correspondances, dont 9 dérivées et 18 déclarées.** Les codes
+médecins se **dérivent** du nom (initiale du prénom + initiale de chaque mot du
+nom, la règle déjà utilisée par la grille de 6D) : recopier neuf noms dans un
+script en aurait fait une source de vérité de plus. La dérivation produit
+exactement `AS, CB, CC, IEG, LD, MC, MY, TE, XB` — vérifié par le script.
+Les créneaux, eux, **ne peuvent pas se dériver** (`Garde` → `WE1 beaune
+08h-20h`, et les irrégularités de saisie des noms en base l'interdisent) : ils
+sont déclarés d'après `desiderata.yaml`, et le bloc **échoue avec la liste des
+manquants** si un créneau attendu est absent, plutôt que d'amorcer une table
+trouée.
+
+**2. `agenda.importer_plan_roulement(...)` — la fonction d'import.** Elle reçoit
+le JSON de 6E-1 tel quel, plus les trois tables de correspondance arrêtées à
+l'écran. Elle revalide tout de son côté : *un écran ne protège rien*, c'est la
+leçon de 7C-3. Le plan est créé en **brouillon sans date d'entrée en vigueur** —
+un import ne touche jamais au planning en cours, c'est 6F qui activera.
+
+`p_verifier_seulement` produit le rapport **sans rien écrire** : c'est ce que
+l'écran de 6E-3 appellera pour afficher le récapitulatif avant confirmation.
+
+Garde-fous testés sur données jetables, puis effacées :
+
+| Test | Résultat |
+|---|---|
+| Un non-coordinateur importe | refusé |
+| Vérification à blanc, correspondances complètes | rapport : 264 affectations, 9 médecins, 2 sites, 13 créneaux |
+| Vérification à blanc, `CB` sans correspondance | `ok: false`, `manquants: {medecins: ["CB"]}` — **et rien d'écrit** |
+| `date_debut` qui n'est pas un lundi | refusé, avec le motif |
+| Semaine S9 dans un cycle de 8 | refusé **avant** toute écriture |
+| Import réel du V2 | 264 règles, plan en `draft` |
+| Les 5 écritures directes (plans, règles, correspondances) | **refusées**, coordinateur authentifié compris |
+| `plan_applicable()` après l'import | V1 aujourd'hui **et** en mars 2027 — le brouillon ne s'applique pas |
+
+**Contrôle décisif — le brouillon importé confronté au fichier : 264 / 264 cases
+identiques, zéro écart.** C'est le contrôle que le script de 6E-1 annonce en fin
+d'exécution, et il passe.
+
+**Mémorisation vérifiée** : 24 des 29 correspondances rafraîchies par l'import
+— 9 médecins + 2 sites + 13 créneaux, exactement ceux que le V2 utilise. Les 5
+créneaux non employés par ce fichier ne sont pas touchés : seule une
+correspondance qui a servi est retenue.
+
+*Le brouillon de test a été supprimé après contrôle.* Le V2 sera importé pour de
+bon depuis l'écran de 6E-3, puis activé en 6F.
+
 ---
 
 `source_file_name` et `imported_at` restent **volontairement NULL** : ce plan ne
@@ -986,7 +1049,7 @@ sous-étape 6G, absente du découpage initial.
 | **6B** | ✓ **FAITE** — Tables `rotation_plans` / `rotation_plan_rules` + RLS en lecture seule, plan « Roulement V1 » créé avec 268 règles. Anciennes tables intactes. | Fait |
 | **6C** | ✓ **FAITE (6C-1 à 6C-3)** — Code basculé sur les plans à iso-comportement, écriture du roulement retirée, écran de paramètres passé en consultation. **6C-4 (suppression des anciennes tables) est reportée après la bascule** — voir ci-dessous. | Non |
 | **6D** | ✓ **FAITE** — Écran Paramètres → Roulement : liste des plans + **grille consultable** à la disposition du fichier (créneaux en lignes, semaines × sites en colonnes). | Non |
-| **6E** | Import d'un fichier → plan en **brouillon**, écran de correspondance, rapport d'anomalies. **6E-1 faite** (le `.xlsx` → JSON canonique) ; restent 6E-2 (fonction d'import `security definer` + mémorisation des correspondances) et 6E-3 (l'écran). | 6E-2 : oui |
+| **6E** | Import d'un fichier → plan en **brouillon**, écran de correspondance, rapport d'anomalies. **6E-1 et 6E-2 faites** (le `.xlsx` → JSON canonique ; la fonction d'import `security definer` + la mémoire des correspondances) ; reste **6E-3**, l'écran. | 6E-2 : fait |
 | **6F** | Écran de différentiel vs plan actif, choix de la date d'entrée en vigueur, activation. | Non |
 | **6G** | **Modifications souhaitées** : collecte depuis une garde, récapitulatif exportable pour report dans le fichier. La contrepartie du verrouillage. | Oui |
 | **6H** | Prévisualisation : génération simulée des gardes des N semaines à venir. | Non |
