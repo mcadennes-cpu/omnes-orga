@@ -1005,6 +1005,83 @@ Rejoué après correction, par le chemin du navigateur :
 
 Le brouillon de test a été supprimé ; `plan_applicable()` rend toujours le V1.
 
+##### 15. Sous-étape 6F — FAITE (01/08/2026)
+
+`docs/sql/22-6F-1-agenda-activation-plan.sql` et
+`components/settings/RotationPlanDiff.tsx`.
+
+##### ⚠️ La doc disait « archiver le plan sortant ». C'était un bug.
+
+La cible décrite plus haut annonçait : « l'ancien est archivé avec sa
+`effective_to` ». Pris au pied de la lettre, **le V1 aurait disparu de la
+résolution des dates passées** : `getRotationPlans()` ne charge que les plans
+`active` ([rotationUtils.ts:56](../src/modules/agenda/lib/rotationUtils.ts)), et
+`plan_applicable()` filtre pareil. « Quel roulement s'appliquait en mars ? »
+n'aurait plus eu de réponse — ce que MOD-1 existe précisément pour corriger.
+
+**Le plan sortant reste donc `active`, avec sa `effective_to` fermée.** Les
+statuts se lisent ainsi :
+
+| Statut | Sens |
+|---|---|
+| `draft` | préparé, hors de la frise |
+| `active` | **dans** la frise : passé, présent ou futur |
+| `archived` | retiré de la frise (brouillon abandonné, plan qui n'a jamais servi) — **pas** « périmé » |
+
+« En vigueur aujourd'hui » n'est pas un statut mais un calcul : `active` **et**
+la date du jour dans `[effective_from, effective_to]`. C'est déjà ce que fait
+`estEnVigueur()` dans l'écran de 6D — les deux lectures concordent.
+
+**La fonction d'activation.** `agenda.activer_plan_roulement(plan, date,
+verifier_seulement)` — deuxième et dernière porte d'écriture des plans. Elle
+ferme le sortant **avant** d'activer l'entrant, sans quoi le trigger de
+non-chevauchement de 6B refuserait l'opération.
+
+Garde-fous testés **par le chemin du navigateur** (PostgREST, rôle
+`authenticated`) :
+
+| Test | Résultat |
+|---|---|
+| Un non-coordinateur active | refusé |
+| Date qui n'est pas un lundi | refusé — la semaine du basculement relèverait de deux plans |
+| Date dans le passé | refusé — les gardes en sont déjà générées |
+| Ancrage S1 postérieur à l'entrée en vigueur | refusé — donnerait une semaine de rotation négative |
+| Activer un plan déjà actif | refusé |
+| Activation du V2 au 04/01/2027 | V1 fermé au 03/01, V2 en vigueur au 04/01 |
+
+**Le contrôle qui comptait — la frise après bascule :**
+
+| Date interrogée | Plan rendu |
+|---|---|
+| Aujourd'hui | V1 |
+| **Mars 2026 (passé)** | **V1 — l'historique survit** |
+| 03/01/2027 (veille) | V1 |
+| 04/01/2027 (bascule) | V2 |
+| Mars 2027 | V2 |
+
+**L'écran.** Différentiel en tableau (nature, semaine, jour, site, créneau,
+avant → après), puis la grille de 6D avec sa prop `highlight` — construite en
+6D pour exactement cet usage, et utilisée sans modification. Choix de la date
+d'entrée en vigueur (le prochain lundi par défaut), puis `ConfirmDialog`.
+L'activation appelle la fonction deux fois, en vérification à blanc puis en
+écriture.
+
+Un brouillon ne peut pas être activé sans passer par cet écran : le bouton
+« Comparer et activer » n'existe que sur les brouillons, et c'est le seul
+chemin.
+
+**Différentiel V1 → V2 mesuré : 93 changements** — 25 ajoutées, 27 supprimées,
+41 modifiées, sur 291 cases dans l'union. Soit **198 cases identiques**, très
+exactement le « 198 sur 305 » relevé en juillet par le comparateur de fichiers,
+retrouvé ici par un calcul entièrement différent.
+
+*Écart assumé, à confirmer* : la fonction **exige un lundi**, alors que la
+section « cas d'usage » évoque une activation « au 1er du mois choisi ». Une
+bascule en milieu de semaine est calculable, mais donnerait un mardi en « S3 du
+V1 » et un mercredi en « S1 du V2 » — illisible pour un cabinet qui lit son
+roulement à la semaine. Le cas d'usage devient donc « le lundi qui suit le 1er
+du mois ». À rouvrir si Matthieu préfère l'inverse.
+
 ---
 
 `source_file_name` et `imported_at` restent **volontairement NULL** : ce plan ne
@@ -1113,7 +1190,7 @@ sous-étape 6G, absente du découpage initial.
 | **6C** | ✓ **FAITE (6C-1 à 6C-3)** — Code basculé sur les plans à iso-comportement, écriture du roulement retirée, écran de paramètres passé en consultation. **6C-4 (suppression des anciennes tables) est reportée après la bascule** — voir ci-dessous. | Non |
 | **6D** | ✓ **FAITE** — Écran Paramètres → Roulement : liste des plans + **grille consultable** à la disposition du fichier (créneaux en lignes, semaines × sites en colonnes). | Non |
 | **6E** | ✓ **FAITE (6E-1 à 6E-3)** — Le `.xlsx` → JSON canonique (Python) ; la fonction d'import `security definer` + la mémoire des correspondances ; l'écran d'import avec correspondances pré-remplies et rapport d'anomalies. | Fait |
-| **6F** | Écran de différentiel vs plan actif, choix de la date d'entrée en vigueur, activation. | Non |
+| **6F** | ✓ **FAITE** — Fonction d'activation `security definer` + écran de différentiel (tableau des changements, grille en évidence, choix de la date, confirmation). | Fait |
 | **6G** | **Modifications souhaitées** : collecte depuis une garde, récapitulatif exportable pour report dans le fichier. La contrepartie du verrouillage. | Oui |
 | **6H** | **Révisée le 01/08/2026** — plus seulement une prévisualisation : **« Ouvrir les N prochaines semaines depuis le plan »**, en remplacement du trio semaine de référence / modèle / duplication. Voir ci-dessous. | Oui |
 

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Repeat, FileSpreadsheet, Lock, ChevronDown, ChevronRight, Upload } from 'lucide-react';
+import { Repeat, FileSpreadsheet, Lock, ChevronDown, ChevronRight, Upload, ArrowRightLeft } from 'lucide-react';
 import RotationPlanGrid from './RotationPlanGrid';
 import RotationPlanImport from './RotationPlanImport';
+import RotationPlanDiff from './RotationPlanDiff';
 
 // ---------------------------------------------------------------------------
 // Consultation des plans de roulement (MOD-1, etape 6C-3).
@@ -68,6 +69,8 @@ export default function RotationManagement() {
   // (recapitulatif, correspondances, anomalies) est trop dense pour une
   // bottom-sheet, et c'est un parcours, pas une saisie ponctuelle.
   const [importEnCours, setImportEnCours] = useState(false);
+  // Le brouillon en cours de comparaison, s'il y en a un (6F).
+  const [planCompare, setPlanCompare] = useState<RotationPlanRow | null>(null);
 
   useEffect(() => {
     loadPlans();
@@ -103,6 +106,21 @@ export default function RotationManagement() {
       <RotationPlanImport
         onRetour={() => setImportEnCours(false)}
         onImporte={loadPlans}
+      />
+    );
+  }
+
+  if (planCompare) {
+    const enVigueur = plans.find(estEnVigueur) ?? null;
+    return (
+      <RotationPlanDiff
+        brouillon={planCompare}
+        actif={enVigueur}
+        onRetour={() => {
+          setPlanCompare(null);
+          loadPlans();
+        }}
+        onActive={loadPlans}
       />
     );
   }
@@ -208,18 +226,33 @@ export default function RotationManagement() {
                 </div>
               </dl>
 
-              <button
-                onClick={() => setPlanDeplie(planDeplie === plan.id ? null : plan.id)}
-                aria-expanded={planDeplie === plan.id}
-                className="mt-4 flex items-center gap-1.5 rounded-pill px-3 py-1.5 text-button text-canard transition-colors hover:bg-canard/10"
-              >
-                {planDeplie === plan.id ? (
-                  <ChevronDown size={17} strokeWidth={2} />
-                ) : (
-                  <ChevronRight size={17} strokeWidth={2} />
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setPlanDeplie(planDeplie === plan.id ? null : plan.id)}
+                  aria-expanded={planDeplie === plan.id}
+                  className="flex items-center gap-1.5 rounded-pill px-3 py-1.5 text-button text-canard transition-colors hover:bg-canard/10"
+                >
+                  {planDeplie === plan.id ? (
+                    <ChevronDown size={17} strokeWidth={2} />
+                  ) : (
+                    <ChevronRight size={17} strokeWidth={2} />
+                  )}
+                  {planDeplie === plan.id ? 'Masquer la grille' : 'Voir la grille'}
+                </button>
+
+                {/* Un brouillon ne s'active jamais sans passer par le
+                    differentiel : treize changements silencieux sont
+                    exactement ce que ce dispositif existe pour eviter. */}
+                {plan.status === 'draft' && (
+                  <button
+                    onClick={() => setPlanCompare(plan)}
+                    className="flex items-center gap-1.5 rounded-pill bg-canard/10 px-3 py-1.5 text-button text-canard transition-colors hover:bg-canard/20"
+                  >
+                    <ArrowRightLeft size={17} strokeWidth={2} />
+                    Comparer et activer
+                  </button>
                 )}
-                {planDeplie === plan.id ? 'Masquer la grille' : 'Voir la grille'}
-              </button>
+              </div>
 
               {planDeplie === plan.id && (
                 <div className="mt-4">

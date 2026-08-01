@@ -44,7 +44,9 @@ const JOURS: { weekday: number; label: string }[] = [
 // Les creneaux portent le site dans leur nom (« J1 Beaune », « WE1 beaune
 // 08h-20h ») : on le retire pour retrouver le code du fichier. Voir la section
 // `correspondance_agenda` de desiderata.yaml.
-function codeCreneau(nomCreneau: string, nomSite: string): string {
+// Exportee : l'ecran de differentiel de 6F doit deriver les memes codes que la
+// grille, sinon les cases mises en evidence ne tomberaient pas en face.
+export function codeCreneau(nomCreneau: string, nomSite: string): string {
   const code = nomCreneau
     .replace(new RegExp(nomSite, 'i'), '')
     .replace(/\d{1,2}\s*h\s*-\s*\d{1,2}\s*h/i, '')
@@ -66,7 +68,7 @@ function comparerCodes(a: string, b: string): number {
 
 // « Imane EL GARI » -> « IEG », « Mireille YUAN » -> « MY ». Verifie sur les 9
 // associes du roulement : initiale du prenom + initiale de chaque mot du nom.
-function initiales(fullName: string): string {
+export function initiales(fullName: string): string {
   return fullName
     .split(/\s+/)
     .filter(Boolean)
