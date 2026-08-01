@@ -804,6 +804,13 @@ l'activation du V2 en 6F qui la posera au 03/01/2027).
 |---:|---:|---:|---:|---:|
 | 282 | 14 | **268** | **0** | **0** |
 
+> **Le plan compte 266 règles depuis 6B-3, et non 268** (relevé en base le
+> 01/08/2026 pendant 6E-1). En retirant `room_id` de la table, 6B-3 a rendu
+> identiques deux paires de règles qui ne différaient que par la salle : le
+> script les supprime avant de retirer la colonne. Aucune case du roulement
+> n'est perdue — c'est la même case, comptée deux fois. **266 est le chiffre de
+> référence du différentiel de 6F.**
+
 Les 14 écartées sont les règles `J3 Dijon` du week-end. Vérification faite case
 par case, elles sont **entièrement redondantes** avec les 14 règles `WE1 Dijon`,
 qui couvrent exactement les mêmes cases : **12 portent le même médecin des deux
@@ -812,6 +819,67 @@ Caroline Chauvet sur `J3` contre Laurène Daudin sur `WE1`. Ces deux-là sont la
 trace de la réattribution de la garde S6 : seule la règle du nouveau créneau a
 été mise à jour, l'ancienne est restée figée sur sa valeur d'origine — celle du
 fichier de décembre. Aucune information n'est perdue.
+
+##### 12. Sous-étape 6E-1 — FAITE (01/08/2026)
+
+**La décision laissée en attente est tranchée : le fichier passe par un JSON
+canonique produit en Python.** L'application ne lira jamais de `.xlsx`. Pas de
+`npm install xlsx`.
+
+Ce qui a emporté la décision : **le parseur existait déjà**. `lire_fichier()`
+dans `22-6-outil-comparer-roulement-fichiers.py` traitait déjà les deux formats
+du cabinet, et c'est lui qui a produit le diagnostic des 27 écarts. Le réécrire
+en TypeScript, c'était refaire à neuf — sans vérificateur — un travail validé
+sur les deux fichiers réels.
+
+**`docs/sql/22-6E-1-export-roulement-json.py`** — c'est le `3_export_app.py` du
+schéma de MOD-1 bis. Il vit dans `docs/sql/` avec les autres scripts du projet ;
+sa place définitive est le dépôt du pipeline Python, aux côtés de
+`verifie-planning.py`.
+
+```
+python3 docs/sql/22-6E-1-export-roulement-json.py docs/planning-V2_2026-07.xlsx \
+    --nom "Roulement V2 - 9 associes" --date-debut 2027-01-04
+```
+
+**Écart assumé au JSON décrit plus haut : il ne porte ni horaire de créneau, ni
+nom complet de médecin.** Le format initial prévoyait de les lire dans
+`desiderata.yaml`. Depuis que la route retenue place l'écran de correspondance
+dans l'application, ce serait une **troisième copie** des tables de
+correspondance — exactement le défaut déjà reproché à `1_optimize.py`, dont la
+doc note que « la duplication finira par diverger ». Le JSON ne porte donc que
+l'image fidèle du fichier : les codes tels qu'ils y sont écrits. La frontière
+devient nette — **Python lit le fichier, l'application résout les identités** —
+et le script n'a aucune dépendance nouvelle (PyYAML n'est pas installé, et n'a
+plus lieu de l'être).
+
+Le script refuse une `--date-debut` qui n'est pas un lundi, et propose le lundi
+le plus proche. Le contrôle existe déjà en base ; le faire ici évite de
+découvrir l'erreur au moment de l'import.
+
+**Rapport d'anomalies** (dans le JSON *et* à l'écran) : `feuille_ignoree`,
+`jour_inconnu`, `cellule_ambigue`, `creneau_ambigu`, `doublon_exact`,
+`ligne_ignoree`, `code_medecin_suspect`, `semaine_vide`. Le plus utile est
+`creneau_ambigu` : sur les lignes `J6 ou J7 ou J8` du V1, le créneau ne se
+déduit pas de la ligne. Vérifié — **toutes** les cellules de ces lignes portent
+leur propre code (`LD J7`), aucune ne retombe sur le libellé ambigu. Le cas ne
+se présente donc pas aujourd'hui, mais il ne passera pas en silence s'il
+survient.
+
+| Fichier | Feuille retenue | Cycle | Affectations | Anomalies |
+|---|---|---:|---:|---|
+| `planning-V2_2026-07.xlsx` | `Roulement V2` | 8 | 264 | aucune |
+| `planning-actuel_2025-12.xlsx` | `Feuille 1` | 8 | 265 | 1 — le doublon `Feuille 1-1` de l'export Numbers, signalé et non lu |
+
+**Contrôle — le JSON du V1 confronté au plan actif en base : 13 écarts, et ce
+sont exactement les 13 « vraies divergences » du diagnostic.** 3 doublons de
+Laurène Daudin présents au fichier et absents de la base, 6 réattributions
+(LD/CB en S4 jeudi, les gardes S6), 4 ajouts isolés. Le tableau S6 de la section
+« diagnostic de la dérive » se relit ligne à ligne dans la sortie. Un chiffre
+établi par un autre script, retrouvé par celui-ci : c'est la vérification qui
+comptait.
+
+---
 
 `source_file_name` et `imported_at` restent **volontairement NULL** : ce plan ne
 vient pas d'un fichier, c'est le relevé d'un état construit à la main dans
@@ -918,7 +986,7 @@ sous-étape 6G, absente du découpage initial.
 | **6B** | ✓ **FAITE** — Tables `rotation_plans` / `rotation_plan_rules` + RLS en lecture seule, plan « Roulement V1 » créé avec 268 règles. Anciennes tables intactes. | Fait |
 | **6C** | ✓ **FAITE (6C-1 à 6C-3)** — Code basculé sur les plans à iso-comportement, écriture du roulement retirée, écran de paramètres passé en consultation. **6C-4 (suppression des anciennes tables) est reportée après la bascule** — voir ci-dessous. | Non |
 | **6D** | ✓ **FAITE** — Écran Paramètres → Roulement : liste des plans + **grille consultable** à la disposition du fichier (créneaux en lignes, semaines × sites en colonnes). | Non |
-| **6E** | Import d'un fichier → plan en **brouillon**, écran de correspondance, rapport d'anomalies. | Non |
+| **6E** | Import d'un fichier → plan en **brouillon**, écran de correspondance, rapport d'anomalies. **6E-1 faite** (le `.xlsx` → JSON canonique) ; restent 6E-2 (fonction d'import `security definer` + mémorisation des correspondances) et 6E-3 (l'écran). | 6E-2 : oui |
 | **6F** | Écran de différentiel vs plan actif, choix de la date d'entrée en vigueur, activation. | Non |
 | **6G** | **Modifications souhaitées** : collecte depuis une garde, récapitulatif exportable pour report dans le fichier. La contrepartie du verrouillage. | Oui |
 | **6H** | Prévisualisation : génération simulée des gardes des N semaines à venir. | Non |
@@ -928,11 +996,10 @@ même calendrier qu'aujourd'hui — même numérotation S1–S8, mêmes pré-aff
 Vérifiable ligne à ligne, et c'est la discipline appliquée en 7C : une migration à
 comportement constant rend tout écart ultérieur suspect par construction.
 
-**Décision en attente pour 6E** : parser le `.xlsx` dans l'application
-(bibliothèque SheetJS, donc un `npm install xlsx` à valider) ou passer par le
-`3_export_app.py` du pipeline Python produisant un JSON canonique. La
-recommandation de MOD-1 bis va au second — toute la fragilité de lecture reste
-alors là où vivent l'expertise et le vérificateur.
+~~**Décision en attente pour 6E**~~ — **tranchée le 01/08/2026 par Matthieu, en
+faveur du JSON canonique produit en Python** (`3_export_app.py`), contre le
+parsing `.xlsx` dans l'application. Pas de `npm install xlsx`. Motif décisif :
+le parseur des deux formats existait déjà et était éprouvé. Détail en 6E-1.
 
 ---
 

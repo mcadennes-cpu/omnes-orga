@@ -1,0 +1,1895 @@
+{
+  "plan": {
+    "nom": "Roulement V2 - 9 associes",
+    "cycle_semaines": 8,
+    "date_debut": "2027-01-04",
+    "source": "planning-V2_2026-07.xlsx",
+    "feuille": "Roulement V2",
+    "exporte_le": "2026-08-01T16:50:49+02:00"
+  },
+  "sites": [
+    "Beaune",
+    "Dijon"
+  ],
+  "creneaux": [
+    "Doublon",
+    "Garde",
+    "J1",
+    "J2",
+    "J3",
+    "J4",
+    "J7",
+    "J8"
+  ],
+  "medecins": [
+    "AS",
+    "CB",
+    "CC",
+    "IEG",
+    "LD",
+    "MC",
+    "MY",
+    "TE",
+    "XB"
+  ],
+  "jours": [
+    "Lundi",
+    "Mardi",
+    "Mercredi",
+    "Jeudi",
+    "Vendredi",
+    "Samedi",
+    "Dimanche"
+  ],
+  "affectations": [
+    {
+      "medecin": "CB",
+      "semaine": 1,
+      "jour": "Lundi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 1,
+      "jour": "Lundi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 1,
+      "jour": "Lundi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 1,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 1,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 1,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 1,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J7"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 1,
+      "jour": "Mardi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 1,
+      "jour": "Mardi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 1,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 1,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 1,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J7"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 1,
+      "jour": "Mercredi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 1,
+      "jour": "Mercredi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 1,
+      "jour": "Mercredi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 1,
+      "jour": "Mercredi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 1,
+      "jour": "Jeudi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 1,
+      "jour": "Jeudi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 1,
+      "jour": "Jeudi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 1,
+      "jour": "Jeudi",
+      "site": "Beaune",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 1,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 1,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 1,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 1,
+      "jour": "Vendredi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 1,
+      "jour": "Vendredi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 1,
+      "jour": "Vendredi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 1,
+      "jour": "Vendredi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 1,
+      "jour": "Samedi",
+      "site": "Beaune",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 1,
+      "jour": "Samedi",
+      "site": "Dijon",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 1,
+      "jour": "Dimanche",
+      "site": "Beaune",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 1,
+      "jour": "Dimanche",
+      "site": "Dijon",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 2,
+      "jour": "Lundi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 2,
+      "jour": "Lundi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 2,
+      "jour": "Lundi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 2,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 2,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 2,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 2,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J7"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 2,
+      "jour": "Mardi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 2,
+      "jour": "Mardi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 2,
+      "jour": "Mardi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 2,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 2,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 2,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 2,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J7"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 2,
+      "jour": "Mercredi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 2,
+      "jour": "Mercredi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 2,
+      "jour": "Mercredi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 2,
+      "jour": "Mercredi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 2,
+      "jour": "Jeudi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 2,
+      "jour": "Jeudi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 2,
+      "jour": "Jeudi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 2,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 2,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 2,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 2,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J7"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 2,
+      "jour": "Vendredi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 2,
+      "jour": "Vendredi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 2,
+      "jour": "Vendredi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 2,
+      "jour": "Vendredi",
+      "site": "Beaune",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 2,
+      "jour": "Vendredi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 2,
+      "jour": "Vendredi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 2,
+      "jour": "Samedi",
+      "site": "Beaune",
+      "creneau": "Doublon"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 2,
+      "jour": "Samedi",
+      "site": "Beaune",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 2,
+      "jour": "Samedi",
+      "site": "Dijon",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 2,
+      "jour": "Dimanche",
+      "site": "Beaune",
+      "creneau": "Doublon"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 2,
+      "jour": "Dimanche",
+      "site": "Beaune",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 2,
+      "jour": "Dimanche",
+      "site": "Dijon",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 3,
+      "jour": "Lundi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 3,
+      "jour": "Lundi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 3,
+      "jour": "Lundi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 3,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 3,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 3,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J7"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 3,
+      "jour": "Mardi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 3,
+      "jour": "Mardi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 3,
+      "jour": "Mardi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 3,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 3,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 3,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 3,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J7"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 3,
+      "jour": "Mercredi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 3,
+      "jour": "Mercredi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 3,
+      "jour": "Mercredi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 3,
+      "jour": "Mercredi",
+      "site": "Beaune",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 3,
+      "jour": "Mercredi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 3,
+      "jour": "Jeudi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 3,
+      "jour": "Jeudi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 3,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 3,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 3,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 3,
+      "jour": "Vendredi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 3,
+      "jour": "Vendredi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 3,
+      "jour": "Vendredi",
+      "site": "Beaune",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 3,
+      "jour": "Vendredi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 3,
+      "jour": "Samedi",
+      "site": "Beaune",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 3,
+      "jour": "Samedi",
+      "site": "Dijon",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 3,
+      "jour": "Dimanche",
+      "site": "Beaune",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 3,
+      "jour": "Dimanche",
+      "site": "Dijon",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 4,
+      "jour": "Lundi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 4,
+      "jour": "Lundi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 4,
+      "jour": "Lundi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 4,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 4,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 4,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 4,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J7"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 4,
+      "jour": "Mardi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 4,
+      "jour": "Mardi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 4,
+      "jour": "Mardi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 4,
+      "jour": "Mardi",
+      "site": "Beaune",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 4,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 4,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 4,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J7"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 4,
+      "jour": "Mercredi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 4,
+      "jour": "Mercredi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 4,
+      "jour": "Mercredi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 4,
+      "jour": "Mercredi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 4,
+      "jour": "Mercredi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 4,
+      "jour": "Jeudi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 4,
+      "jour": "Jeudi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 4,
+      "jour": "Jeudi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 4,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 4,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 4,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 4,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J7"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 4,
+      "jour": "Vendredi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 4,
+      "jour": "Vendredi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 4,
+      "jour": "Vendredi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 4,
+      "jour": "Vendredi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 4,
+      "jour": "Vendredi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 4,
+      "jour": "Samedi",
+      "site": "Beaune",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 4,
+      "jour": "Samedi",
+      "site": "Dijon",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 4,
+      "jour": "Dimanche",
+      "site": "Beaune",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 4,
+      "jour": "Dimanche",
+      "site": "Dijon",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 5,
+      "jour": "Lundi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 5,
+      "jour": "Lundi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 5,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 5,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 5,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 5,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J7"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 5,
+      "jour": "Mardi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 5,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 5,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 5,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 5,
+      "jour": "Mercredi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 5,
+      "jour": "Mercredi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 5,
+      "jour": "Mercredi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 5,
+      "jour": "Mercredi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 5,
+      "jour": "Jeudi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 5,
+      "jour": "Jeudi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 5,
+      "jour": "Jeudi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 5,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 5,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 5,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 5,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J7"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 5,
+      "jour": "Vendredi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 5,
+      "jour": "Vendredi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 5,
+      "jour": "Vendredi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 5,
+      "jour": "Vendredi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 5,
+      "jour": "Samedi",
+      "site": "Beaune",
+      "creneau": "Doublon"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 5,
+      "jour": "Samedi",
+      "site": "Beaune",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 5,
+      "jour": "Samedi",
+      "site": "Dijon",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 5,
+      "jour": "Dimanche",
+      "site": "Beaune",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 5,
+      "jour": "Dimanche",
+      "site": "Dijon",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 6,
+      "jour": "Lundi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 6,
+      "jour": "Lundi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 6,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 6,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 6,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 6,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J7"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 6,
+      "jour": "Mardi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 6,
+      "jour": "Mardi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 6,
+      "jour": "Mardi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 6,
+      "jour": "Mardi",
+      "site": "Beaune",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 6,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 6,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 6,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 6,
+      "jour": "Mercredi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 6,
+      "jour": "Mercredi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 6,
+      "jour": "Mercredi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 6,
+      "jour": "Mercredi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 6,
+      "jour": "Mercredi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 6,
+      "jour": "Jeudi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 6,
+      "jour": "Jeudi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 6,
+      "jour": "Jeudi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 6,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 6,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 6,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 6,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J7"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 6,
+      "jour": "Vendredi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 6,
+      "jour": "Vendredi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 6,
+      "jour": "Vendredi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 6,
+      "jour": "Vendredi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 6,
+      "jour": "Vendredi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 6,
+      "jour": "Vendredi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 6,
+      "jour": "Vendredi",
+      "site": "Dijon",
+      "creneau": "J7"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 6,
+      "jour": "Samedi",
+      "site": "Beaune",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 6,
+      "jour": "Samedi",
+      "site": "Dijon",
+      "creneau": "Doublon"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 6,
+      "jour": "Samedi",
+      "site": "Dijon",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 6,
+      "jour": "Dimanche",
+      "site": "Beaune",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 6,
+      "jour": "Dimanche",
+      "site": "Dijon",
+      "creneau": "Doublon"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 6,
+      "jour": "Dimanche",
+      "site": "Dijon",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 7,
+      "jour": "Lundi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 7,
+      "jour": "Lundi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 7,
+      "jour": "Lundi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 7,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 7,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 7,
+      "jour": "Mardi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 7,
+      "jour": "Mardi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 7,
+      "jour": "Mardi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 7,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 7,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 7,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 7,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J7"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 7,
+      "jour": "Mercredi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 7,
+      "jour": "Mercredi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 7,
+      "jour": "Mercredi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 7,
+      "jour": "Mercredi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 7,
+      "jour": "Jeudi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 7,
+      "jour": "Jeudi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 7,
+      "jour": "Jeudi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 7,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 7,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 7,
+      "jour": "Vendredi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 7,
+      "jour": "Vendredi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 7,
+      "jour": "Vendredi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 7,
+      "jour": "Samedi",
+      "site": "Beaune",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 7,
+      "jour": "Samedi",
+      "site": "Dijon",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 7,
+      "jour": "Dimanche",
+      "site": "Beaune",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 7,
+      "jour": "Dimanche",
+      "site": "Dijon",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 8,
+      "jour": "Lundi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 8,
+      "jour": "Lundi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 8,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 8,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 8,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 8,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J7"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 8,
+      "jour": "Lundi",
+      "site": "Dijon",
+      "creneau": "J8"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 8,
+      "jour": "Mardi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 8,
+      "jour": "Mardi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 8,
+      "jour": "Mardi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 8,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 8,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 8,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 8,
+      "jour": "Mardi",
+      "site": "Dijon",
+      "creneau": "J7"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 8,
+      "jour": "Mercredi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 8,
+      "jour": "Mercredi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 8,
+      "jour": "Mercredi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 8,
+      "jour": "Mercredi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 8,
+      "jour": "Jeudi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "XB",
+      "semaine": 8,
+      "jour": "Jeudi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 8,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 8,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "CC",
+      "semaine": 8,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 8,
+      "jour": "Jeudi",
+      "site": "Dijon",
+      "creneau": "J7"
+    },
+    {
+      "medecin": "AS",
+      "semaine": 8,
+      "jour": "Vendredi",
+      "site": "Beaune",
+      "creneau": "J1"
+    },
+    {
+      "medecin": "LD",
+      "semaine": 8,
+      "jour": "Vendredi",
+      "site": "Beaune",
+      "creneau": "J2"
+    },
+    {
+      "medecin": "TE",
+      "semaine": 8,
+      "jour": "Vendredi",
+      "site": "Beaune",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "CB",
+      "semaine": 8,
+      "jour": "Vendredi",
+      "site": "Dijon",
+      "creneau": "J3"
+    },
+    {
+      "medecin": "MC",
+      "semaine": 8,
+      "jour": "Vendredi",
+      "site": "Dijon",
+      "creneau": "J4"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 8,
+      "jour": "Vendredi",
+      "site": "Dijon",
+      "creneau": "J7"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 8,
+      "jour": "Samedi",
+      "site": "Beaune",
+      "creneau": "Doublon"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 8,
+      "jour": "Samedi",
+      "site": "Beaune",
+      "creneau": "Garde"
+    },
+    {
+      "medecin": "IEG",
+      "semaine": 8,
+      "jour": "Dimanche",
+      "site": "Beaune",
+      "creneau": "Doublon"
+    },
+    {
+      "medecin": "MY",
+      "semaine": 8,
+      "jour": "Dimanche",
+      "site": "Beaune",
+      "creneau": "Garde"
+    }
+  ],
+  "anomalies": []
+}
