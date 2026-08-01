@@ -1115,7 +1115,57 @@ sous-étape 6G, absente du découpage initial.
 | **6E** | ✓ **FAITE (6E-1 à 6E-3)** — Le `.xlsx` → JSON canonique (Python) ; la fonction d'import `security definer` + la mémoire des correspondances ; l'écran d'import avec correspondances pré-remplies et rapport d'anomalies. | Fait |
 | **6F** | Écran de différentiel vs plan actif, choix de la date d'entrée en vigueur, activation. | Non |
 | **6G** | **Modifications souhaitées** : collecte depuis une garde, récapitulatif exportable pour report dans le fichier. La contrepartie du verrouillage. | Oui |
-| **6H** | Prévisualisation : génération simulée des gardes des N semaines à venir. | Non |
+| **6H** | **Révisée le 01/08/2026** — plus seulement une prévisualisation : **« Ouvrir les N prochaines semaines depuis le plan »**, en remplacement du trio semaine de référence / modèle / duplication. Voir ci-dessous. | Oui |
+
+#### Le pont plan → gardes existe déjà — relevé le 01/08/2026
+
+Constat fait à partir d'une capture de Matthieu (calendrier vide au 04/01/2027)
+et de son explication : « les dates ne sont pas encore ouvertes aux
+remplaçants ; quand Charlotte fait une ouverture, le roulement se met par
+défaut ». Vérification faite dans le code : **c'est exact, et ce pont tourne
+déjà sur les nouvelles tables de plans** depuis 6C.
+
+`lib/weekTemplateUtils.ts` → `duplicateWeekTemplate()` : chaque jour généré
+résout **son propre** plan (`getPlanForDate`), calcule sa semaine de rotation,
+cherche la règle correspondante et pré-affecte le médecin
+(`status = 'assigned'`). Une période à cheval sur deux roulements applique donc
+le bon de part et d'autre — ce qui rend l'activation du V2 en 6F sans effet sur
+les semaines déjà ouvertes.
+
+**Le modèle de semaine ne fait pas double emploi avec le plan.** Les deux
+répondent à des questions différentes, et les chiffres le montrent :
+
+| | Ce qu'il dit | Volume |
+|---|---|---:|
+| **Plan de roulement** | *qui* travaille — les 9 associés | 266 règles ÷ 8 semaines ≈ **33 cases/semaine** |
+| **Modèle de semaine** | *quelles cases sont ouvertes* | ≈ **48 gardes/semaine** en base |
+
+L'écart d'une quinzaine, ce sont les créneaux `J5`, `J6` et les salles
+supplémentaires : **les cases des remplaçants**, que le roulement ne connaît pas
+et ne doit pas connaître. C'est la clé de lecture posée plus haut — *rotation =
+associés, demandes = remplaçants*. Le modèle porte l'**offre**, le plan porte
+l'**affectation**.
+
+**Mais le parcours actuel est plus lourd qu'il n'a besoin de l'être**, et c'est
+l'intuition de Matthieu (« il y a peut-être plus simple à trouver »). Ouvrir des
+semaines suppose aujourd'hui : disposer d'une semaine de référence bien formée,
+l'enregistrer comme modèle, puis la dupliquer — et uniquement sur un calendrier
+**vide**. Trois étapes et une condition, alors que le plan couvre à lui seul
+toutes les cases des associés. Il ne manque qu'une liste courte : les créneaux
+remplaçants à ouvrir systématiquement. **D'où la 6H révisée** : « Ouvrir les N
+prochaines semaines », sans semaine de référence à fabriquer.
+
+**Défaut relevé au passage** : `duplicateWeekTemplate` fait une requête
+d'existence **par case et par jour**, soit ~380 allers-retours enchaînés pour 8
+semaines. Or la fonction vient de vérifier que la période est **vide** : ces
+requêtes ne peuvent rien trouver. C'est probablement ce qui rend l'ouverture
+lente. À corriger avec 6H.
+
+*Arbitrage de Matthieu (01/08/2026) : 6F d'abord.* Activer le V2 sans écran de
+différentiel, ce serait laisser passer treize changements silencieux — le
+dispositif existe précisément pour éviter ça.
+
+---
 
 **6C est le passage délicat** : le plan « V1 » migré doit produire exactement le
 même calendrier qu'aujourd'hui — même numérotation S1–S8, mêmes pré-affectations.
