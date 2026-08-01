@@ -942,6 +942,69 @@ correspondance qui a servi est retenue.
 *Le brouillon de test a été supprimé après contrôle.* Le V2 sera importé pour de
 bon depuis l'écran de 6E-3, puis activé en 6F.
 
+##### 14. Sous-étape 6E-3 — FAITE (01/08/2026)
+
+**`components/settings/RotationPlanImport.tsx`**, plus un bouton « Importer un
+plan » dans `RotationManagement`.
+
+**L'écran explique l'étape d'avant.** Remarque de Matthieu : « je ne visualise
+pas très bien le glisser/déposer de `.json` ». Elle est juste, et elle a changé
+le design — le `.json` est un fichier intermédiaire produit par une commande au
+terminal, pas un document que la coordinatrice manipule d'habitude. Une simple
+zone de dépôt aurait laissé chacun deviner quel fichier déposer. L'écran
+**affiche donc la commande de conversion** avant la zone de dépôt, et dit
+pourquoi elle vit hors de l'application. Glisser-déposer **et** sélecteur de
+fichier : le premier ne se devine pas, le second se voit.
+
+**Un panneau, pas une modale.** Le contenu (récapitulatif, correspondances,
+anomalies) est trop dense pour une bottom-sheet, et c'est un parcours, pas une
+saisie ponctuelle. L'import prend donc toute la carte Roulement, avec le
+`ChevronLeft` réglementaire pour revenir. *Ce n'est pas une déviation au design
+system : le pattern bottom-sheet vise les modales de contenu, et il n'y a pas
+de modale ici.*
+
+**Les correspondances déjà mémorisées ne s'affichent pas** — seules les
+inconnues demandent une action, avec un « Tout afficher et modifier » pour les
+revoir. Quand tout est reconnu, l'écran le dit en une ligne (« les 24 codes du
+fichier sont tous reconnus ») plutôt que d'aligner 24 listes déroulantes que
+personne ne lira. Le bouton d'import reste désactivé tant qu'un code n'est pas
+tranché.
+
+L'écran appelle la fonction **deux fois** : d'abord en vérification à blanc,
+puis en écriture. Le premier appel ne sert pas à l'affichage — il sert à ce que
+le serveur revalide avant d'écrire.
+
+##### ⚠️ Le bug que seul le test de bout en bout pouvait trouver
+
+Les garde-fous de 6E-2 avaient été testés par l'API d'administration, en rôle
+`postgres`. Rejoués par le **chemin réel du navigateur** (PostgREST, rôle
+`authenticated`, jeton de session), le premier appel a échoué :
+
+```
+{"code":"21000","message":"DELETE requires a WHERE clause"}
+```
+
+Supabase active **pg_safeupdate** pour le rôle `authenticated` : tout `DELETE`
+sans clause `WHERE` est refusé. La fonction en contenait un
+(`delete from tmp_affectations;`), remplacé par un `drop` + `create` de la table
+temporaire. **L'import aurait échoué au premier clic**, et rien dans les tests
+précédents ne l'annonçait.
+
+*La leçon vaut pour la suite de MOD-1 : une fonction `security definer` testée
+en rôle d'administration n'est pas une fonction testée.* Le rôle qui l'exécutera
+n'a ni les mêmes droits ni les mêmes garde-fous.
+
+Rejoué après correction, par le chemin du navigateur :
+
+| Appel | Résultat |
+|---|---|
+| Coordinateur, vérification à blanc | `ok: true` — 264 affectations, 9 médecins, 2 sites, 13 créneaux |
+| Médecin non coordinateur | refusé |
+| Coordinateur, `CB` sans correspondance | `ok: false`, `manquants: {medecins: ["CB"]}` |
+| Coordinateur, écriture réelle avec mémorisation | 264 règles, plan en `draft` |
+
+Le brouillon de test a été supprimé ; `plan_applicable()` rend toujours le V1.
+
 ---
 
 `source_file_name` et `imported_at` restent **volontairement NULL** : ce plan ne
@@ -1049,7 +1112,7 @@ sous-étape 6G, absente du découpage initial.
 | **6B** | ✓ **FAITE** — Tables `rotation_plans` / `rotation_plan_rules` + RLS en lecture seule, plan « Roulement V1 » créé avec 268 règles. Anciennes tables intactes. | Fait |
 | **6C** | ✓ **FAITE (6C-1 à 6C-3)** — Code basculé sur les plans à iso-comportement, écriture du roulement retirée, écran de paramètres passé en consultation. **6C-4 (suppression des anciennes tables) est reportée après la bascule** — voir ci-dessous. | Non |
 | **6D** | ✓ **FAITE** — Écran Paramètres → Roulement : liste des plans + **grille consultable** à la disposition du fichier (créneaux en lignes, semaines × sites en colonnes). | Non |
-| **6E** | Import d'un fichier → plan en **brouillon**, écran de correspondance, rapport d'anomalies. **6E-1 et 6E-2 faites** (le `.xlsx` → JSON canonique ; la fonction d'import `security definer` + la mémoire des correspondances) ; reste **6E-3**, l'écran. | 6E-2 : fait |
+| **6E** | ✓ **FAITE (6E-1 à 6E-3)** — Le `.xlsx` → JSON canonique (Python) ; la fonction d'import `security definer` + la mémoire des correspondances ; l'écran d'import avec correspondances pré-remplies et rapport d'anomalies. | Fait |
 | **6F** | Écran de différentiel vs plan actif, choix de la date d'entrée en vigueur, activation. | Non |
 | **6G** | **Modifications souhaitées** : collecte depuis une garde, récapitulatif exportable pour report dans le fichier. La contrepartie du verrouillage. | Oui |
 | **6H** | Prévisualisation : génération simulée des gardes des N semaines à venir. | Non |

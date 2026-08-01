@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Repeat, FileSpreadsheet, Lock, ChevronDown, ChevronRight } from 'lucide-react';
+import { Repeat, FileSpreadsheet, Lock, ChevronDown, ChevronRight, Upload } from 'lucide-react';
 import RotationPlanGrid from './RotationPlanGrid';
+import RotationPlanImport from './RotationPlanImport';
 
 // ---------------------------------------------------------------------------
 // Consultation des plans de roulement (MOD-1, etape 6C-3).
@@ -63,6 +64,10 @@ export default function RotationManagement() {
   // Grille depliee. La grille du plan en vigueur s'ouvre d'office : c'est
   // l'information que la coordinatrice vient chercher ici.
   const [planDeplie, setPlanDeplie] = useState<string | null>(null);
+  // L'import prend toute la carte plutot que d'ouvrir une modale : le contenu
+  // (recapitulatif, correspondances, anomalies) est trop dense pour une
+  // bottom-sheet, et c'est un parcours, pas une saisie ponctuelle.
+  const [importEnCours, setImportEnCours] = useState(false);
 
   useEffect(() => {
     loadPlans();
@@ -93,16 +98,34 @@ export default function RotationManagement() {
     p.effective_from <= aujourdhui &&
     (p.effective_to === null || aujourdhui <= p.effective_to);
 
+  if (importEnCours) {
+    return (
+      <RotationPlanImport
+        onRetour={() => setImportEnCours(false)}
+        onImporte={loadPlans}
+      />
+    );
+  }
+
   return (
     <div className="rounded-card border border-border bg-carte p-6 shadow-card">
-      <div className="mb-6 flex items-center gap-3">
-        <div className="rounded-pill bg-canard/10 p-2">
-          <Repeat className="h-6 w-6 text-canard" />
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="rounded-pill bg-canard/10 p-2">
+            <Repeat className="h-6 w-6 text-canard" />
+          </div>
+          <div>
+            <h2 className="text-h2 text-ink">Plans de roulement</h2>
+            <p className="text-caption">Cycle de rotation des associés</p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-h2 text-ink">Plans de roulement</h2>
-          <p className="text-caption">Cycle de rotation des associés</p>
-        </div>
+        <button
+          onClick={() => setImportEnCours(true)}
+          className="flex items-center gap-2 rounded-input bg-marine px-4 py-2.5 text-button text-white shadow-button transition-opacity hover:opacity-90"
+        >
+          <Upload size={17} strokeWidth={2} />
+          Importer un plan
+        </button>
       </div>
 
       <div className="mb-6 flex items-start gap-3 rounded-card border border-marine/20 bg-marine/5 p-4">

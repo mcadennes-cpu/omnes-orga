@@ -311,11 +311,16 @@ begin
   end if;
 
   -- --- 5.3 Les affectations, mises a plat -------------------------------
-  create temporary table if not exists tmp_affectations (
+  -- `drop` puis `create`, plutot que `if not exists` suivi d'un `delete` :
+  -- Supabase active pg_safeupdate pour le role `authenticated`, qui refuse
+  -- tout DELETE sans clause WHERE. Le defaut ne se voyait pas par la voie
+  -- d'administration -- le role postgres n'a pas ce garde-fou -- mais l'import
+  -- echouait des le premier appel depuis le navigateur.
+  drop table if exists tmp_affectations;
+  create temporary table tmp_affectations (
     medecin  text, semaine integer, jour text, site text, creneau text,
     weekday  integer
   ) on commit drop;
-  delete from tmp_affectations;
 
   insert into tmp_affectations (medecin, semaine, jour, site, creneau, weekday)
   select a ->> 'medecin',
