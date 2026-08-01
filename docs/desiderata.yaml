@@ -9,12 +9,26 @@
 # se fait ICI, nulle part ailleurs. Le script `verifie-planning.py` et le
 # futur optimiseur (`1_optimize.py`) doivent lire ce fichier directement.
 #
-# Dernière mise à jour : 2026-07-14
+# Dernière mise à jour : 2026-08-01
 # Historique :
 #   - 2026-07-14 : création — fusion des données de refaire-le-planning.md
 #     et parametres.md. Conflit détecté sur les gardes d'IEG entre les deux
 #     anciennes sources.
 #   - 2026-07-14 : conflit IEG confirmé par l'intéressée — voir fiche IEG.
+#   - 2026-08-01 : confrontation avec les créneaux réellement déclarés dans
+#     l'agenda (étape 6 / MOD-1). Trois écarts arbitrés par Matthieu :
+#       * J5 → l'horaire de la base fait foi (12:00-20:00) et J5 sort du
+#         roulement des associés (voir fiche J5).
+#       * J2 Beaune → ce fichier fait foi (14:00-22:00) ; la base portait
+#         10:00-22:00, corrigée.
+#       * J5 bis (créneau présent en base, absent d'ici) → désactivé, non
+#         reconduit ici.
+#     Ajout de la section 1bis (correspondance codes ↔ créneaux de l'agenda).
+#
+# ⚠️ Ce fichier est une COPIE de référence, placée dans le dépôt Omnès-Orga
+# pour servir de source au parseur de roulement (MOD-1). Le fichier maître
+# vit dans le pipeline Python (1_optimize.py / verifie-planning.py) : y
+# reporter les corrections du 2026-08-01, sans quoi les deux divergeront.
 # ============================================================================
 
 # ----------------------------------------------------------------------------
@@ -30,13 +44,37 @@ creneaux:
     horaire: "14:00-22:00"
     unique_par_site_jour: true
     commentaire: "Créneau rare, 1 seul par site et par jour — la ressource la plus disputée"
+    # 2026-08-01 : la base déclarait J2 Beaune en 10:00-22:00 contre 14:00-22:00
+    # à Dijon. Arbitré par Matthieu — cet horaire fait foi, J2 dure 8 h sur les
+    # deux sites ; le créneau a été corrigé dans l'agenda.
   J3: {horaire: "08:00-18:30", unique_par_site_jour: false}
   J4: {horaire: "08:00-18:30", unique_par_site_jour: false}
-  J5: {horaire: "08:00-18:30", unique_par_site_jour: false}
+  J5:
+    horaire: "12:00-20:00"
+    unique_par_site_jour: false
+    usage_habituel: remplacants   # PREFERENCE, pas une regle dure
+    hors_roulement: true
+    # 2026-08-01 : ce fichier annonçait 08:00-18:30 (journée d'associé). Arbitré
+    # par Matthieu — l'horaire de la base fait foi. Les chiffres le confirment :
+    # sur 239 gardes J5, 133 sont tenues par un remplaçant et 16 seulement par
+    # un associé, et la ligne J5 est VIDE dans le roulement V2 (quasi vide en
+    # V1). J5 est donc un créneau de renfort d'après-midi, hors roulement,
+    # au même titre que J6.
   J6:
     horaire: "08:00-14:00"
-    reserve_remplacants: true
-    commentaire: "Ne doit JAMAIS contenir un associé — concept 'préJ2' abandonné"
+    usage_habituel: remplacants   # PREFERENCE, pas une regle dure
+    hors_roulement: true
+    commentaire: "Va en pratique aux remplaçants — concept 'préJ2' abandonné"
+    # ⚠️ 2026-08-01, précisé par Matthieu : ce fichier disait « ne doit JAMAIS
+    # contenir un associé » et classait donc J6 parmi les règles dures. C'est
+    # FAUX. Rien ne doit empêcher d'assigner un associé sur un J6 : c'est un
+    # usage habituel, pas un invariant. Ne jamais en faire un contrôle bloquant
+    # dans l'application (tout au plus un avertissement), et ne pas le compter
+    # comme une violation dans verifie-planning.py.
+    #
+    # Le créneau s'appelait "Pré J2 Dijon" dans l'agenda ; renommé "J6 Dijon"
+    # le 2026-08-01 (même horaire, 176 de ses 257 gardes tenues par des
+    # remplaçants, aucune règle de roulement).
   J7: {horaire: "08:00-18:30", unique_par_site_jour: false}
   J8: {horaire: "08:00-18:30", unique_par_site_jour: false}
 
@@ -47,14 +85,76 @@ creneaux:
 fenetre_recouvrement_max: "14:00-16:00"
 
 # ----------------------------------------------------------------------------
+# 1bis. Correspondance codes ↔ créneaux déclarés dans l'agenda (2026-08-01)
+# ----------------------------------------------------------------------------
+# Les créneaux de l'application (table shift_types) portent le site DANS leur
+# nom : la correspondance est donc un couple (code, site) → un shift_type, et
+# non un simple code. Elle est reprise ici pour pré-remplir l'écran de
+# correspondance de l'import Excel (MOD-1).
+#
+# Un code peut n'exister que sur un site : c'est normal et voulu.
+
+# État vérifié en base le 2026-08-01, après les scripts 22-6A-1 et 22-6A-2 :
+# 19 créneaux, 9 à Beaune et 10 à Dijon, plus aucun espace parasite dans les
+# noms. La correspondance ci-dessous est donc exacte et directement exploitable.
+
+correspondance_agenda:
+  J1:   {Beaune: "J1 Beaune"}
+  J2:   {Beaune: "J2 Beaune", Dijon: "J2 Dijon"}
+  J3:   {Beaune: "J3 Beaune", Dijon: "J3 Dijon"}
+  J4:   {Beaune: "J4 Beaune", Dijon: "J4 Dijon"}
+  J5:   {Dijon: "J5 Dijon"}                  # pas de J5 à Beaune
+  J6:   {Beaune: "J6 Beaune", Dijon: "J6 Dijon"}
+  J7:   {Beaune: "J7 Beaune", Dijon: "J7 Dijon"}
+  J8:   {Beaune: "J8 Beaune", Dijon: "J8 Dijon"}
+  Garde:   {Beaune: "WE1 beaune 08h-20h", Dijon: "WE1 Dijon"}
+  Doublon: {Beaune: "WE2 beaune 08h-20h", Dijon: "WE 2 Dijon"}
+
+# Créés le 2026-08-01 (script 22-6A-2) : J4, J7, J8 et J6 Beaune. Beaune passe
+# de 3 à 7 créneaux en semaine et peut donc occuper ses 6 salles.
+#
+# Motif immédiat : le roulement V2 place 6 affectations sur J4 Beaune (IEG en
+# S1 jeudi, S2 vendredi, S3 mercredi, S3 vendredi ; MY en S4 mardi et S6
+# mardi), créneau qui n'existait pas — son import aurait échoué. Les salles,
+# elles, existaient déjà toutes les 6 depuis le 2025-11-17 : le site n'avait
+# simplement jamais ouvert que Salle 1 et Salle 2, faute de créneaux.
+#
+# Créneaux de l'agenda sans correspondance dans les fichiers de roulement :
+#    "J5 bis Dijon" — désactivé le 2026-08-01 (3 gardes en tout, aucune à
+#    venir, la dernière le 2026-03-02, aucune règle de roulement).
+
+# ----------------------------------------------------------------------------
 # 2. Sites
 # ----------------------------------------------------------------------------
 sites:
   Beaune:
     salles: 6
     salles_avant_demenagement: 2  # historique — déménagement effectué en 2026-07
+    salles_reellement_ouvertes: 2  # 2026-08-01 : Salle 1 et Salle 2 seulement
+    visites_a_domicile: true
+    # ⚠️ Précisé par Matthieu le 2026-08-01, indevinable depuis les données :
+    # à Beaune, le médecin en J1 consulte AU CABINET de 08:00 à 13:00, puis part
+    # en VISITES À DOMICILE l'après-midi. La salle se libère donc à 13:00 et le
+    # J2 (14:00-22:00) peut l'occuper — le chevauchement apparent des horaires
+    # J1 (08:00-16:00) et J2 n'est PAS un conflit de salle.
+    # Il n'y a pas de visites à domicile à Dijon : c'est ce qui explique que
+    # l'occupation des salles diffère entre les deux sites.
   Dijon:
     salles: 6
+    visites_a_domicile: false
+
+# ----------------------------------------------------------------------------
+# 2bis. Salle par créneau
+# ----------------------------------------------------------------------------
+# Un créneau se tient toujours dans la même salle : la salle est donc une
+# propriété du CRÉNEAU (colonne agenda.shift_types.default_room_id), et non du
+# roulement — le fichier de roulement ne mentionne d'ailleurs aucune salle.
+#
+# La réciproque est fausse : une même salle peut porter DEUX créneaux, à
+# condition que leurs horaires ne se recouvrent pas réellement.
+#   . Dijon  : J6 (08:00-14:00) puis J2 (14:00-22:00) — d'où l'ancien nom
+#              « pré J2 ». Seul cas à Dijon.
+#   . Beaune : J1 (au cabinet 08:00-13:00, puis visites) puis J2.
 
 # ----------------------------------------------------------------------------
 # 3. Règles dures (invariants — cf. refaire-le-planning.md pour le détail humain)

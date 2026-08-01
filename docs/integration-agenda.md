@@ -254,6 +254,85 @@ Calcul (`src/lib/rotationUtils.ts` → `getRotationWeek`) : on prend le lundi de
 3. **Saisie case par case uniquement.** Aucun import en masse. Avec 8 semaines × 5 jours × plusieurs salles × plusieurs créneaux, cela représente potentiellement des centaines de saisies manuelles, alors que la source de vérité du cabinet est **un fichier Excel**.
 4. **Contrainte UNIQUE trop rigide.** Une seule case = un seul médecin. Impossible d'exprimer « deux médecins sur ce créneau » ni « personne cette semaine-là ».
 
+#### ⚠️ Principe directeur, posé par Matthieu le 01/08/2026 : une seule vérité
+
+> « J'aimerais qu'il n'y ait qu'une seule vérité : faire les modifications depuis
+> le fichier Excel (ou autre format), décider d'une date de mise en œuvre, et que
+> le planning soit toujours égal à notre fichier validé. »
+
+Ce principe commande toute la conception de MOD-1. Il demande une distinction
+sans laquelle on vise à côté :
+
+- **Le plan de roulement** (qui est censé travailler tel jour de telle semaine du
+  cycle) → le fichier est l'unique vérité, sans réserve.
+- **Le planning réel** (les gardes effectives) → l'égalité stricte est impossible
+  *et non souhaitable* : maladie, échange entre associés, remplaçant prenant une
+  garde libre. C'est précisément le rôle du circuit demandes/remplaçants.
+
+**Formulation qui tient : le plan est la vérité, le planning en découle par
+génération, et tout écart du réel est visible plutôt que silencieux.** C'est ce
+dernier point qui manque aujourd'hui — la dérive s'est installée sans que
+personne ne la voie.
+
+##### Le roulement devient en lecture seule dans l'application
+
+**Décision de Matthieu (01/08/2026) : « plan verrouillé + aide au report ».**
+
+L'application ne modifie **plus jamais** le plan de roulement. La fonction
+« appliquer à la semaine de roulement » (`useShiftDetail`, `AssignDoctorModal`)
+en est retirée : c'est elle qui a fait diverger la base du fichier.
+
+En contrepartie — et c'est la condition pour que ce soit tenable au quotidien —
+l'application doit offrir un **chemin de retour vers le fichier** : quand
+Charlotte veut un changement permanent, elle l'enregistre comme *modification
+souhaitée*, et un écran les récapitule pour qu'elle les reporte dans l'Excel
+avant le prochain import. Sans ce chemin, le verrouillage se paierait en
+rouvertures de Numbers pour le moindre ajustement, et finirait contourné.
+
+À conserver en revanche : changer le médecin d'**une garde précise**. C'est une
+opération sur le planning réel, pas sur le plan — elle reste nécessaire.
+
+##### Diagnostic de la dérive (relevé le 01/08/2026)
+
+Comparaison des 282 `rotation_assignment_rules` au fichier `planning-actuel_2025-12.xlsx` :
+**27 écarts, qui recouvrent trois réalités distinctes.**
+
+| Nature | Nombre | Détail |
+|---|---:|---|
+| **Vestige de modélisation** | **14** | Règles `J3 Dijon` du samedi et du dimanche, créées les 11–15/12/2025. **Ce n'est pas une dérive du roulement** : avant septembre 2026, le créneau week-end de Dijon n'existait pas et la garde était enregistrée sur un créneau de journée. Vérifié dans les gardes : `J3 Dijon` le week-end de janvier à août 2026 (68 gardes), puis `WE1 Dijon` de septembre à janvier 2027 (36 gardes). Ces règles sont **mortes**. |
+| **Vraies divergences** | **13** | 3 doublons de Laurène Daudin présents au fichier, absents de la base ; 6 réattributions (LD et CB échangés en S4 jeudi, gardes S6 réattribuées) ; 4 ajouts isolés. |
+
+Et l'ampleur de l'écriture par l'application, sur les 282 règles : **41 modifiées**
+après création, **24 ajoutées** en avril, mai et juillet 2026. La dérive n'était
+pas marginale, elle était continue.
+
+##### Le V2 tranche les 13 divergences — toutes contre la base
+
+Vérifié le 01/08/2026 : sur les 13, **13 suivent le fichier, 0 suit la base**.
+L'optimiseur est parti de l'Excel de décembre, pas de l'état réel de
+l'application : les décisions prises dans l'app n'ont jamais existé pour lui.
+
+Un cas achève de l'éclairer — les gardes de week-end en S6 :
+
+| | Garde S6 Beaune | Garde S6 Dijon | Doublon S6 Dijon |
+|---|---|---|---|
+| Fichiers V1 **et** V2 | MC | CC | **LD** |
+| Base, après dérive | CC | LD | — |
+
+Dans la base, **Laurène Daudin est de garde seule à Dijon en S6**, alors que sa
+fiche porte `pas_de_garde_seule: true` et ne lui donne aucune garde de week-end,
+uniquement des doublons. La dérive n'a pas seulement écarté la base du fichier :
+elle a introduit une **violation d'un desiderata explicite**, sans que rien ne la
+signale. C'est le coût de la double vérité, démontré sur les données réelles.
+
+**Conséquence pour la migration du plan « V1 » en 6B** : reprendre **l'état de la
+base moins les 14 règles mortes**, pour rester à comportement constant — c'est ce
+qui produit le planning d'aujourd'hui. Les 13 divergences n'ont pas à être
+reportées dans le fichier : le V2 les a déjà tranchées, et il prendra le relais le
+04/01/2027. Elles doivent en revanche **apparaître à l'écran de différentiel de
+6F** au moment d'activer le V2 — treize changements silencieux seraient
+exactement le genre de surprise que ce dispositif existe pour éviter.
+
 #### Cible proposée : des « plans de roulement » versionnés
 
 ```
@@ -327,17 +406,416 @@ Le fichier est **exporté depuis Apple Numbers**. Le classeur contient donc troi
 
 #### Définition des créneaux (source : `desiderata.yaml`)
 
+*(Tableau à jour des arbitrages du 01/08/2026 — voir la section suivante.)*
+
 | Code | Horaire | Contrainte |
 |---|---|---|
 | `J1` | 08:00–16:00 | **Beaune uniquement**, 1 seul par jour |
 | `J2` | 14:00–22:00 | **1 seul par site et par jour** — la ressource la plus disputée |
-| `J3` `J4` `J5` `J7` `J8` | 08:00–18:30 | Journée, multipliables |
-| `J6` | 08:00–14:00 | **Réservé aux remplaçants — jamais un associé** |
+| `J3` `J4` `J7` `J8` | 08:00–18:30 | Journée, multipliables |
+| `J5` | **12:00–20:00** | Va en pratique aux remplaçants — hors roulement |
+| `J6` | 08:00–14:00 | Va en pratique aux remplaçants — hors roulement |
 | `Garde` / `Doublon` | week-end | `Doublon` = second médecin sur la même garde |
 
 Fenêtre de recouvrement maximal : 14:00–16:00 (J1, J2 et journées se chevauchent). Capacité : 6 salles par site, **9 associés simultanés maximum**.
 
-**Conséquence architecturale majeure :** le roulement ne concerne que les **9 associés**. Le créneau `J6`, et plus généralement tous les créneaux non couverts par le roulement, sont destinés aux **remplaçants** — c'est-à-dire exactement ce que le circuit « garde libre → demande → approbation » de l'agenda gère déjà. Les deux mécanismes sont donc complémentaires et couvrent chacun une population : **rotation = associés (affectation automatique)**, **demandes = remplaçants (à la demande)**. C'est la clé de lecture du module.
+**Conséquence architecturale majeure :** le roulement ne concerne que les **9 associés**. Les créneaux `J5` et `J6`, et plus généralement tous les créneaux non couverts par le roulement, sont destinés aux **remplaçants** — c'est-à-dire exactement ce que le circuit « garde libre → demande → approbation » de l'agenda gère déjà. Les deux mécanismes sont donc complémentaires et couvrent chacun une population : **rotation = associés (affectation automatique)**, **demandes = remplaçants (à la demande)**. C'est la clé de lecture du module.
+
+---
+
+#### Décisions du 01/08/2026 — les deux points qui bloquaient le démarrage de MOD-1
+
+Les deux éléments manquants de la checklist sont tranchés. Les arbitrages ont été
+rendus sur des relevés faits en base (schéma `agenda` d'Omnès-Orga) et sur un
+parsing des deux fichiers Excel, pas sur la seule documentation.
+
+##### 1. Le roulement V2 démarre le lundi 04/01/2027, en semaine S6
+
+| Champ du plan | Valeur | Pourquoi |
+|---|---|---|
+| `effective_from` | **2027-01-04** | Le planning n'est généré que jusqu'au 03/01/2027 : **aucune garde déjà publiée n'est touchée**. |
+| `start_date` | **2026-11-30** | Pour que le 04/01/2027 tombe en **S6** (04/01 − 5 semaines). |
+| `cycle_length_weeks` | 8 | Inchangé. |
+
+**Le choix de Matthieu : ne pas rompre l'ordre habituel.** La semaine du
+28/12/2026 est S5 dans le roulement en cours ; celle du 04/01/2027 doit donc être
+S6, et non S1. Les médecins lisent la numérotation des semaines dans le
+calendrier — un saut S5 → S1 les perdrait.
+
+Propriété remarquable : **le `start_date` calculé (30/11/2026) est lui-même une
+frontière S1 du roulement actuel**. Les deux plans partagent donc exactement le
+même ancrage de cycle ; la numérotation reste continue, sans le moindre décalage.
+Le V2 passera en S1 pour la première fois le **lundi 25/01/2027**.
+
+**C'est la démonstration que `start_date` et `effective_from` doivent être deux
+colonnes distinctes** dans `rotation_plans` : le plan est ancré au 30/11/2026
+mais n'entre en vigueur qu'au 04/01/2027, et ses semaines S1 à S5 ne seront
+jamais jouées lors de son premier passage. Le schéma cible proposé plus haut
+tient — ce cas d'usage réel le valide.
+
+*Vérification du calcul (roulement en cours : `start_date` 2025-12-29, cycle 8) :
+28/12/2026 → S5, 04/01/2027 → S6, 11/01 → S7, 18/01 → S8, 25/01/2027 → S1.*
+
+##### 2. Les trois écarts d'horaire
+
+Arbitrés au vu de l'usage réel des créneaux, relevé en base :
+
+| Créneau | Base | `desiderata.yaml` | Décision | Justification |
+|---|---|---|---|---|
+| `J5 Dijon` | 12:00–20:00 | 08:00–18:30 | **la base fait foi** | Sur 239 gardes, **133 tenues par un remplaçant, 16 seulement par un associé**. La ligne `J5` est **vide** dans le roulement V2 et quasi vide en V1. Ce n'est pas une journée d'associé mais un **créneau de renfort, hors roulement**, comme `J6`. |
+| `J2 Beaune` | 10:00–22:00 | 14:00–22:00 | **`desiderata.yaml` fait foi** | `J2 Dijon` est bien à 14:00–22:00. L'écart est propre à Beaune sur un créneau tenu à 80 % par des associés (206 gardes sur 256) : erreur de saisie, à corriger en base. |
+| `J5 bis Dijon` | 12:00–20:00 | absent | **désactivé** | 3 gardes en tout, **aucune à venir**, la dernière le 02/03/2026, aucune règle de roulement, aucun associé. `is_active = false` : il sort des menus de création, l'historique des 3 gardes reste lisible. |
+
+Un argument a pesé dans les deux sens : `shifts.shift_type` stocke le
+`time_range` du créneau (conséquence de la dénormalisation documentée en 7A) —
+**l'horaire de la base est donc celui que les médecins lisent dans « Mes
+gardes »**. Corriger le créneau ne corrige pas les gardes déjà créées.
+
+##### 3. Constats relevés au passage — tous utiles à MOD-1
+
+- **Le roulement en base est le V1, pas le V2.** Comparaison des 282
+  `rotation_assignment_rules` aux deux grilles : **256 cases sur 283 identiques
+  au V1** contre **198 sur 305 au V2**. La base suit le V1 avec une **dérive de
+  27 cases** accumulée depuis décembre 2025 (retouches au fil de l'eau). L'import
+  du V2 sera donc une vraie bascule, et l'écran de différentiel prévu par MOD-1
+  n'est pas un confort : c'est ce qui rendra cette dérive visible avant écriture.
+- **`Pré J2 Dijon` est le `J6` de `desiderata.yaml`** : même horaire (08:00–14:00),
+  176 des 257 gardes tenues par des remplaçants, aucune règle de roulement. La
+  correspondance est établie, il n'y a pas de `J6` manquant — seulement un nom
+  historique. Table complète dans `desiderata.yaml`, section `correspondance_agenda`.
+- **⚠️ Le V2 introduit `J4 Beaune`, qui n'existe pas en base** — 6 affectations
+  (IEG en S1 jeudi, S2 vendredi, S3 mercredi, S3 vendredi ; MY en S4 mardi et S6
+  mardi). Le créneau **et la salle qui l'accueille** sont à créer avant l'import.
+  Cohérent avec le déménagement : Beaune n'a jamais ouvert que `Salle 1` et
+  `Salle 2` (les salles 3 à 6 existent en base mais n'ont **jamais** porté une
+  garde). C'est le cas d'usage « ouverture d'une nouvelle salle » de MOD-1, et il
+  se présente dès le premier import.
+- **Le roulement s'applique à la *création* des gardes, pas rétroactivement**
+  (`weekTemplateUtils.applyWeekTemplate`, `applyRotationRulesToShifts`). Un
+  changement de plan ne réécrit donc aucune garde existante. C'est ce qui rend la
+  date du 04/01/2027 indolore — et ce qui explique qu'une date antérieure aurait
+  exigé de rejouer le plan sur des gardes déjà assignées.
+
+##### 4. Sous-étape 6A — FAITE (01/08/2026)
+
+Deux scripts exécutés sur la base Orga, schéma `agenda`.
+
+**`docs/sql/22-6A-1-agenda-correction-creneaux.sql`** — les arbitrages ci-dessus :
+
+| Action | Résultat vérifié |
+|---|---|
+| `J2 Beaune` → `14:00-22:00` | créneau corrigé + **107 gardes à venir** ; les **149 passées** gardent `10:00-22:00` |
+| `J5 bis Dijon` → `is_active = false` | ses 3 gardes passées restent lisibles |
+| `J5 Dijon` | aucune écriture — c'est la doc qui a été corrigée |
+
+Portée choisie par Matthieu pour `J2 Beaune` : les gardes **déjà effectuées**
+gardent leur horaire d'origine, seules celles à venir sont corrigées. Sans ce
+second `UPDATE` la correction serait restée invisible : `shifts.shift_type`
+porte une copie texte de l'horaire (dénormalisation, écart n°2 de 7A), et les
+médecins auraient continué à lire `10:00-22:00` dans « Mes gardes » jusqu'en 2027.
+
+**`docs/sql/22-6A-2-agenda-creneaux-beaune.sql`** — les créneaux manquants :
+
+| | Avant | Après |
+|---|---:|---:|
+| Créneaux Beaune | 3 + 2 week-end | **7 + 2 week-end** |
+| Créneaux Dijon | 8 + 2 week-end | 8 + 2 week-end (dont 1 inactif) |
+| **Total** | 15 | **19** |
+
+Créés : `J4`, `J7`, `J8 Beaune` (08:00–18:30) et `J6 Beaune` (08:00–14:00).
+Beaune peut désormais occuper ses 6 salles. **Les salles, elles, existaient
+déjà toutes les six** depuis le 17/11/2025 : le site n'avait jamais ouvert que
+`Salle 1` et `Salle 2`, faute de créneaux pour occuper les autres — le
+déménagement avait été anticipé en base, mais à moitié.
+
+Hygiène des noms au passage : `Pré J2 Dijon ` → **`J6 Dijon`** (le concept
+« préJ2 » est déclaré abandonné par `desiderata.yaml`, et le nom divergeait de
+`J6 Beaune` qu'on venait de créer), et suppression des espaces parasites en fin
+de nom (`WE1 Dijon `, `WE 2 Dijon `). Sans effet sur les données : les gardes
+stockent l'horaire, jamais le nom du créneau.
+
+**Créer un créneau n'ouvre aucune garde** — il devient seulement proposable à la
+création. Rien n'a changé pour les médecins ; c'est Charlotte qui décide d'ouvrir
+des gardes dessus, via les modèles de semaine.
+
+##### 5. Bascule d'affichage coordination / médecin (01/08/2026)
+
+`is_agenda_coordinator` posé sur le compte de Matthieu, qui rejoint Charlotte. Le
+module en déduisant un rôle **unique**, il y perdait du même coup « Mes gardes »
+et « Planning du jour », réservés au rôle `doctor` — alors qu'il exerce et a donc
+des gardes, contrairement à la coordinatrice.
+
+D'où un sélecteur **Coordination / Médecin** dans le header (`App.tsx` +
+`AgendaHeader.tsx`), bâti sur la primitive `Segmented` existante. Rendu aux seuls
+comptes **réellement** coordinateurs, choix mémorisé en `localStorage`, retour au
+Calendrier à chaque bascule (seul onglet commun aux deux rôles).
+
+**Ce qu'il remplace** : jusqu'ici, Matthieu contrôlait les écrans coordinateur en
+se connectant **avec les identifiants de Charlotte**. Les actions de test
+apparaissaient donc sous le nom de la coordinatrice, et un mot de passe circulait
+entre deux personnes. Le sélecteur supprime les deux. *(Reste à faire un jour,
+hors périmètre : changer ce mot de passe partagé.)*
+
+**Conservé durablement**, à la demande de Matthieu — ce n'est pas un outil de test
+jetable mais le moyen normal, pour un associé exerçant la coordination, de voir
+ses propres gardes.
+
+**⚠️ Portée du sélecteur** : il change ce que l'**interface** propose, pas ce que
+la **base** autorise. En vue médecin l'utilisateur reste coordinateur pour la RLS
+(`agenda.est_coordinateur()`) : ses droits d'écriture sont intacts et une action
+proposée s'exécute réellement. Ce n'est ni un bac à sable ni un contrôle de
+sécurité — seules les policies en sont un, et elles ont été testées par
+usurpation d'identité en 7C-3.
+
+##### 6. « Planning du jour » reste réservé au rôle médecin — décision assumée
+
+La question s'est posée : faut-il ouvrir `DailyScheduleView` à la coordinatrice ?
+**Non**, tranché avec Matthieu le 01/08/2026.
+
+La grille coordinateur (`WeekView`) **affiche déjà le nom du médecin dans chaque
+case**, sans clic — c'est donc un doublon d'information, et même un sous-ensemble :
+la grille couvre 7 jours au lieu d'un, avec le statut de chaque case en plus.
+
+Les deux écrans ne répondent d'ailleurs pas à la même question. « Planning du
+jour » est coloré par **créneau** et pensé mobile-first (une pastille par garde,
+avatar à gauche) : « qui travaille aujourd'hui ? », pour un médecin en
+déplacement. La grille est colorée par **statut** : « qu'est-ce qui reste à
+pourvoir ? ». C'est exactement la double optimisation d'écran posée dans les
+contraintes du projet — lui donner un onglet coordinateur mélangerait les deux
+logiques et allongerait une barre d'onglets déjà à trois entrées.
+
+Et le sélecteur du point 5 rend le besoin caduc : une coordinatrice qui veut
+cette lecture bascule en vue Médecin.
+
+##### 8. Sous-étape 6C — FAITE (6C-1 à 6C-3, 01/08/2026)
+
+Le module lit et écrit désormais les plans. Plus aucun fichier ne consulte
+`rotation_assignment_rules` ni `rotation_settings`.
+
+**6C-1 — le socle.** `rotationUtils` expose `getRotationPlans()` (chargement
+unique, caché 60 s) et `getPlanForDate()` (résolution en mémoire, sans requête).
+`getRotationWeek` est **réutilisée telle quelle** : un `RotationPlan` porte
+`start_date` et `cycle_length_weeks`, donc l'arithmétique ne peut pas diverger —
+l'iso-comportement est structurel, pas seulement testé.
+
+*Deux choix de conception* : le plan est résolu sur le **lundi** de la semaine
+visée, pour qu'une semaine relève toujours d'un seul plan même si une date
+d'entrée en vigueur tombait en milieu de semaine ; et les dates sont comparées
+en chaînes `YYYY-MM-DD` construites en local, jamais via `toISOString()` — qui
+convertit en UTC et décale d'un jour selon l'heure.
+
+**Preuve d'équivalence sur les 2 681 gardes** (ancien calcul contre nouveau,
+rejoués en SQL) :
+
+| Identiques | Médecin différent | Ancien seul | Nouveau seul |
+|---:|---:|---:|---:|
+| **1 625** | **0** | 60 | **0** |
+
+Les 60 sont exclusivement les gardes `J3 Dijon` du week-end, celles du vestige.
+Toutes déjà `assigned`, dont les 8 restantes — et le roulement ne s'applique
+qu'à la *création* d'une garde. Aucune conséquence pratique.
+
+**6C-2 — les consommateurs** : `MonthView` (chaque cellule résout son propre
+plan), `WeekView`, `weekTemplateUtils`, `applyRotationRulesToShifts`. Un mois à
+cheval sur deux roulements affichera donc la bonne numérotation de part et
+d'autre, sans bascule manuelle.
+
+**6C-3 — le retrait de l'écriture.** Les deux fonctions concernées faisaient
+chacune **deux** choses ; une seule disparaît :
+
+| Fonction | Écriture du roulement | Action sur les gardes |
+|---|---|---|
+| `handleApplyToRotationWeek` | `upsert` de la règle → **retiré** | assigne le médecin → **conservé** |
+| `handleCancelAssignment('rotation')` | `delete` de la règle → **retiré** | libère les gardes → **conservé** |
+
+Les libellés suivent, sans quoi l'interface promettrait une action qu'elle ne
+fait plus : « Supprimer la règle de roulement » devient **« Libérer les gardes
+de cette case »**, et les deux modales portent la mention explicite que le
+roulement vient du fichier validé et n'est pas modifié.
+
+**Garde-fou ajouté** : « la même case du roulement » ne retient plus que les
+gardes **régies par le même plan**. Sans ce test, une action passée en décembre
+2026 toucherait des gardes de 2027 relevant du V2 — qui ne sont pas dans la même
+case, puisque le roulement a changé. Sans effet aujourd'hui (un seul plan),
+indispensable au 04/01/2027. Même famille de défaut que l'incident du 29/07 :
+une action dont le périmètre dépasse ce qu'elle annonce.
+
+`RotationManagement` passe en **consultation** : liste des plans, période,
+ancrage, nombre d'affectations, fichier d'origine. Il permettait jusqu'ici de
+changer `start_date` et la durée du cycle — le défaut n°2 de MOD-1.
+
+*Note de convention* : le **nom d'un plan est du texte affiché**, il porte donc
+ses accents (« Roulement V1 — décembre 2025 »). La règle « pas d'accents dans
+les migrations » vise les identifiants et le code, pas les valeurs destinées à
+l'écran.
+
+##### 11. Sous-étape 6B-3 — la salle sort du roulement (01/08/2026)
+
+**Découverte par la grille de 6D** : une case affichait « MY · MY ». En cause,
+deux règles pour la même case sur des **salles différentes** — l'ancienne
+contrainte (`UNIQUE(site, salle, créneau, jour, semaine)`) l'autorisait, et
+l'`upsert` du code portait sur ces mêmes colonnes : changer de salle créait une
+ligne au lieu d'en modifier une.
+
+| Case | Salles | Règles créées le |
+|---|---|---|
+| S6 jeudi · `J7 Dijon` | Cabinet B3 / **B6** | 15/12/2025 et 11/05/2026 |
+| S1 mardi · `J8 Dijon` | Cabinet B2 / **B3** | 29/07/2026 (les deux) |
+
+À la génération, deux salles ouvertes le même jour auraient produit **deux
+gardes assignées au même médecin à la même date** — ce que l'index
+`unique_doctor_per_day` refuse. La création aurait échoué sans message lisible.
+
+**Décision de Matthieu : sortir la salle du roulement.** Le fichier de roulement
+n'en parle pas ; un créneau se tient toujours dans la même salle, donc la salle
+est une propriété du **créneau**. Script `22-6B-3-agenda-salle-par-creneau.sql` :
+colonne `agenda.shift_types.default_room_id`, remplie **par déduction** (salle
+majoritaire des gardes réelles) pour les 15 créneaux historiques ; `room_id`
+retiré de `rotation_plan_rules`, dont la clé d'unicité devient exactement ce que
+dit le fichier — plan, site, créneau, jour, semaine, médecin. **266 règles**
+(268 − 2 vestiges).
+
+**⚠️ Aucune contrainte d'unicité sur `default_room_id`** — deux créneaux peuvent
+partager une salle si leurs horaires ne se recouvrent pas réellement :
+
+- **Dijon** : `J6` (08:00–14:00) puis `J2` (14:00–22:00) — d'où l'ancien nom
+  « pré J2 ».
+- **Beaune** : `J1` puis `J2`, alors que leurs horaires se chevauchent en
+  apparence (08:00–16:00 et 14:00–22:00). **Précisé par Matthieu, indevinable
+  depuis les données** : le médecin en `J1` consulte au cabinet de 08:00 à 13:00
+  puis part en **visites à domicile**. La salle se libère donc à 13:00. Il n'y a
+  pas de visites à Dijon — c'est ce qui distingue l'occupation des deux sites.
+  Consigné dans `desiderata.yaml`.
+
+Salles des 4 créneaux créés en 6A-2 (aucune garde, donc rien à déduire) :
+`J4` → Salle 3, `J7` → Salle 4, `J8` → Salle 5, `J6` → Salle 6 — ce dernier
+étant un créneau du matin, il ne peut rien partager, la Salle 1 étant occupée
+par `J1`.
+
+**Contrôle d'équivalence après coup** (2 681 gardes) : 1 625 identiques, **0
+médecin différent**, 60 « ancien seul » (le vestige `J3` week-end, déjà connu)
+et **1 « nouveau seul »** — une garde `J8 Dijon` du 02/06/2026 placée
+exceptionnellement en Cabinet B2, que l'ancien système ne rattachait à aucune
+règle faute de salle identique. Le nouveau retrouve Airelle Sauvage… qui est
+précisément la personne assignée. **La salle n'aurait jamais dû faire partie de
+l'identité d'une case.**
+
+##### 10. Sous-étape 6D — FAITE (01/08/2026)
+
+`components/settings/RotationPlanGrid.tsx` : la grille d'un plan, **à la
+disposition du fichier de roulement** — créneaux en lignes groupés par jour,
+semaines × sites en colonnes (`S1 Beaune`, `S1 Dijon`, `S2 Beaune`…). Choix de
+Matthieu : c'est la lecture à laquelle les associés sont habitués.
+
+**Pas de vue par médecin dans cet écran** : « Mes gardes » la couvre côté
+médecin, et la bascule Coordination / Médecin y donne accès côté coordination.
+*(Nuance relevée : « Mes gardes » montre les gardes réelles, pas la place dans
+le cycle. Comme les gardes sont générées loin à l'avance, l'information est là
+en pratique — à revoir si le besoin remonte.)*
+
+**Fichier séparé et prop `highlight` prévue dès maintenant** : c'est la même
+grille qui servira à l'écran de différentiel de 6F, avec les cases modifiées en
+couleur. Autant la construire une fois.
+
+Points d'implémentation : les sites et le nombre de semaines sont **déduits des
+données** (un troisième site apparaîtrait tout seul) ; le code du créneau est
+obtenu en retirant le nom du site et la plage horaire du libellé
+(`WE1 beaune 08h-20h` → `WE1`) ; le tri est naturel (J1 < J2 < … < J8 < WE) et
+non alphabétique ; les initiales sont dérivées du nom (initiale du prénom +
+initiale de chaque mot du nom — vérifié sur les 9 associés, `Imane EL GARI` →
+`IEG`), avec le nom complet en infobulle et une légende sous la grille.
+
+*Déviation assumée au design system* : la barre de défilement horizontale reste
+**visible**. La règle `.hide-scrollbar` vise les listes de chips ; sur un tableau
+de données large, la masquer nuirait à sa découvrabilité.
+
+**Contrôle** : la grille produite a été comparée au fichier
+`planning-actuel_2025-12.xlsx` pour le lundi — **case pour case identique**, y
+compris les `J7` que le fichier note en cellule composite (`AS J7` sur la ligne
+« J6 ou J7 ou J8 ») et que la base a normalisées.
+
+##### 9. ⚠️ 6C-4 reportée après la bascule — et ce qu'elle révèle
+
+La suppression de `rotation_settings` et `rotation_assignment_rules` **ne peut
+pas avoir lieu maintenant** : `docs/sql/22-7F-resynchronisation-agenda.py` les
+recopie depuis Planning, et ce script doit encore servir le soir de la bascule
+pour rattraper le delta de Bolt. Les supprimer le casserait. Elles ne coûtent
+rien en attendant — plus aucun code ne les lit.
+
+**Mais la vraie conséquence est ailleurs.** Charlotte travaille dans Bolt jusqu'à
+la bascule, et Bolt a toujours son « appliquer à la semaine de roulement », qui
+écrit dans `rotation_assignment_rules`. **Le plan « Roulement V1 » est figé au
+01/08/2026** : toute modification du roulement faite dans Bolt d'ici la bascule
+n'y sera pas.
+
+À prévoir le soir de la bascule, après la resynchronisation :
+
+1. **Comparer** `rotation_assignment_rules` fraîchement resynchronisée au plan
+   V1, et présenter les écarts — ne pas régénérer en silence.
+2. Arbitrer : soit reporter ces changements dans le plan, soit les considérer
+   comme caducs puisque le V2 prend le relais au 04/01/2027.
+3. Puis seulement, exécuter 6C-4.
+
+*Piste plus simple, à confirmer avec Matthieu* : demander à Charlotte de ne plus
+utiliser « appliquer à la semaine de roulement » dans Bolt d'ici la bascule. Le
+contrôle reste nécessaire — une consigne humaine ne se vérifie pas toute seule.
+
+##### 7. Sous-étape 6B — FAITE (01/08/2026)
+
+Deux scripts : `22-6B-1-agenda-plans-roulement.sql` (schéma) et
+`22-6B-2-agenda-migration-plan-v1.sql` (reprise du roulement actuel).
+
+**Le schéma** — `agenda.rotation_plans` (13 colonnes) et
+`agenda.rotation_plan_rules` (9 colonnes), 6 index, 2 fonctions de validation,
+1 fonction `agenda.plan_applicable(date)`.
+
+Les quatre défauts de conception sont corrigés : historisation par plan,
+numérotation ancrée sur le `start_date` **du plan** (plus de décalage rétroactif
+quand le cycle change de longueur), `doctor_id` dans la clé d'unicité (le
+`Doublon` du week-end devient exprimable), et l'import comme voie d'entrée.
+
+**Le verrou du principe « une seule vérité » est dans la base** : aucune policy
+`insert` / `update` / `delete` n'existe, pas même pour les coordinateurs. La
+seule porte d'entrée sera la fonction d'import de 6E, en `security definer`.
+Vérifié par usurpation d'identité — Charlotte lit les plans, mais ses trois
+tentatives d'écriture sont refusées.
+
+Garde-fous testés sur données jetables, puis effacées :
+
+| Test | Résultat |
+|---|---|
+| `start_date` qui n'est pas un lundi | refusé — décalerait tout le plan en silence |
+| Deux plans actifs qui se recouvrent | refusé — « quel roulement s'appliquait en mars ? » doit avoir une réponse unique |
+| Un plan qui enchaîne le lendemain du précédent | accepté |
+| Semaine S9 dans un cycle de 8 | refusé — serait une affectation qui ne se déclenche jamais |
+| **Deux médecins sur la même case** | **accepté** |
+| Le même médecin deux fois sur une case | refusé |
+| `plan_applicable()` : 15/12/2026 → V1, 10/01/2027 → V2 | correct |
+
+*Choix technique : un trigger plutôt qu'une contrainte d'exclusion pour le
+non-chevauchement — `btree_gist` n'est pas installé sur le projet, et l'ajouter
+pour cette seule règle serait disproportionné.*
+
+**La migration** — plan « Roulement V1 — décembre 2025 », `start_date`
+2025-12-29, cycle 8, actif depuis le 29/12/2025, sans date de fin (c'est
+l'activation du V2 en 6F qui la posera au 03/01/2027).
+
+| Source | Écartées | Migrées | Migrée sans source | Source sans migrée |
+|---:|---:|---:|---:|---:|
+| 282 | 14 | **268** | **0** | **0** |
+
+Les 14 écartées sont les règles `J3 Dijon` du week-end. Vérification faite case
+par case, elles sont **entièrement redondantes** avec les 14 règles `WE1 Dijon`,
+qui couvrent exactement les mêmes cases : **12 portent le même médecin des deux
+côtés** (doublon exact), et les **2 dernières** (S6 samedi et dimanche) portent
+Caroline Chauvet sur `J3` contre Laurène Daudin sur `WE1`. Ces deux-là sont la
+trace de la réattribution de la garde S6 : seule la règle du nouveau créneau a
+été mise à jour, l'ancienne est restée figée sur sa valeur d'origine — celle du
+fichier de décembre. Aucune information n'est perdue.
+
+`source_file_name` et `imported_at` restent **volontairement NULL** : ce plan ne
+vient pas d'un fichier, c'est le relevé d'un état construit à la main dans
+l'application pendant sept mois. C'est précisément ce que MOD-1 fait cesser.
 
 ---
 
@@ -401,7 +879,23 @@ desiderata.yaml ──► 1_optimize.py ──► 2_generate_xlsx.py ──► p
 
 Intérêt : toute la fragilité de lecture reste dans le pipeline Python, là où l'expertise et le vérificateur vivent déjà. L'import côté application devient trivial et robuste — il ne fait plus que valider un JSON et créer un plan. L'import `.xlsx` direct reste utile en secours, mais ce n'est plus le chemin principal.
 
-**Règles dures à porter dans l'application** (validation à la création/affectation d'une garde, à aligner avec `src/lib/shiftValidation.ts`) : un seul `J2` par site et par jour ; un seul `J1` par jour à Beaune ; jamais un associé sur `J6` ; maximum 9 associés simultanés sur la fenêtre 14:00–16:00 ; maximum 6 salles occupées par site ; lundi off obligatoire après un week-end travaillé.
+**Règles dures à porter dans l'application** (validation à la création/affectation d'une garde, à aligner avec `src/lib/shiftValidation.ts`) : un seul `J2` par site et par jour ; un seul `J1` par jour à Beaune ; maximum 9 associés simultanés sur la fenêtre 14:00–16:00 ; maximum 6 salles occupées par site ; lundi off obligatoire après un week-end travaillé.
+
+> **⚠️ Une règle en moins — corrigée par Matthieu le 01/08/2026.** Cette liste
+> comptait « jamais un associé sur `J6` », reprise telle quelle de
+> `desiderata.yaml` (« ne doit JAMAIS contenir un associé »). **C'est faux** :
+> `J5` et `J6` vont *en pratique* aux remplaçants, mais rien ne doit empêcher
+> d'y assigner un associé. C'est un usage habituel, pas un invariant — donc
+> **jamais un contrôle bloquant**, tout au plus un avertissement. `desiderata.yaml`
+> a été corrigé (`usage_habituel: remplacants` au lieu de `reserve_remplacants`),
+> et la correction est à reporter dans `verifie-planning.py`, qui compte
+> aujourd'hui ce cas comme une violation.
+>
+> Le piège est instructif pour la suite de MOD-1 : une contrainte écrite en
+> majuscules dans un fichier de configuration n'est pas nécessairement une règle
+> dure. Chaque règle de `shiftValidation.ts` mérite d'être reconfirmée avant
+> d'être transformée en verrou — un verrou de trop se paie en blocages
+> incompréhensibles pour la coordinatrice.
 
 **Incohérence repérée dans le pipeline** (à corriger côté Python, indépendamment de l'application) : `desiderata.yaml` se présente comme la source unique de vérité et prévoit que l'optimiseur le lise, mais `1_optimize.py` code encore en dur le dictionnaire `targetJ2` et le bloc des desiderata. Les valeurs coïncident aujourd'hui, mais la duplication finira par diverger. Sa section 4 (« Cibles J2 retenues pour la V2 ») est par ailleurs vide, les cibles vivant dans les fiches individuelles `j2_cible`.
 
@@ -410,6 +904,35 @@ Intérêt : toute la fragilité de lecture reste dans le pipeline Python, là o�
 - **Association d'un nouveau médecin** → nouveau plan importé depuis l'Excel mis à jour, activé au 1er du mois choisi. Les plannings déjà publiés ne bougent pas.
 - **Ouverture d'un nouveau lieu / nouvelle salle** → création du site/salle dans les paramètres, puis import d'un plan intégrant les nouvelles colonnes.
 - **Départ d'un médecin** → le plan archivé conserve ses affectations passées ; le profil reste en base (désactivé) pour ne pas casser l'historique.
+
+---
+
+### MOD-1 — découpage en sous-étapes (arrêté le 01/08/2026)
+
+Révisé après la décision « plan verrouillé + aide au report » — d'où la
+sous-étape 6G, absente du découpage initial.
+
+| | Contenu | Écrit en base ? |
+|---|---|---|
+| **6A** | ✓ **FAITE** — Correction des créneaux, création des 4 créneaux Beaune. | Fait |
+| **6B** | ✓ **FAITE** — Tables `rotation_plans` / `rotation_plan_rules` + RLS en lecture seule, plan « Roulement V1 » créé avec 268 règles. Anciennes tables intactes. | Fait |
+| **6C** | ✓ **FAITE (6C-1 à 6C-3)** — Code basculé sur les plans à iso-comportement, écriture du roulement retirée, écran de paramètres passé en consultation. **6C-4 (suppression des anciennes tables) est reportée après la bascule** — voir ci-dessous. | Non |
+| **6D** | ✓ **FAITE** — Écran Paramètres → Roulement : liste des plans + **grille consultable** à la disposition du fichier (créneaux en lignes, semaines × sites en colonnes). | Non |
+| **6E** | Import d'un fichier → plan en **brouillon**, écran de correspondance, rapport d'anomalies. | Non |
+| **6F** | Écran de différentiel vs plan actif, choix de la date d'entrée en vigueur, activation. | Non |
+| **6G** | **Modifications souhaitées** : collecte depuis une garde, récapitulatif exportable pour report dans le fichier. La contrepartie du verrouillage. | Oui |
+| **6H** | Prévisualisation : génération simulée des gardes des N semaines à venir. | Non |
+
+**6C est le passage délicat** : le plan « V1 » migré doit produire exactement le
+même calendrier qu'aujourd'hui — même numérotation S1–S8, mêmes pré-affectations.
+Vérifiable ligne à ligne, et c'est la discipline appliquée en 7C : une migration à
+comportement constant rend tout écart ultérieur suspect par construction.
+
+**Décision en attente pour 6E** : parser le `.xlsx` dans l'application
+(bibliothèque SheetJS, donc un `npm install xlsx` à valider) ou passer par le
+`3_export_app.py` du pipeline Python produisant un JSON canonique. La
+recommandation de MOD-1 bis va au second — toute la fragilité de lecture reste
+alors là où vivent l'expertise et le vérificateur.
 
 ---
 
@@ -455,9 +978,9 @@ Autres améliorations à prévoir quelle que soit la piste retenue : remplacer `
 - [x] ~~Le fichier Excel de roulement~~ — deux fichiers fournis et analysés (`planning-actuel_2025-12.xlsx` et `planning-V2_2026-07.xlsx`). **Placer les deux dans `docs/`** : ils servent de jeux de test au parseur, précisément parce que leurs formats diffèrent.
 - [x] ~~Signification des codes J1 à J8~~ — documentée dans `desiderata.yaml`, reprise dans le tableau ci-dessus. **Placer `desiderata.yaml` dans `docs/`** : il fait autorité sur les contraintes.
 - [x] ~~Noms complets des 9 associés~~ — connus (`analyse-planning-actuel.md`).
-- [ ] **⚠️ Date réelle de démarrage du roulement V2** : quelle semaine calendaire correspond à `S1` ? Aucun fichier ne le précise, et c'est la valeur `start_date` du plan — sans elle, l'application ne peut pas placer le roulement sur le calendrier.
+- [x] ~~**⚠️ Date réelle de démarrage du roulement V2**~~ — **tranché par Matthieu le 01/08/2026**. Le V2 entre en vigueur le **lundi 04/01/2027**, et cette semaine-là est numérotée **S6** pour ne pas rompre l'ordre habituel (la semaine du 28/12/2026 est S5 dans le roulement en cours). Il en découle **`start_date` = lundi 30/11/2026** (04/01/2027 − 5 semaines) et `effective_from` = 04/01/2027. Détail et vérification dans « Décisions du 01/08/2026 » ci-dessous.
 - [x] ~~**Emails des 9 associés** dans Omnès-Orga, pour relier les initiales aux comptes~~ — établi le 30/07/2026 en 7B-1, et mieux : **la correspondance initiales → comptes est résolue** (`MY` Mireille YUAN, `TE` Thomas ETIENNE, `XB` Xavier BAUDRILLART, `AS` Airelle SAUVAGE, `CB` Christophe BERTRAND, `IEG` Imane EL GARI, `CC` Caroline CHAUVET, `LD` Laurène DAUDIN, `MC` Matthieu CADENNES). Déduite des règles de roulement présentes en base, pas d'une saisie manuelle. Détail dans `migration-agenda-etape7.md`, table de correspondance complète dans `docs/mapping-comptes-agenda.csv`.
-- [x] ~~**État des `shift_types` déjà déclarés dans l'agenda**~~ — vérifié le 30/07/2026 en 7A : **ils ne correspondent pas**. 15 créneaux déclarés, dont le nom inclut le site (`J1 Beaune`, `J2 Dijon`…), aucun `J6`, trois écarts d'horaire avec `desiderata.yaml` et des irrégularités de saisie. Détail et conséquences pour MOD-1 dans `migration-agenda-etape7.md`. **Reste à arbitrer** : la source de vérité des horaires est-elle la base ou `desiderata.yaml` ?
+- [x] ~~**État des `shift_types` déjà déclarés dans l'agenda**~~ — vérifié le 30/07/2026 en 7A : **ils ne correspondent pas**. 15 créneaux déclarés, dont le nom inclut le site (`J1 Beaune`, `J2 Dijon`…), aucun `J6`, trois écarts d'horaire avec `desiderata.yaml` et des irrégularités de saisie. Détail et conséquences pour MOD-1 dans `migration-agenda-etape7.md`. **Les trois écarts d'horaire sont arbitrés** (01/08/2026) : `J5 Dijon` → la base fait foi, `J2 Beaune` → `desiderata.yaml` fait foi, `J5 bis Dijon` → désactivé. Voir « Décisions du 01/08/2026 » ci-dessous. La table de correspondance complète (code, site) → `shift_type` vit désormais dans `desiderata.yaml`, section `correspondance_agenda`.
 - [ ] Décision sur la piste d'annulation retenue (A, B ou C).
 - [ ] **Notifications aux médecins** (souhaité par Matthieu, *sans urgence*) — le module n'envoie **aucune** notification aujourd'hui : « les médecins sont notifiés » signifie qu'ils voient leurs gardes apparaître dans « Mes gardes ». Omnès-Orga dispose déjà de Firebase et d'un `fcm_token` par médecin : une fois la migration faite, la validation définitive du planning pourrait déclencher une vraie notification. À placer en étape 8.
 - [x] ~~Confirmation : les associés gérants ont-ils les droits coordinateur sur l'agenda ?~~ — **NON**, tranché par Matthieu le 30/07/2026. **Charlotte Franzino est la seule coordinatrice** (`is_agenda_coordinator = true` sur son compte). Caroline Chauvet, Thomas Étienne et Xavier Baudrillart restent `doctor` sur l'agenda malgré leur rôle `associe_gerant`. Le compte générique `Coordinateur Admin` de Planning, avec lequel Charlotte se connecte aujourd'hui, n'est pas migré.

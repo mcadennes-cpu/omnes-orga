@@ -54,10 +54,17 @@ si le concept est simple ou déjà vu dans le projet.
 
 ## Git
 
-Matthieu fait lui-même les `git add` / `commit` / `push` — ce n'est pas à
-Claude Code de les lancer automatiquement, sauf demande explicite en ce sens
-pour une tâche donnée. Préparer un message de commit clair et sans accent
-en fin de sous-étape, à lui proposer plutôt qu'à exécuter directement.
+**Règle modifiée le 01/08/2026, à la demande de Matthieu.** Claude Code
+propose lui-même le `git add` + `commit`, et le `push` quand c'est pertinent,
+dès qu'une sous-étape validée le mérite : Matthieu approuve d'un clic via la
+demande de permission. Ne plus lui faire coller les commandes à la main, ne
+plus attendre qu'il le demande.
+
+Message de commit clair et **sans accent** (cf. tableau des accents).
+
+Ce qui n'a pas changé : ne rien committer tant que Matthieu n'a pas validé le
+travail, et ne jamais regrouper dans un même commit des sous-étapes qu'il n'a
+pas encore vues. Le commit vient **après** la validation, pas à la place.
 
 ## Documentation projet
 

@@ -40,9 +40,12 @@ apprend en même temps. En conséquence :
   préalable, même pour un paquet mineur.
 - Expliquer brièvement le "pourquoi" des choix d'architecture (nouvelle
   table, RLS, pattern de composant...), pas seulement le "quoi".
-- Ne pas lancer `git add` / `commit` / `push` automatiquement — c'est
-  Matthieu qui les exécute, sauf demande explicite. Proposer un message de
-  commit clair et sans accent en fin de sous-étape.
+- **Git (règle modifiée le 01/08/2026)** : proposer soi-même le `git add` +
+  `commit`, et le `push` quand c'est pertinent, dès qu'une sous-étape validée
+  le mérite — Matthieu approuve via la demande de permission. Ne pas attendre
+  qu'il le demande, ne pas lui faire coller les commandes. Message clair et
+  **sans accent**. Ce qui reste inchangé : ne rien committer avant qu'il ait
+  validé le travail, et ne jamais grouper des sous-étapes non validées.
 
 ### Design UI
 
