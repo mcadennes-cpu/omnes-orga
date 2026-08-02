@@ -10,6 +10,7 @@ import ShiftDetailModal from './ShiftDetailModal';
 import SaveWeekTemplateModal from './SaveWeekTemplateModal';
 import DeleteWeekTemplateModal from './DeleteWeekTemplateModal';
 import DuplicateWeekTemplateModal from './DuplicateWeekTemplateModal';
+import OpenWeeksModal from './OpenWeeksModal';
 import UndoButton from './UndoButton';
 import StatusBadge from './ui/StatusBadge';
 import { AgendaStatusKey } from '../lib/statusStyles';
@@ -34,6 +35,8 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
   const [showDeleteTemplateModal, setShowDeleteTemplateModal] = useState(false);
   const [showDuplicateTemplateModal, setShowDuplicateTemplateModal] = useState(false);
+  // Ouverture des semaines depuis le plan de roulement (6H).
+  const [showOpenWeeksModal, setShowOpenWeeksModal] = useState(false);
   const [availableDoctors, setAvailableDoctors] = useState<Array<{ id: string; name: string }>>([]);
 
   const isMobile = currentUser.role === 'doctor';
@@ -330,6 +333,7 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
                     onSaveAsTemplate={() => setShowSaveTemplateModal(true)}
                     onDeleteTemplate={() => setShowDeleteTemplateModal(true)}
                     onDuplicateTemplate={() => setShowDuplicateTemplateModal(true)}
+                    onOpenWeeks={() => setShowOpenWeeksModal(true)}
                   />
                 )}
               </>
@@ -389,6 +393,13 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
         <DuplicateWeekTemplateModal
           onClose={() => setShowDuplicateTemplateModal(false)}
           onDuplicate={handleDuplicateTemplate}
+        />
+      )}
+
+      {showOpenWeeksModal && (
+        <OpenWeeksModal
+          onClose={() => setShowOpenWeeksModal(false)}
+          onOpened={loadShifts}
         />
       )}
     </div>

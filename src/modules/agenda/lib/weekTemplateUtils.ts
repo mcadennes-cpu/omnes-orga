@@ -148,7 +148,8 @@ export async function duplicateWeekTemplate(
   const shiftTypeMap = new Map(shiftTypes?.map(st => [st.id, st.time_range || st.name]) || []);
 
   let created = 0;
-  let skipped = 0;
+  // Toujours 0 depuis 6H : la periode est vide, rien ne peut etre saute.
+  const skipped = 0;
   const shiftsToCreate: any[] = [];
 
   const currentDate = new Date(startDate + 'T12:00:00');
@@ -165,20 +166,12 @@ export async function duplicateWeekTemplate(
     const matchingItems = items.filter(item => item.weekday === weekday);
 
     for (const item of matchingItems) {
-      const { data: existing } = await supabase
-        .from('shifts')
-        .select('id')
-        .eq('date', dateStr)
-        .eq('site_id', item.site_id)
-        .eq('room_id', item.room_id)
-        .eq('shift_type_id', item.shift_type_id)
-        .single();
-
-      if (existing) {
-        skipped++;
-        continue;
-      }
-
+      // Plus de requete d'existence par case et par jour (6H, 02/08/2026) :
+      // la periode vient d'etre verifiee VIDE plus haut, et les items du
+      // modele sont uniques par (weekday, site, salle, creneau). Ces requetes
+      // ne pouvaient donc jamais rien trouver -- elles coutaient ~380
+      // allers-retours enchaines pour 8 semaines, et c'est ce qui rendait
+      // l'ouverture lente. `skipped` reste dans le retour par compatibilite.
       let assignedDoctorId = null;
       let status = 'free';
 

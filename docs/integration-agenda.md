@@ -1082,6 +1082,66 @@ V1 » et un mercredi en « S1 du V2 » — illisible pour un cabinet qui lit son
 roulement à la semaine. Le cas d'usage devient donc « le lundi qui suit le 1er
 du mois ». À rouvrir si Matthieu préfère l'inverse.
 
+##### 16. Sous-étape 6H — FAITE (02/08/2026)
+
+`docs/sql/22-6H-1-agenda-ouvrir-semaines.sql`, `components/OpenWeeksModal.tsx`,
+bouton **« Ouvrir des semaines »** dans la vue Semaine.
+
+**Deux constats relevés dans les données ont fondé la conception :**
+
+1. **La salle se dérive du créneau, sans exception.** Sur les 367 gardes
+   couvertes par le plan des neuf dernières semaines, **367** utilisent
+   `shift_types.default_room_id`. La prémisse de 6B-3 se vérifie dans les faits,
+   donc la génération n'a pas besoin qu'on lui dise la salle.
+2. **L'habituel se sépare de l'accidentel par la fréquence.** Quinze cases hors
+   roulement existent ; **onze reviennent 7 à 9 fois sur 9 semaines** (donc
+   chaque semaine) — `J5`, `J6`, `J7`, `J8` à Dijon selon les jours. Les
+   **quatre autres n'apparaissent qu'une ou deux fois**, et ce sont des
+   accidents de saisie : un créneau de week-end (`WE1`) posé un mercredi ou un
+   vendredi. Un seuil à la moitié des semaines de référence les sépare
+   proprement.
+
+**`agenda.creneaux_hors_plan(n)`** déduit ces cases et marque les habituelles.
+Elle sert à **pré-cocher** l'écran, jamais à décider seule : une déduction sur
+l'historique reproduirait fidèlement une anomalie passée. Le coordinateur garde
+la main — même philosophie que l'écran de correspondance de 6E-3. Les cases
+non habituelles s'affichent décochées, avec leur fréquence en étiquette.
+
+**`agenda.ouvrir_semaines(debut, semaines, hors_plan, verifier_seulement)`** est
+en **`security invoker`**, volontairement — contrairement aux fonctions d'import
+et d'activation. Celles-là devaient franchir un verrou ; ici les coordinateurs
+ont déjà le droit d'écrire dans `shifts`, donc la RLS s'applique normalement et
+aucun privilège n'est accordé sans nécessité.
+
+Elle reprend **exactement** l'arithmétique de `getRotationWeek()` et résout le
+plan jour par jour : une période à cheval sur deux roulements applique le bon de
+part et d'autre.
+
+Garde-fous testés **par le chemin du navigateur** :
+
+| Test | Résultat |
+|---|---|
+| Un non-coordinateur ouvre | refusé |
+| Début qui n'est pas un lundi | refusé |
+| 99 semaines | refusé (bornes 1–52) |
+| Période déjà occupée | refusé, avec le nombre de gardes trouvées |
+| Vérification à blanc, 8 semaines | 352 cases — 264 du plan, 88 hors roulement |
+| Ouverture réelle d'une semaine | 42 gardes **en 0,20 s** |
+
+**Le contrôle qui comptait** — sur la semaine du 04/01/2027 : **42/42 gardes
+dans la salle par défaut de leur créneau**, et **31 règles du plan V2 sur 31 ont
+produit la bonne garde avec le bon médecin**. Les 11 restantes sont libres, pour
+les remplaçants.
+
+**Dette réglée** : `duplicateWeekTemplate` faisait une requête d'existence par
+case et par jour — ~380 allers-retours enchaînés pour 8 semaines — alors qu'elle
+venait de vérifier que la période était **vide**. Ces requêtes ne pouvaient rien
+trouver. Supprimées.
+
+*L'ancien chemin (modèle de semaine) n'est pas retiré* : Charlotte peut s'y
+appuyer, et le supprimer sortirait du cadre de MOD-1. Il est simplement passé en
+bouton secondaire, « Ouvrir des semaines » devenant le chemin principal.
+
 ---
 
 `source_file_name` et `imported_at` restent **volontairement NULL** : ce plan ne
@@ -1192,7 +1252,7 @@ sous-étape 6G, absente du découpage initial.
 | **6E** | ✓ **FAITE (6E-1 à 6E-3)** — Le `.xlsx` → JSON canonique (Python) ; la fonction d'import `security definer` + la mémoire des correspondances ; l'écran d'import avec correspondances pré-remplies et rapport d'anomalies. | Fait |
 | **6F** | ✓ **FAITE** — Fonction d'activation `security definer` + écran de différentiel (tableau des changements, grille en évidence, choix de la date, confirmation). | Fait |
 | **6G** | **Modifications souhaitées** : collecte depuis une garde, récapitulatif exportable pour report dans le fichier. La contrepartie du verrouillage. | Oui |
-| **6H** | **Révisée le 01/08/2026** — plus seulement une prévisualisation : **« Ouvrir les N prochaines semaines depuis le plan »**, en remplacement du trio semaine de référence / modèle / duplication. Voir ci-dessous. | Oui |
+| **6H** | ✓ **FAITE** — Révisée : « Ouvrir les N prochaines semaines depuis le plan », en remplacement du trio semaine de référence / modèle / duplication. Créneaux hors roulement déduits de l'usage et proposés cochés. | Fait |
 
 #### Le pont plan → gardes existe déjà — relevé le 01/08/2026
 
