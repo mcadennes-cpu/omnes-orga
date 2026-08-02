@@ -1142,6 +1142,82 @@ trouver. Supprimées.
 appuyer, et le supprimer sortirait du cadre de MOD-1. Il est simplement passé en
 bouton secondaire, « Ouvrir des semaines » devenant le chemin principal.
 
+##### 17. Sous-étape 6H-2 — la révision qui corrige 6H-1 (02/08/2026)
+
+Deux remarques de Matthieu sur l'écran livré la veille. Toutes deux justes, et
+la première a mis au jour un vrai trou fonctionnel.
+
+**« Il y a 2 créneaux de WE1 le vendredi : à mon avis c'est un bug. »** Ce n'en
+était pas un — `WE1 Beaune` et `WE1 Dijon` sont deux créneaux distincts, le nom
+portant le site. Mais le relevé a révélé bien pire.
+
+**Les 18 gardes de week-end posées en semaine tombent TOUTES sur un jour
+férié** : Pâques, 1er Mai, 8 Mai, Ascension, Pentecôte, 14 Juillet, 11 Novembre,
+Noël, Jour de l'An. Neuf fériés, zéro exception. Le cabinet traite un férié
+comme un jour de week-end, et cela **remplace** la journée :
+
+| Date | Gardes ouvertes |
+|---|---|
+| Vendredi 18/12 (ordinaire) | **10** — J1 à J8 |
+| Vendredi 25/12 (Noël) | **2** — `WE1` sur chaque site |
+| Mercredi 11/11 (Armistice) | **2** |
+
+**Ma déduction par fréquence de 6H-1 avait classé ces cases en « accidents de
+saisie ».** C'était faux : elle voyait « 2 fois sur 9 semaines » sans pouvoir
+comprendre pourquoi. *Un chiffre sans cause n'est pas un diagnostic* — et ni le
+roulement ni la fonction d'ouverture n'avaient la moindre notion de jour férié.
+
+**« Je trouverais ça plus simple de montrer un tableau avec une semaine type. »**
+Une liste de cases à cocher ne montre pas ce qui sera **fermé**, or c'est ce que
+Charlotte doit vérifier. Et le cabinet ouvre plus de créneaux l'hiver que l'été :
+il y a plusieurs semaines types, qu'il faut pouvoir reconnaître.
+
+**Ce que 6H-2 change.** La séparation devient franche : *la semaine type dit
+quelles cases ouvrent (l'offre), le plan dit qui les occupe (l'affectation).*
+
+- **Les semaines types réutilisent `opening_week_templates`**, qui existe depuis
+  l'origine et contenait déjà « Semaine type hiver » et « semaine hiver WE non
+  doublée ». Le concept était juste, il lui manquait un écran qui le montre.
+- **La grille** : créneaux en lignes, jours en colonnes. Les cases du roulement
+  sont **verrouillées ouvertes** — les fermer priverait un associé de sa garde.
+- **`agenda.jours_feries()`** calcule les 11 fériés français (dates fixes +
+  Pâques par l'algorithme grégorien anonyme). **Vérifié : 9 fériés observés en
+  base, 9 reconnus.**
+
+**Une 8e colonne « Férié », et pourquoi elle existe.** Première tentative : « un
+férié ouvre les créneaux du dimanche ». Le test l'a invalidée — elle produisait
+**5 gardes** sur le lundi de Pâques (les `WE1`, les deux doublons `WE2` et le
+vestige `J3 Dijon`) là où les fériés observés n'en portent que **2**. Plutôt que
+de deviner une règle (« `WE1` oui, `WE2` non ») à redécouvrir à chaque évolution
+des créneaux, le férié devient une **colonne de la grille**, réglée par la
+coordinatrice.
+
+Elle se pré-remplit d'après les fériés passés, **à la majorité et non en
+union** : sur les 12 fériés en base, 11 portent exactement `WE1` sur chaque site,
+mais le Jour de l'An 2026 — le plus ancien, antérieur à la pratique actuelle — a
+été ouvert comme une journée ordinaire. L'union aurait fait revivre ce cas unique
+à chaque férié. *Cette fois la fréquence a une cause identifiée : c'est ce qui
+manquait à 6H-1.*
+
+Les gardes de férié restent **sans affectation** : le roulement ne les couvre
+pas, et les deux derniers fériés en base sont effectivement libres. Les
+attribuer d'office inventerait une règle que le cabinet n'a jamais posée.
+
+*Défaut de performance corrigé en cours de route* : la déduction des créneaux de
+férié, écrite en sous-requête corrélée, relançait le calcul des fériés pour
+chaque ligne de `shifts` et dépassait le délai d'exécution. Extraite dans
+`agenda.creneaux_ferie_habituels()`, calculée une fois.
+
+**Contrôle sur données réelles** — 2 semaines à partir du lundi de Pâques 2027,
+avec « Semaine type hiver » : 118 gardes, 62 pré-affectées, et **2 gardes sur le
+férié**, conformes aux 11 fériés sur 12 observés.
+
+*À signaler à Charlotte* : « Semaine type hiver » contient `J3 Dijon` le samedi
+et le dimanche — le **vestige de modélisation** documenté en 6B, d'avant la
+création du créneau `WE1 Dijon`. Le modèle date de novembre 2025 et a figé cet
+état. La grille le montre et permet de le décocher ; une liste de cases à cocher
+ne l'aurait jamais laissé voir.
+
 ---
 
 `source_file_name` et `imported_at` restent **volontairement NULL** : ce plan ne

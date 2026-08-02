@@ -1,45 +1,71 @@
-import { useState, useEffect, useCallback } from 'react';
-import { CalendarPlus, Loader2 } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { CalendarPlus, Loader2, Save, Lock, PartyPopper } from 'lucide-react';
 import BottomSheet from './ui/BottomSheet';
 import { supabase } from '../lib/supabase';
 
 // ---------------------------------------------------------------------------
-// Ouvrir les N prochaines semaines depuis le plan (MOD-1, etape 6H).
+// Ouvrir les N prochaines semaines (MOD-1, etape 6H).
 //
-// Remplace le trio « semaine de reference -> modele -> duplication ». Le plan
-// de roulement decrit deja toutes les cases des associes ; il ne manquait que
-// les creneaux HORS ROULEMENT (J5, J6, J7/J8 de Dijon), ceux qui vont aux
-// remplacants. La base les deduit de ce qui est ouvert d'habitude, et cet
-// ecran les propose coches -- une deduction sur l'historique reproduirait
-// fidelement une anomalie passee, donc le coordinateur garde la main.
+// La separation que cet ecran rend visible :
+//     la SEMAINE TYPE dit quelles cases ouvrent (l'offre),
+//     le PLAN DE ROULEMENT dit qui les occupe (l'affectation).
 //
-// Tout passe par agenda.ouvrir_semaines(), qui insere en une seule fois. La
-// duplication de modele faisait une requete d'existence par case et par jour :
-// environ 380 allers-retours enchaines pour 8 semaines.
+// La premiere version proposait une liste de cases a cocher des « creneaux
+// hors roulement ». Remarque de Matthieu (02/08/2026) : une liste ne montre
+// pas ce qui sera FERME, or c'est ce que Charlotte doit verifier -- le cabinet
+// ouvre plus de creneaux l'hiver que l'ete, il y a donc plusieurs semaines
+// types et il faut pouvoir reconnaitre laquelle on s'apprete a rejouer. D'ou
+// la grille : creneaux en lignes, jours en colonnes, comme la vue Semaine.
+//
+// Les cases du roulement sont VERROUILLEES ouvertes : ne pas les ouvrir
+// priverait un associe de sa garde.
+//
+// Les JOURS FERIES ont leur propre colonne, la 8e. Releve du 02/08/2026 : les
+// 18 gardes de week-end posees en semaine tombent toutes sur un ferie, et le
+// ferie REMPLACE la journee (le vendredi 18/12 porte 10 gardes, le 25/12 en
+// porte 2). Une premiere version reprenait les creneaux du DIMANCHE ; le test
+// l'a invalidee -- elle ouvrait aussi les doublons, absents des 12 feries
+// releves. D'ou une colonne reglee a la main plutot qu'une regle devinee.
+// Les gardes de ferie restent SANS AFFECTATION : le roulement ne les couvre
+// pas, et les deux derniers feries en base sont effectivement libres.
 // ---------------------------------------------------------------------------
 
-type CreneauHorsPlan = {
+type Case = {
   weekday: number;
   site_id: string;
   site_nom: string;
   shift_type_id: string;
   creneau_nom: string;
   salle_nom: string | null;
-  occurrences: number;
-  habituel: boolean;
+  ouvert: boolean;
+  couvert_par_le_plan: boolean;
 };
+
+type Template = { id: string; name: string };
 
 type Rapport = {
   total: number;
   affectees: number;
   libres: number;
-  depuis_le_plan: number;
-  hors_plan: number;
+  sur_feries: number;
+  feries: { jour: string; nom: string }[];
   debut: string;
   fin: string;
 };
 
-const JOURS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+// Colonnes dans l'ordre de lecture de la semaine ; la valeur est la convention
+// weekday de la base (0 = dimanche, comme Date.getDay()).
+//
+// La 8e colonne n'est pas un jour : c'est ce qu'ouvre un JOUR FERIE, quel que
+// soit le jour de la semaine sur lequel il tombe. Releve du 02/08/2026 : le
+// cabinet traite un ferie comme un jour de week-end, et cela REMPLACE la
+// journee (le vendredi 18/12 porte 10 gardes, le 25/12 en porte 2).
+const JOURS = [
+  { weekday: 1, court: 'Lun' }, { weekday: 2, court: 'Mar' },
+  { weekday: 3, court: 'Mer' }, { weekday: 4, court: 'Jeu' },
+  { weekday: 5, court: 'Ven' }, { weekday: 6, court: 'Sam' },
+  { weekday: 0, court: 'Dim' }, { weekday: 7, court: 'Férié' },
+];
 
 const fieldClass =
   'w-full rounded-input border border-border bg-carte px-3 py-2 text-body-m text-ink ' +
@@ -56,113 +82,174 @@ function versIso(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-type OpenWeeksModalProps = {
-  onClose: () => void;
-  onOpened: () => void;
-};
+// Le site est dans le nom du creneau (« J1 Beaune ») : on le retire pour la
+// colonne de gauche, qui groupe deja par site.
+function codeCourt(creneau: string, site: string): string {
+  return creneau.replace(new RegExp(site, 'i'), '').replace(/\s+/g, ' ').trim() || creneau;
+}
+
+type OpenWeeksModalProps = { onClose: () => void; onOpened: () => void };
 
 export default function OpenWeeksModal({ onClose, onOpened }: OpenWeeksModalProps) {
   const [debut, setDebut] = useState('');
   const [semaines, setSemaines] = useState(8);
-  const [creneaux, setCreneaux] = useState<CreneauHorsPlan[]>([]);
-  const [coches, setCoches] = useState<Set<string>>(new Set());
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [templateId, setTemplateId] = useState('');
+  const [cases, setCases] = useState<Case[]>([]);
+  const [ouvertes, setOuvertes] = useState<Set<string>>(new Set());
   const [rapport, setRapport] = useState<Rapport | null>(null);
   const [chargement, setChargement] = useState(true);
   const [calcul, setCalcul] = useState(false);
   const [ecriture, setEcriture] = useState(false);
   const [erreur, setErreur] = useState('');
+  const [nomAEnregistrer, setNomAEnregistrer] = useState('');
+  const [enregistrement, setEnregistrement] = useState(false);
 
-  const cle = (c: CreneauHorsPlan) => `${c.weekday}|${c.site_id}|${c.shift_type_id}`;
+  const cle = (weekday: number, siteId: string, shiftTypeId: string) =>
+    `${weekday}|${siteId}|${shiftTypeId}`;
 
   useEffect(() => {
     const preparer = async () => {
       try {
-        // Le lundi qui suit la derniere garde generee : c'est la ou le
-        // calendrier s'arrete, donc la ou Charlotte veut reprendre.
         const { data: derniere } = await supabase
           .from('shifts').select('date').order('date', { ascending: false }).limit(1);
-
-        const apres = derniere?.[0]?.date
-          ? new Date(derniere[0].date + 'T12:00:00')
-          : new Date();
+        const apres = derniere?.[0]?.date ? new Date(derniere[0].date + 'T12:00:00') : new Date();
         apres.setDate(apres.getDate() + 1);
         while (apres.getDay() !== 1) apres.setDate(apres.getDate() + 1);
         setDebut(versIso(apres));
 
-        const { data, error } = await supabase.rpc('creneaux_hors_plan', {
-          p_semaines_reference: 9,
-        });
+        const { data, error } = await supabase
+          .from('opening_week_templates')
+          .select('id, name')
+          .order('created_at', { ascending: false });
         if (error) throw error;
 
-        const liste = (data ?? []) as CreneauHorsPlan[];
-        setCreneaux(liste);
-        setCoches(new Set(liste.filter((c) => c.habituel).map(cle)));
+        const liste = (data ?? []) as Template[];
+        setTemplates(liste);
+        if (liste.length > 0) setTemplateId(liste[0].id);
+        else setChargement(false);
       } catch (err: any) {
         setErreur(err.message);
-      } finally {
         setChargement(false);
       }
     };
     preparer();
   }, []);
 
-  const horsPlanChoisis = useCallback(
+  useEffect(() => {
+    if (!templateId) return;
+    const charger = async () => {
+      setChargement(true);
+      try {
+        const { data, error } = await supabase.rpc('semaine_type', {
+          p_template_id: templateId,
+        });
+        if (error) throw error;
+        const liste = (data ?? []) as Case[];
+        setCases(liste);
+        setOuvertes(new Set(
+          liste.filter((c) => c.ouvert || c.couvert_par_le_plan)
+               .map((c) => cle(c.weekday, c.site_id, c.shift_type_id)),
+        ));
+      } catch (err: any) {
+        setErreur(err.message);
+      } finally {
+        setChargement(false);
+      }
+    };
+    charger();
+  }, [templateId]);
+
+  // Les lignes : un creneau par site, dans l'ordre d'affichage du module.
+  const lignes = useMemo(() => {
+    const vues = new Map<string, { site_id: string; site_nom: string; shift_type_id: string; creneau_nom: string; salle_nom: string | null }>();
+    for (const c of cases) {
+      const k = `${c.site_id}|${c.shift_type_id}`;
+      if (!vues.has(k)) {
+        vues.set(k, {
+          site_id: c.site_id, site_nom: c.site_nom,
+          shift_type_id: c.shift_type_id, creneau_nom: c.creneau_nom, salle_nom: c.salle_nom,
+        });
+      }
+    }
+    return [...vues.values()];
+  }, [cases]);
+
+  const verrouillees = useMemo(() => {
+    const s = new Set<string>();
+    for (const c of cases) {
+      if (c.couvert_par_le_plan) s.add(cle(c.weekday, c.site_id, c.shift_type_id));
+    }
+    return s;
+  }, [cases]);
+
+  const ouverturesPayload = useCallback(
     () =>
-      creneaux
-        .filter((c) => coches.has(cle(c)))
-        .map((c) => ({
-          weekday: c.weekday,
-          site_id: c.site_id,
-          shift_type_id: c.shift_type_id,
-        })),
-    [creneaux, coches],
+      [...ouvertes].map((k) => {
+        const [weekday, site_id, shift_type_id] = k.split('|');
+        return { weekday: Number(weekday), site_id, shift_type_id };
+      }),
+    [ouvertes],
   );
 
-  // Verification a blanc a chaque changement : le coordinateur voit ce qu'il
-  // va creer avant de le creer. C'est la base qui compte, pas l'ecran.
   useEffect(() => {
-    if (!debut || semaines < 1 || chargement) return;
+    if (!debut || semaines < 1 || chargement || ouvertes.size === 0) return;
     let annule = false;
-
     const calculer = async () => {
       setCalcul(true);
       setErreur('');
       try {
         const { data, error } = await supabase.rpc('ouvrir_semaines', {
-          p_debut: debut,
-          p_semaines: semaines,
-          p_hors_plan: horsPlanChoisis(),
-          p_verifier_seulement: true,
+          p_debut: debut, p_semaines: semaines,
+          p_ouvertures: ouverturesPayload(), p_verifier_seulement: true,
         });
         if (annule) return;
         if (error) throw error;
         setRapport(data as Rapport);
       } catch (err: any) {
-        if (!annule) {
-          setRapport(null);
-          setErreur(err.message);
-        }
+        if (!annule) { setRapport(null); setErreur(err.message); }
       } finally {
         if (!annule) setCalcul(false);
       }
     };
-
     const minuteur = setTimeout(calculer, 250);
-    return () => {
-      annule = true;
-      clearTimeout(minuteur);
-    };
-  }, [debut, semaines, coches, chargement, horsPlanChoisis]);
+    return () => { annule = true; clearTimeout(minuteur); };
+  }, [debut, semaines, ouvertes, chargement, ouverturesPayload]);
+
+  const basculer = (k: string) => {
+    if (verrouillees.has(k)) return;
+    const suivant = new Set(ouvertes);
+    if (suivant.has(k)) suivant.delete(k);
+    else suivant.add(k);
+    setOuvertes(suivant);
+  };
+
+  const enregistrer = async () => {
+    if (!nomAEnregistrer.trim()) return;
+    setEnregistrement(true);
+    setErreur('');
+    try {
+      const { data, error } = await supabase.rpc('enregistrer_semaine_type', {
+        p_nom: nomAEnregistrer.trim(), p_ouvertures: ouverturesPayload(),
+      });
+      if (error) throw error;
+      setTemplates([{ id: data as string, name: nomAEnregistrer.trim() }, ...templates]);
+      setTemplateId(data as string);
+      setNomAEnregistrer('');
+    } catch (err: any) {
+      setErreur(err.message);
+    } finally {
+      setEnregistrement(false);
+    }
+  };
 
   const ouvrir = async () => {
     setEcriture(true);
     setErreur('');
     try {
       const { error } = await supabase.rpc('ouvrir_semaines', {
-        p_debut: debut,
-        p_semaines: semaines,
-        p_hors_plan: horsPlanChoisis(),
-        p_verifier_seulement: false,
+        p_debut: debut, p_semaines: semaines,
+        p_ouvertures: ouverturesPayload(), p_verifier_seulement: false,
       });
       if (error) throw error;
       onOpened();
@@ -173,11 +260,7 @@ export default function OpenWeeksModal({ onClose, onOpened }: OpenWeeksModalProp
     }
   };
 
-  const parJour = JOURS.map((label, weekday) => ({
-    label,
-    weekday,
-    items: creneaux.filter((c) => c.weekday === weekday),
-  })).filter((g) => g.items.length > 0);
+  const cellule = 'border border-border px-1 py-1 text-center';
 
   return (
     <BottomSheet
@@ -204,102 +287,210 @@ export default function OpenWeeksModal({ onClose, onOpened }: OpenWeeksModalProp
         </>
       }
     >
-      {chargement ? (
-        <p className="text-caption">Chargement…</p>
-      ) : (
-        <div className="space-y-4">
-          <div className="flex flex-wrap gap-3">
-            <div className="flex-1">
-              <label className="mb-2 block text-field-label">Premier lundi</label>
-              <input
-                type="date"
-                value={debut}
-                onChange={(e) => setDebut(e.target.value)}
-                className={fieldClass}
-              />
-            </div>
-            <div className="w-32">
-              <label className="mb-2 block text-field-label">Semaines</label>
-              <input
-                type="number"
-                min={1}
-                max={52}
-                value={semaines}
-                onChange={(e) => setSemaines(Number(e.target.value))}
-                className={fieldClass}
-              />
-            </div>
+      <div className="space-y-4">
+        <div className="flex flex-wrap gap-3">
+          <div className="flex-1">
+            <label className="mb-2 block text-field-label">Premier lundi</label>
+            <input type="date" value={debut} onChange={(e) => setDebut(e.target.value)} className={fieldClass} />
           </div>
-
-          {rapport && !erreur && (
-            <div className="rounded-input border border-canard/30 bg-canard/5 p-3">
-              <p className="text-body-m text-ink">
-                Du {formatDate(rapport.debut)} au {formatDate(rapport.fin)} :{' '}
-                <strong>{rapport.total} gardes</strong> seront créées.
-              </p>
-              <p className="mt-1 text-caption">
-                {rapport.affectees} pré-affectées par le plan de roulement,{' '}
-                {rapport.libres} laissées libres pour les remplaçants.
-              </p>
-            </div>
-          )}
-
-          {erreur && (
-            <div className="rounded-input border border-brique/20 bg-brique/10 p-3 text-body-m text-brique">
-              {erreur}
-            </div>
-          )}
-
-          <div>
-            <p className="text-field-label mb-1">Créneaux hors roulement</p>
-            <p className="mb-3 text-caption">
-              Le plan ne les connaît pas — ce sont les créneaux des remplaçants. Ceux
-              ouverts d'habitude sont cochés.
-            </p>
-            <div className="space-y-3">
-              {parJour.map((groupe) => (
-                <div key={groupe.weekday}>
-                  <p className="mb-1 text-caption font-semibold text-ink">{groupe.label}</p>
-                  <div className="space-y-1">
-                    {groupe.items.map((c) => (
-                      <label
-                        key={cle(c)}
-                        className="flex cursor-pointer items-center gap-2 text-body-m text-ink"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={coches.has(cle(c))}
-                          onChange={(e) => {
-                            const suivant = new Set(coches);
-                            if (e.target.checked) suivant.add(cle(c));
-                            else suivant.delete(cle(c));
-                            setCoches(suivant);
-                          }}
-                          className="h-4 w-4 rounded border-border text-canard focus:ring-canard/30"
-                        />
-                        <span>
-                          {c.creneau_nom}
-                          {c.salle_nom ? ` · ${c.salle_nom}` : ''}
-                        </span>
-                        {!c.habituel && (
-                          <span className="rounded-pill bg-ocre/15 px-2 py-0.5 text-caption text-ocre-fonce">
-                            {c.occurrences} fois sur 9 semaines
-                          </span>
-                        )}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-input border border-marine/20 bg-marine/5 p-3 text-body-m text-ink">
-            L'ouverture ne se fait que sur un calendrier vide. Les gardes déjà créées ne
-            sont jamais modifiées.
+          <div className="w-28">
+            <label className="mb-2 block text-field-label">Semaines</label>
+            <input
+              type="number" min={1} max={52} value={semaines}
+              onChange={(e) => setSemaines(Number(e.target.value))} className={fieldClass}
+            />
           </div>
         </div>
-      )}
+
+        <div>
+          <label className="mb-2 block text-field-label">Semaine type</label>
+          <select
+            value={templateId}
+            onChange={(e) => setTemplateId(e.target.value)}
+            className={fieldClass}
+          >
+            {templates.length === 0 && <option value="">Aucune semaine type enregistrée</option>}
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+        </div>
+
+        {erreur && (
+          <div className="rounded-input border border-brique/20 bg-brique/10 p-3 text-body-m text-brique">
+            {erreur}
+          </div>
+        )}
+
+        {chargement ? (
+          <p className="text-caption">Chargement…</p>
+        ) : lignes.length === 0 ? (
+          <p className="text-caption">Cette semaine type ne contient aucun créneau.</p>
+        ) : (
+          <>
+            <div>
+              <p className="text-field-label mb-1">Semaine d'ouverture</p>
+              <p className="mb-2 text-caption">
+                Cliquer une case pour l'ouvrir ou la fermer. Les cases du roulement sont
+                verrouillées : les fermer priverait un associé de sa garde. La colonne{' '}
+                <strong>Férié</strong> n'est pas un jour — c'est ce qui s'ouvre les jours
+                fériés, à la place de la journée ordinaire.
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr>
+                      <th className={`${cellule} sticky left-0 z-10 bg-fond text-left text-field-label text-ink`}>
+                        Créneau
+                      </th>
+                      {JOURS.map((j) => (
+                        <th
+                          key={j.weekday}
+                          className={`${cellule} bg-fond text-field-label text-ink ${
+                            j.weekday === 7 ? 'border-l-2 border-l-ocre/50 text-ocre-fonce' : ''
+                          }`}
+                        >
+                          {j.court}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lignes.map((l) => (
+                      <tr key={`${l.site_id}|${l.shift_type_id}`}>
+                        <th
+                          scope="row"
+                          className={`${cellule} sticky left-0 z-10 bg-carte text-left text-body-m font-normal text-ink whitespace-nowrap`}
+                        >
+                          <span className="font-semibold">{codeCourt(l.creneau_nom, l.site_nom)}</span>
+                          <span className="text-caption"> {l.site_nom}</span>
+                        </th>
+                        {JOURS.map((j) => {
+                          const k = cle(j.weekday, l.site_id, l.shift_type_id);
+                          const estOuverte = ouvertes.has(k);
+                          const estVerrouillee = verrouillees.has(k);
+                          return (
+                            <td
+                              key={j.weekday}
+                              className={`${cellule} ${
+                                j.weekday === 7 ? 'border-l-2 border-l-ocre/50' : ''
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => basculer(k)}
+                                disabled={estVerrouillee}
+                                aria-pressed={estOuverte}
+                                title={
+                                  estVerrouillee
+                                    ? 'Case du roulement — toujours ouverte'
+                                    : j.weekday === 7
+                                      ? estOuverte
+                                        ? 'Ouverte les jours fériés — cliquer pour fermer'
+                                        : 'Fermée les jours fériés — cliquer pour ouvrir'
+                                      : estOuverte ? 'Ouverte — cliquer pour fermer'
+                                                   : 'Fermée — cliquer pour ouvrir'
+                                }
+                                className={`flex h-7 w-full items-center justify-center rounded-pill text-caption transition-colors ${
+                                  estVerrouillee
+                                    ? 'cursor-default bg-canard/25 text-canard'
+                                    : estOuverte
+                                      ? 'bg-canard/10 text-canard hover:bg-canard/20'
+                                      : 'bg-fond text-faint hover:bg-border'
+                                }`}
+                              >
+                                {estVerrouillee ? <Lock className="h-3 w-3" /> : estOuverte ? '●' : ''}
+                              </button>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-caption">
+                <span className="flex items-center gap-1">
+                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-pill bg-canard/25">
+                    <Lock className="h-2.5 w-2.5 text-canard" />
+                  </span>
+                  Roulement
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-pill bg-canard/10 text-canard">●</span>
+                  Ouverte pour les remplaçants
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block h-4 w-4 rounded-pill bg-fond" />
+                  Fermée
+                </span>
+              </div>
+            </div>
+
+            {rapport && !erreur && (
+              <div className="rounded-input border border-canard/30 bg-canard/5 p-3">
+                <p className="text-body-m text-ink">
+                  Du {formatDate(rapport.debut)} au {formatDate(rapport.fin)} :{' '}
+                  <strong>{rapport.total} gardes</strong> seront créées.
+                </p>
+                <p className="mt-1 text-caption">
+                  {rapport.affectees} pré-affectées par le plan de roulement,{' '}
+                  {rapport.libres} laissées libres pour les remplaçants.
+                </p>
+              </div>
+            )}
+
+            {rapport && rapport.feries.length > 0 && (
+              <div className="rounded-input border border-ocre/30 bg-ocre/10 p-3">
+                <div className="mb-1 flex items-center gap-2">
+                  <PartyPopper className="h-4 w-4 flex-shrink-0 text-ocre-fonce" />
+                  <span className="text-body-m font-semibold text-ocre-fonce">
+                    {rapport.feries.length} jour{rapport.feries.length > 1 ? 's' : ''} férié
+                    {rapport.feries.length > 1 ? 's' : ''} dans la période
+                  </span>
+                </div>
+                <p className="text-body-m text-ink">
+                  {rapport.feries.map((f) => `${f.nom} (${formatDate(f.jour)})`).join(', ')}.
+                </p>
+                <p className="mt-1 text-caption">
+                  Ces journées passent en garde de week-end : les créneaux du dimanche
+                  s'ouvrent, les consultations restent fermées. Elles sont laissées{' '}
+                  <strong>sans affectation</strong> — le roulement ne couvre pas les jours
+                  fériés.
+                </p>
+              </div>
+            )}
+
+            <div className="rounded-input border border-border bg-fond p-3">
+              <label className="mb-2 block text-field-label">
+                Enregistrer cette grille comme semaine type
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <input
+                  type="text"
+                  value={nomAEnregistrer}
+                  onChange={(e) => setNomAEnregistrer(e.target.value)}
+                  placeholder="Ex : Semaine type été"
+                  className={`${fieldClass} flex-1`}
+                />
+                <button
+                  onClick={enregistrer}
+                  disabled={!nomAEnregistrer.trim() || enregistrement}
+                  className="flex items-center gap-2 rounded-input border border-border bg-carte px-4 py-2 text-button text-marine transition-colors hover:bg-fond disabled:opacity-50"
+                >
+                  {enregistrement ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Enregistrer
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        <div className="rounded-input border border-marine/20 bg-marine/5 p-3 text-body-m text-ink">
+          L'ouverture ne se fait que sur un calendrier vide. Les gardes déjà créées ne sont
+          jamais modifiées.
+        </div>
+      </div>
     </BottomSheet>
   );
 }
