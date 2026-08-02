@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Repeat, FileSpreadsheet, Lock, ChevronDown, ChevronRight, Upload, ArrowRightLeft } from 'lucide-react';
+import { Repeat, FileSpreadsheet, Lock, ChevronDown, ChevronRight, Upload, ArrowRightLeft, Trash2 } from 'lucide-react';
 import RotationPlanGrid from './RotationPlanGrid';
 import RotationPlanImport from './RotationPlanImport';
 import RotationPlanDiff from './RotationPlanDiff';
+import ConfirmDialog from '../../../../components/common/ConfirmDialog';
 
 // ---------------------------------------------------------------------------
 // Consultation des plans de roulement (MOD-1, etape 6C-3).
@@ -71,6 +72,10 @@ export default function RotationManagement() {
   const [importEnCours, setImportEnCours] = useState(false);
   // Le brouillon en cours de comparaison, s'il y en a un (6F).
   const [planCompare, setPlanCompare] = useState<RotationPlanRow | null>(null);
+  // Le brouillon dont la suppression est proposee (6F-2). Un import repete
+  // laisse vite deux brouillons identiques dans la liste.
+  const [planASupprimer, setPlanASupprimer] = useState<RotationPlanRow | null>(null);
+  const [suppression, setSuppression] = useState(false);
 
   useEffect(() => {
     loadPlans();
@@ -91,6 +96,25 @@ export default function RotationManagement() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const supprimerBrouillon = async () => {
+    if (!planASupprimer) return;
+    setSuppression(true);
+    setError('');
+    try {
+      const { error: rpcError } = await supabase.rpc('supprimer_plan_roulement', {
+        p_plan_id: planASupprimer.id,
+      });
+      if (rpcError) throw rpcError;
+      setPlanASupprimer(null);
+      await loadPlans();
+    } catch (err: any) {
+      setError(err.message);
+      setPlanASupprimer(null);
+    } finally {
+      setSuppression(false);
     }
   };
 
@@ -244,13 +268,25 @@ export default function RotationManagement() {
                     differentiel : treize changements silencieux sont
                     exactement ce que ce dispositif existe pour eviter. */}
                 {plan.status === 'draft' && (
-                  <button
-                    onClick={() => setPlanCompare(plan)}
-                    className="flex items-center gap-1.5 rounded-pill bg-canard/10 px-3 py-1.5 text-button text-canard transition-colors hover:bg-canard/20"
-                  >
-                    <ArrowRightLeft size={17} strokeWidth={2} />
-                    Comparer et activer
-                  </button>
+                  <>
+                    <button
+                      onClick={() => setPlanCompare(plan)}
+                      className="flex items-center gap-1.5 rounded-pill bg-canard/10 px-3 py-1.5 text-button text-canard transition-colors hover:bg-canard/20"
+                    >
+                      <ArrowRightLeft size={17} strokeWidth={2} />
+                      Comparer et activer
+                    </button>
+                    {/* Aux brouillons seulement : supprimer un plan qui a servi
+                        effacerait la reponse a « quel roulement s'appliquait en
+                        mars ? ». La fonction le refuse aussi cote base. */}
+                    <button
+                      onClick={() => setPlanASupprimer(plan)}
+                      className="flex items-center gap-1.5 rounded-pill px-3 py-1.5 text-button text-brique transition-colors hover:bg-brique/10"
+                    >
+                      <Trash2 size={17} strokeWidth={2} />
+                      Supprimer le brouillon
+                    </button>
+                  </>
                 )}
               </div>
 
@@ -263,6 +299,25 @@ export default function RotationManagement() {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!planASupprimer}
+        title="Supprimer ce brouillon ?"
+        message={
+          planASupprimer
+            ? `« ${planASupprimer.name} » et ses ` +
+              `${planASupprimer.rotation_plan_rules?.[0]?.count ?? 0} affectations seront ` +
+              `supprimés. Ce plan n'a jamais été appliqué : le planning en cours et les ` +
+              `semaines déjà ouvertes ne changent pas. Pour le retrouver, il faudra ` +
+              `réimporter le fichier de roulement.`
+            : ''
+        }
+        confirmLabel="Supprimer"
+        confirmVariant="danger"
+        onConfirm={supprimerBrouillon}
+        onCancel={() => setPlanASupprimer(null)}
+        submitting={suppression}
+      />
     </div>
   );
 }

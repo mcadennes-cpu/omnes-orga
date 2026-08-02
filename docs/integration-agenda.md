@@ -1212,6 +1212,40 @@ chaque ligne de `shifts` et dépassait le délai d'exécution. Extraite dans
 avec « Semaine type hiver » : 118 gardes, 62 pré-affectées, et **2 gardes sur le
 férié**, conformes aux 11 fériés sur 12 observés.
 
+##### 19. Sous-étape 6F-2 — supprimer un brouillon (02/08/2026)
+
+Demandé par Matthieu après qu'un import répété a laissé deux brouillons
+identiques dans la liste des plans.
+
+**`agenda.supprimer_plan_roulement()`** — troisième et dernière porte d'écriture
+des plans, après l'import (6E-2) et l'activation (6F-1). Les policies RLS n'en
+accordent toujours aucune en direct.
+
+**Réservée aux brouillons, et c'est le point important.** Supprimer un plan
+`active` effacerait la réponse à « quel roulement s'appliquait en mars ? » —
+précisément l'historique que 6F a pris soin de préserver en *ne l'archivant
+pas*. Un plan qui a servi ne se supprime pas : il se ferme.
+
+**Nuance apportée au message de confirmation.** Matthieu le formulait ainsi :
+« il faudra réimporter une version de planning pour rouvrir des jours ».
+L'intention est juste mais la conséquence est plus étroite — un brouillon n'a
+jamais été appliqué, donc le supprimer **n'a aucun effet sur les jours déjà
+ouverts ni sur le planning en cours**. Ce qu'on perd, c'est le plan préparé.
+Écrire l'inverse aurait inquiété à tort au moment de cliquer. Le message retenu :
+
+> « Roulement V2 - 9 associés » et ses 264 affectations seront supprimés. Ce
+> plan n'a jamais été appliqué : le planning en cours et les semaines déjà
+> ouvertes ne changent pas. Pour le retrouver, il faudra réimporter le fichier
+> de roulement.
+
+| Test | Résultat |
+|---|---|
+| Un non-coordinateur supprime | refusé |
+| Supprimer le plan **en vigueur** | refusé, avec le motif |
+| Supprimer le plan V1 (historique) | refusé |
+| Plan inexistant | refusé |
+| Supprimer un brouillon | 264 règles parties en cascade, 0 orpheline |
+
 ##### 18. Deux correctifs signalés par Matthieu le 02/08/2026
 
 **1. Deux lignes `WE2` dans la grille du roulement.** Cause : l'espace parasite
