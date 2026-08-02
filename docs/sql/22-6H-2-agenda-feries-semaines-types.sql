@@ -198,7 +198,10 @@ grant execute on function agenda.creneaux_ferie_habituels() to authenticated;
 -- celles qui reviennent aux remplacants. L'ecran verrouille les
 -- premieres : ne pas les ouvrir priverait un associe de sa garde.
 -- ---------------------------------------------------------------------
-create or replace function agenda.semaine_type(p_template_id uuid)
+create or replace function agenda.semaine_type(
+  p_template_id uuid,
+  p_date        date default current_date
+)
 returns table (
   weekday             integer,
   site_id             uuid,
@@ -228,9 +231,7 @@ as $$
     union
     select r.weekday, r.site_id, r.shift_type_id, true
       from agenda.rotation_plan_rules r
-      join agenda.rotation_plans p on p.id = r.plan_id
-     where p.status = 'active'
-       and (p.effective_to is null or p.effective_to >= current_date)
+     where r.plan_id = agenda.plan_applicable(p_date)
     union
     -- Le jour ferie, quand le modele n'en porte pas encore : ce que les
     -- feries passes montrent, plutot qu'une regle inventee.
@@ -244,11 +245,13 @@ as $$
       from cases group by 1, 2, 3
   ),
   plan as (
+    -- LE plan applicable a la date visee, pas « tous les plans actifs » :
+    -- le V1 s'arrete au 03/01/2027 et contient des « J5 Dijon » le lundi,
+    -- ce qui faisait passer ce creneau pour une case du roulement en
+    -- janvier 2027, alors que le V2 ne connait pas J5.
     select distinct r.site_id, r.shift_type_id, r.weekday
       from agenda.rotation_plan_rules r
-      join agenda.rotation_plans p on p.id = r.plan_id
-     where p.status = 'active'
-       and (p.effective_to is null or p.effective_to >= current_date)
+     where r.plan_id = agenda.plan_applicable(p_date)
   )
   select f.weekday, f.site_id, si.name, f.shift_type_id, st.name, ro.name,
          f.ouvert,
@@ -264,8 +267,8 @@ as $$
    order by si.name, st.sort_order, f.weekday;
 $$;
 
-revoke all on function agenda.semaine_type(uuid) from public, anon;
-grant execute on function agenda.semaine_type(uuid) to authenticated;
+revoke all on function agenda.semaine_type(uuid, date) from public, anon;
+grant execute on function agenda.semaine_type(uuid, date) to authenticated;
 
 -- ---------------------------------------------------------------------
 -- 3. Ouvrir des semaines -- version pilotee par la semaine type
@@ -353,9 +356,28 @@ begin
      and not exists (select 1 from agenda.feries_entre(p_debut, v_fin) f
                       where f.jour = j.jour::date);
 
-  -- b) Les cases HORS ROULEMENT de la semaine type, sans medecin : ce
-  --    sont celles des remplacants. On ecarte celles que le plan couvre
-  --    deja -- (a) les a posees au bon rythme.
+  -- b) Les cases de la semaine type que (a) n'a pas deja posees, sans
+  --    medecin : ce sont celles des remplacants.
+  --
+  --    ⚠ L'exclusion porte sur LE PLAN APPLICABLE A CETTE DATE, et sur
+  --    lui seul. C'est la que deux versions se sont trompees.
+  --
+  --    La premiere lisait « tous les plans actifs » : le V1, qui s'arrete
+  --    au 03/01/2027, contient des « J5 Dijon » le lundi -- ce creneau se
+  --    trouvait donc ferme en janvier 2027, alors que le V2 ne connait
+  --    pas J5 du tout. C'est le bug signale par Matthieu (« pas
+  --    d'ouverture en cabinet B2 le lundi »).
+  --
+  --    La seconde n'ecartait que ce que (a) avait pose CE JOUR-LA. Elle
+  --    ouvrait alors, en case vide, tout creneau du roulement dans les
+  --    semaines du cycle ou le plan ne s'en sert pas : « J4 Beaune » se
+  --    retrouvait libre 7 jeudis sur 8, et la semaine passait de 48 a 61
+  --    gardes.
+  --
+  --    La bonne regle : une case du roulement n'ouvre que quand le
+  --    roulement s'en sert. Sa presence dans le plan, a ce jour de
+  --    semaine, suffit a la retirer de l'offre permanente -- quelle que
+  --    soit la semaine du cycle ou elle sert.
   insert into tmp_ouverture (date, site_id, room_id, shift_type_id, doctor_id, ferie)
   select j.jour::date, (o ->> 'site_id')::uuid, st.default_room_id,
          (o ->> 'shift_type_id')::uuid, null, null
@@ -366,8 +388,7 @@ begin
      and st.is_active
      and not exists (
            select 1 from agenda.rotation_plan_rules r
-             join agenda.rotation_plans p2 on p2.id = r.plan_id
-            where p2.status = 'active'
+            where r.plan_id       = agenda.plan_applicable(j.jour::date)
               and r.site_id       = (o ->> 'site_id')::uuid
               and r.shift_type_id = (o ->> 'shift_type_id')::uuid
               and r.weekday       = extract(dow from j.jour)::integer)

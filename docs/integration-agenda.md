@@ -1212,6 +1212,64 @@ chaque ligne de `shifts` et dépassait le délai d'exécution. Extraite dans
 avec « Semaine type hiver » : 118 gardes, 62 pré-affectées, et **2 gardes sur le
 férié**, conformes aux 11 fériés sur 12 observés.
 
+##### 20. Le bug des créneaux remplaçants manquants (02/08/2026)
+
+**« Pas d'ouverture en cabinet B2 le lundi et le mardi. »** Signalé par Matthieu
+sur une semaine ouverte avec le correctif précédent.
+
+**Une seule cause pour deux symptômes : la contamination par le V1.** Les deux
+requêtes qui demandent « cette case est-elle au roulement ? » lisaient *tous les
+plans actifs*. Or depuis 6F, **deux plans sont actifs en permanence** — le V1
+(jusqu'au 03/01/2027) et le V2 (à partir du 04/01). Et le V1 contient des
+`J5 Dijon` le lundi, que le V2 ne connaît pas du tout.
+
+Conséquence : en janvier 2027, `J5 Dijon` passait pour une case du roulement, se
+trouvait donc exclue de l'offre remplaçants, **et n'était affectée par personne
+puisque le V2 l'ignore**. La case disparaissait purement et simplement.
+
+*C'est un effet de bord direct du versionnement des plans* : tant qu'un seul
+plan existait, « les plans actifs » et « le plan applicable » se confondaient.
+Les deux fonctions lisent désormais `agenda.plan_applicable(date)`.
+
+**Une seconde tentative, et pourquoi elle était fausse aussi.** J'ai d'abord fait
+porter l'exclusion sur *ce que la branche (a) avait posé ce jour-là*. Cela
+rétablissait bien `J5 Dijon`, mais ouvrait **en case vide** tout créneau du
+roulement dans les semaines du cycle où le plan ne s'en sert pas : `J4 Beaune`
+se retrouvait libre 7 jeudis sur 8, et la semaine passait de 48 à **61 gardes**.
+
+La règle juste : **une case du roulement n'ouvre que quand le roulement s'en
+sert.** Sa présence dans le plan applicable, à ce jour de semaine, suffit à la
+retirer de l'offre permanente — quelle que soit la semaine du cycle où elle
+sert.
+
+Le contrôle qui tranche entre les trois versions est la **stabilité du nombre de
+cases libres** : l'offre remplaçants ne dépend pas de la semaine de rotation.
+
+| Version | Gardes/semaine | Libres/semaine |
+|---|---|---|
+| Exclusion sur « tous les plans actifs » | 42–48 | 11 — mais `J5 Dijon` manquant lundi et mardi |
+| Exclusion sur ce que (a) a posé | **61** partout | 23 à 33 — **variable, donc faux** |
+| **Exclusion sur le plan applicable** | 42–52 | **14, constant** ✓ |
+
+Résultat final, avec « Semaine type hiver » :
+
+| Semaine | S1 | S2 | S3 | S4 | S5 | S6 | S7 | S8 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Gardes | 45 | 51 | 45 | 49 | 44 | 52 | 42 | 48 |
+| Affectées | 31 | 37 | 31 | 35 | 30 | 38 | 28 | 34 |
+| Libres | 14 | 14 | 14 | 14 | 14 | 14 | 14 | 14 |
+
+Les affectées suivent exactement les effectifs du plan V2.
+
+*Effet de bord signalé à Matthieu* : `Cabinet B3` reste fermé le lundi, et c'est
+correct — la semaine type y place `J5 bis Dijon`, créneau désactivé en 6A. Pour
+l'ouvrir, cocher `J8 Dijon` dans la grille.
+
+**Ajout à l'écran** : les cases ajustées à la main survivent désormais au
+rechargement de la grille. Comme celle-ci dépend maintenant de la date (le plan
+applicable en dépend), changer la date aurait sinon effacé les ajustements sans
+prévenir.
+
 ##### 19. Sous-étape 6F-2 — supprimer un brouillon (02/08/2026)
 
 Demandé par Matthieu après qu'un import répété a laissé deux brouillons

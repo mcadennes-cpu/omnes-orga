@@ -103,6 +103,10 @@ export default function OpenWeeksModal({ onClose, onOpened }: OpenWeeksModalProp
   const [ecriture, setEcriture] = useState(false);
   const [erreur, setErreur] = useState('');
   const [nomAEnregistrer, setNomAEnregistrer] = useState('');
+  // Les cases que le coordinateur a lui-meme ouvertes ou fermees. Elles
+  // survivent au rechargement de la grille -- sans quoi changer la date
+  // effacerait ses ajustements sans prevenir.
+  const [forcees, setForcees] = useState<Map<string, boolean>>(new Map());
   const [enregistrement, setEnregistrement] = useState(false);
 
   const cle = (weekday: number, siteId: string, shiftTypeId: string) =>
@@ -136,21 +140,32 @@ export default function OpenWeeksModal({ onClose, onOpened }: OpenWeeksModalProp
     preparer();
   }, []);
 
+  // La grille depend AUSSI de la date : `couvert_par_le_plan` doit refleter
+  // le plan applicable a la periode qu'on s'apprete a ouvrir. Le V1 et le V2
+  // ne couvrent pas les memes creneaux -- lire « tous les plans actifs »
+  // faisait passer J5 Dijon pour une case du roulement en janvier 2027.
   useEffect(() => {
-    if (!templateId) return;
+    if (!templateId || !debut) return;
     const charger = async () => {
       setChargement(true);
       try {
         const { data, error } = await supabase.rpc('semaine_type', {
           p_template_id: templateId,
+          p_date: debut,
         });
         if (error) throw error;
         const liste = (data ?? []) as Case[];
         setCases(liste);
-        setOuvertes(new Set(
+
+        const defaut = new Set(
           liste.filter((c) => c.ouvert || c.couvert_par_le_plan)
                .map((c) => cle(c.weekday, c.site_id, c.shift_type_id)),
-        ));
+        );
+        for (const [k, ouverte] of forcees) {
+          if (ouverte) defaut.add(k);
+          else defaut.delete(k);
+        }
+        setOuvertes(defaut);
       } catch (err: any) {
         setErreur(err.message);
       } finally {
@@ -158,7 +173,8 @@ export default function OpenWeeksModal({ onClose, onOpened }: OpenWeeksModalProp
       }
     };
     charger();
-  }, [templateId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templateId, debut]);
 
   // Les lignes : un creneau par site, dans l'ordre d'affichage du module.
   const lignes = useMemo(() => {
@@ -219,9 +235,11 @@ export default function OpenWeeksModal({ onClose, onOpened }: OpenWeeksModalProp
   const basculer = (k: string) => {
     if (verrouillees.has(k)) return;
     const suivant = new Set(ouvertes);
-    if (suivant.has(k)) suivant.delete(k);
-    else suivant.add(k);
+    const ouvre = !suivant.has(k);
+    if (ouvre) suivant.add(k);
+    else suivant.delete(k);
     setOuvertes(suivant);
+    setForcees(new Map(forcees).set(k, ouvre));
   };
 
   const enregistrer = async () => {
@@ -306,7 +324,10 @@ export default function OpenWeeksModal({ onClose, onOpened }: OpenWeeksModalProp
           <label className="mb-2 block text-field-label">Semaine type</label>
           <select
             value={templateId}
-            onChange={(e) => setTemplateId(e.target.value)}
+            onChange={(e) => {
+              setForcees(new Map());
+              setTemplateId(e.target.value);
+            }}
             className={fieldClass}
           >
             {templates.length === 0 && <option value="">Aucune semaine type enregistrée</option>}
