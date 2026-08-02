@@ -108,7 +108,10 @@ correspondance_agenda:
   J7:   {Beaune: "J7 Beaune", Dijon: "J7 Dijon"}
   J8:   {Beaune: "J8 Beaune", Dijon: "J8 Dijon"}
   Garde:   {Beaune: "WE1 beaune 08h-20h", Dijon: "WE1 Dijon"}
-  Doublon: {Beaune: "WE2 beaune 08h-20h", Dijon: "WE 2 Dijon"}
+  Doublon: {Beaune: "WE2 beaune 08h-20h", Dijon: "WE2 Dijon"}
+  # 2026-08-02 : « WE 2 Dijon » renommé « WE2 Dijon » (script 22-6H-3).
+  # L'espace parasite faisait dériver deux codes distincts — « WE 2 » et
+  # « WE2 » — donc deux lignes de doublon dans la grille du roulement.
 
 # Créés le 2026-08-01 (script 22-6A-2) : J4, J7, J8 et J6 Beaune. Beaune passe
 # de 3 à 7 créneaux en semaine et peut donc occuper ses 6 salles.

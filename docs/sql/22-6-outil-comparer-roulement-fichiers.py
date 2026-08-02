@@ -71,7 +71,7 @@ CRENEAU = {
     "J6 Dijon": "J6", "J7 Dijon": "J7", "J8 Dijon": "J8",
     "J5 bis Dijon": "J5bis",
     "WE1 beaune 08h-20h": "Garde", "WE1 Dijon": "Garde",
-    "WE2 beaune 08h-20h": "Doublon", "WE 2 Dijon": "Doublon",
+    "WE2 beaune 08h-20h": "Doublon", "WE2 Dijon": "Doublon",
 }
 
 

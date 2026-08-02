@@ -216,7 +216,7 @@ begin
     ('Dijon',  'J7',      'J7 Dijon'),
     ('Dijon',  'J8',      'J8 Dijon'),
     ('Dijon',  'Garde',   'WE1 Dijon'),
-    ('Dijon',  'Doublon', 'WE 2 Dijon');
+    ('Dijon',  'Doublon', 'WE2 Dijon');   -- renomme le 02/08/2026 (22-6H-3)
 
   select string_agg(a.nom_en_base, ', ' order by a.nom_en_base)
     into v_manquants

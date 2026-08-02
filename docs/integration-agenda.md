@@ -1212,6 +1212,53 @@ chaque ligne de `shifts` et dépassait le délai d'exécution. Extraite dans
 avec « Semaine type hiver » : 118 gardes, 62 pré-affectées, et **2 gardes sur le
 férié**, conformes aux 11 fériés sur 12 observés.
 
+##### 18. Deux correctifs signalés par Matthieu le 02/08/2026
+
+**1. Deux lignes `WE2` dans la grille du roulement.** Cause : l'espace parasite
+de `WE 2 Dijon`. La grille dérive le code en retirant le site et la plage
+horaire du nom — `WE2 beaune 08h-20h` donne `WE2`, mais `WE 2 Dijon` donnait
+`WE 2`. Deux codes, donc deux lignes, là où le doublon de week-end n'en est
+qu'un. Que `WE1 Dijon` et `WE1 beaune 08h-20h` se rejoignent bien sur une seule
+ligne confirmait le diagnostic.
+
+Renommé en `WE2 Dijon` (script `22-6H-3`). Sans risque : tout ce qui pointe vers
+un créneau le fait par son identifiant, et la colonne texte `shifts.shift_type`
+porte la plage horaire, pas le nom. Répercuté dans `desiderata.yaml`,
+`22-6-outil-comparer-roulement-fichiers.py` et l'amorçage de `22-6E-2`.
+
+**2. Sur-ouverture — un défaut introduit par 6H-2 lui-même.** En confiant à la
+semaine type le pilotage de *toutes* les cases, y compris celles du roulement,
+j'avais perdu ce que 6H-1 faisait bien : **le plan se résout semaine de rotation
+par semaine de rotation.**
+
+Une semaine type ne distingue pas les 8 semaines du cycle. Marquer « du
+roulement » une case que le plan n'utilise qu'en S8 la faisait donc ouvrir
+**toutes** les semaines. Mesuré sur les données : la semaine du 15/02/2027 est
+une S7, à 28 affectations au plan — elle a reçu **63 créneaux**, soit 35 cases
+vides sans raison d'être.
+
+`ouvrir_semaines` génère désormais en trois temps distincts :
+
+| | Source | Rythme | Médecin |
+|---|---|---|---|
+| **a** | Les règles du plan | par semaine de rotation | affecté |
+| **b** | La semaine type, cases **non** couvertes par le plan | chaque semaine | libre |
+| **c** | La colonne « Férié » | sur les jours fériés | libre |
+
+Contrôle après correction, avec « Semaine type hiver » :
+
+| Semaine ouverte | Gardes | Affectées | Règles du plan |
+|---|---:|---:|---|
+| 22/02/2027 (S8) | 45 | **34** | S8 = 34 ✓ |
+| 01/03/2027 (S1) | 42 | **31** | S1 = 31 ✓ |
+| 29/03/2027 (S5, lundi de Pâques) | 36 | 24 | S5 = 30, moins les 6 du lundi remplacé ✓ |
+
+*Ce que l'épisode enseigne* : la semaine type et le plan ne sont pas deux
+descriptions de la même chose à des niveaux différents. **Le plan a une
+dimension que la semaine type n'a pas — le cycle.** Toute tentative de faire
+porter les cases du roulement par la semaine type écrase cette dimension, et
+l'écrasement ne se voit qu'au comptage.
+
 *À signaler à Charlotte* : « Semaine type hiver » contient `J3 Dijon` le samedi
 et le dimanche — le **vestige de modélisation** documenté en 6B, d'avant la
 création du créneau `WE1 Dijon`. Le modèle date de novembre 2025 et a figé cet

@@ -331,30 +331,50 @@ begin
     doctor_id uuid, ferie text
   ) on commit drop;
 
-  -- a) Les jours ORDINAIRES : les cases de la semaine type, avec le
-  --    medecin que le plan du jour designe (le cas echeant).
+  -- a) Les cases DU PLAN, resolues semaine de rotation par semaine de
+  --    rotation. C'est le point que la premiere version de 6H-2 avait
+  --    perdu : la semaine type ne distingue pas les 8 semaines du cycle,
+  --    donc piloter les cases du plan par elle ouvrait chaque semaine
+  --    toutes les cases que le roulement utilise dans N'IMPORTE laquelle
+  --    de ses semaines. Une S7 a 28 affectations recevait 63 creneaux.
   insert into tmp_ouverture (date, site_id, room_id, shift_type_id, doctor_id, ferie)
-  select j.jour::date, (o ->> 'site_id')::uuid, st.default_room_id,
-         (o ->> 'shift_type_id')::uuid, r.doctor_id, null
+  select j.jour::date, r.site_id, st.default_room_id, r.shift_type_id, r.doctor_id, null
     from generate_series(p_debut, v_fin, interval '1 day') as j(jour)
-    cross join lateral jsonb_array_elements(p_ouvertures) as o
-    join agenda.shift_types st on st.id = (o ->> 'shift_type_id')::uuid
-    left join agenda.rotation_plans p on p.id = agenda.plan_applicable(j.jour::date)
-    left join agenda.rotation_plan_rules r
-           on r.plan_id       = p.id
-          and r.site_id       = (o ->> 'site_id')::uuid
-          and r.shift_type_id = (o ->> 'shift_type_id')::uuid
-          and r.weekday       = extract(dow from j.jour)::integer
-          and r.rotation_week =
-              ((((date_trunc('week', j.jour)::date - p.start_date) / 7)
-                % p.cycle_length_weeks + p.cycle_length_weeks)
-               % p.cycle_length_weeks) + 1
-   where (o ->> 'weekday')::integer = extract(dow from j.jour)::integer
-     and st.is_active
+    join agenda.rotation_plans p on p.id = agenda.plan_applicable(j.jour::date)
+    join agenda.rotation_plan_rules r
+      on r.plan_id       = p.id
+     and r.weekday       = extract(dow from j.jour)::integer
+     and r.rotation_week =
+         ((((date_trunc('week', j.jour)::date - p.start_date) / 7)
+           % p.cycle_length_weeks + p.cycle_length_weeks)
+          % p.cycle_length_weeks) + 1
+    join agenda.shift_types st on st.id = r.shift_type_id
+   where st.is_active
      and not exists (select 1 from agenda.feries_entre(p_debut, v_fin) f
                       where f.jour = j.jour::date);
 
-  -- b) Les jours FERIES : la colonne « Ferie » de la grille, sans
+  -- b) Les cases HORS ROULEMENT de la semaine type, sans medecin : ce
+  --    sont celles des remplacants. On ecarte celles que le plan couvre
+  --    deja -- (a) les a posees au bon rythme.
+  insert into tmp_ouverture (date, site_id, room_id, shift_type_id, doctor_id, ferie)
+  select j.jour::date, (o ->> 'site_id')::uuid, st.default_room_id,
+         (o ->> 'shift_type_id')::uuid, null, null
+    from generate_series(p_debut, v_fin, interval '1 day') as j(jour)
+    cross join lateral jsonb_array_elements(p_ouvertures) as o
+    join agenda.shift_types st on st.id = (o ->> 'shift_type_id')::uuid
+   where (o ->> 'weekday')::integer = extract(dow from j.jour)::integer
+     and st.is_active
+     and not exists (
+           select 1 from agenda.rotation_plan_rules r
+             join agenda.rotation_plans p2 on p2.id = r.plan_id
+            where p2.status = 'active'
+              and r.site_id       = (o ->> 'site_id')::uuid
+              and r.shift_type_id = (o ->> 'shift_type_id')::uuid
+              and r.weekday       = extract(dow from j.jour)::integer)
+     and not exists (select 1 from agenda.feries_entre(p_debut, v_fin) f
+                      where f.jour = j.jour::date);
+
+  -- c) Les jours FERIES : la colonne « Ferie » de la grille, sans
   --    affectation.
   insert into tmp_ouverture (date, site_id, room_id, shift_type_id, doctor_id, ferie)
   select f.jour, (o ->> 'site_id')::uuid, st.default_room_id,
