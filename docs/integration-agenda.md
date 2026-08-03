@@ -218,7 +218,7 @@ ALTER TABLE profiles ADD COLUMN agenda_beta_access boolean DEFAULT false;
     - ✓ **Appli Bolt corrigée (30/07/2026)** : le **même défaut** existait dans `src/components/ShiftDetailModal.tsx` de l'appli Bolt (ligne 450), toujours en production. Matthieu a reporté le correctif et vérifié le comportement sur le Site TEST. Les deux applications sont désormais alignées ; le point est clos. Marche à suivre conservée dans `docs/correctif-bolt-roulement.md` à titre de trace.
     - **Leçon pour MOD-2** : cet incident valide la priorité du **journal d'activité** et de la **suppression douce** (`deleted_at`). Le diagnostic n'a été possible qu'en recoupant `updated_at` à la seconde près avec les demandes et les règles de roulement — un journal aurait donné la réponse en une requête. Toujours reporté à MOD-2 / étape 7 (interdit de créer une table dans la base Planning tant qu'on en est client).
 
-- ⏳ **Étape 6 / MOD-1 — QUASI TERMINÉE (01-03/08/2026)** — 6A à 6H faites et validées en réel par Matthieu ; **reste 6G** (modifications souhaitées) et **6C-4** (suppression des anciennes tables, reportée après la bascule). Le détail vit dans la section « MOD-1 » plus bas — sous-étapes numérotées 1 à 21.
+- ✓ **Étape 6 / MOD-1 — FAITE (01-03/08/2026)** — 6A à 6H livrées et validées en réel par Matthieu. Seule **6C-4** reste ouverte (suppression des anciennes tables `rotation_settings` / `rotation_assignment_rules`), volontairement reportée après la bascule : le script de resynchronisation 7F les recopie encore. Le détail vit dans la section « MOD-1 » plus bas — sous-étapes numérotées 1 à 21.
   - **Ce que MOD-1 a livré** : le roulement est verrouillé en écriture (trois portes d'entrée en `security definer` : import, activation, suppression de brouillon), les plans sont versionnés dans le temps sans décalage rétroactif, le fichier de roulement se convertit en JSON canonique côté Python, l'import se fait par un écran avec correspondances mémorisées et rapport d'anomalies, l'activation passe par un différentiel obligatoire, et l'ouverture des semaines se pilote depuis le plan et une semaine type — jours fériés compris.
   - **Le V2 est en base et en vigueur au 04/01/2027** : V1 fermé au 03/01/2027 (266 règles), V2 actif à partir du 04/01 (264 règles). Différentiel mesuré entre les deux : **93 changements**.
   - **Ce que les allers-retours avec Matthieu ont corrigé**, et qu'aucune relecture de code n'aurait trouvé : le trou fonctionnel des **jours fériés** (18 gardes de week-end en semaine, toutes sur un férié), la **contamination par le V1** dans les requêtes « cette case est-elle au roulement ? » (deux plans actifs coexistent depuis 6F), et surtout le **modèle d'ouverture** lui-même — l'offre ouvre chaque semaine, le roulement s'y pose quand ses règles tombent. Trois réglages successifs avant de retrouver le fonctionnement historique du cabinet.
@@ -1217,6 +1217,71 @@ chaque ligne de `shifts` et dépassait le délai d'exécution. Extraite dans
 avec « Semaine type hiver » : 118 gardes, 62 pré-affectées, et **2 gardes sur le
 férié**, conformes aux 11 fériés sur 12 observés.
 
+##### 22. Sous-étape 6G — FAITE (03/08/2026)
+
+**La contrepartie du verrou.** Depuis 6B, l'application n'écrit plus jamais le
+plan. Le principe ne tient au quotidien que si Charlotte dispose d'un **chemin
+de retour vers le fichier** — sans lui, le moindre ajustement permanent
+demanderait de rouvrir Numbers séance tenante, et le verrou finirait contourné,
+exactement comme la double vérité qu'on venait d'éliminer.
+
+**`agenda.rotation_plan_changes`** — un carnet, pas une file d'écriture. Rien
+n'y modifie le plan, jamais, même après report. La seule façon de changer le
+roulement reste le fichier, puis l'import de 6E. *Les trois écrans le disent
+sans détour* : sans cela, on croira le changement appliqué.
+
+Deux choix de modélisation qui comptent :
+
+- **La case du roulement est dénormalisée** (semaine, jour, site, créneau) :
+  elle doit survivre à la suppression de la garde d'origine, qui n'est que le
+  prétexte de la saisie.
+- **`plan_id` enregistre le plan en vigueur au moment du souhait** : sans lui,
+  une note prise sous le V1 deviendrait illisible une fois le V2 en place —
+  « S3 lundi » ne désigne pas la même chose d'un plan à l'autre.
+
+**C'est la base qui traduit la garde en case de roulement.** « La garde du lundi
+18/01/2027 » devient « S3 · Lundi · J3 Dijon ». Ce calcul — plan applicable,
+puis semaine de rotation — est celui qui a produit les défauts les plus subtils
+de MOD-1 ; il vit déjà dans `ouvrir_semaines` et dans `getRotationWeek`. On ne
+l'a pas écrit une troisième fois dans un composant React.
+
+*Garde-fou utile* : réenregistrer sur la même case **remplace** le souhait
+précédent (index unique partiel sur les `pending`), plutôt que d'empiler des
+doublons qu'il faudrait démêler au report.
+
+**L'écran** : bouton « Signaler un changement permanent » sur une garde
+(coordinateur, quand la case relève du roulement), et récapitulatif sous la
+liste des plans dans Paramètres → Roulement. Le récapitulatif rend les lignes
+**dans la forme où le fichier les attend** — `S3 · Lundi · J3 Dijon : AS → MY` —
+avec un bouton « Copier la liste » : le report se fait dans Numbers, hors de
+l'application, et recopier quinze lignes à l'œil est une source d'erreur qu'un
+presse-papier supprime.
+
+##### ⚠️ Une fuite de lecture, trouvée par le test de bout en bout
+
+`modifications_souhaitees()` était en `security definer` **sans contrôle
+explicite** : la policy réservant la lecture aux coordinateurs était donc
+contournée, et n'importe quel médecin pouvait lire le carnet de la coordination
+— qui elle souhaite déplacer, et pourquoi. L'écriture, elle, était bien
+refusée.
+
+Invisible à la relecture : la table *a* sa policy, la fonction *a* l'air
+correcte. Seul l'appel réel avec un jeton de non-coordinateur l'a montré.
+*C'est la deuxième fois en trois jours que `security definer` fait sauter un
+contrôle qu'on croyait posé* — à vérifier systématiquement sur les fonctions à
+venir.
+
+| Test | Résultat |
+|---|---|
+| Un non-coordinateur enregistre | refusé |
+| Garde inexistante | refusé |
+| Souhaiter le médecin déjà au roulement | refusé — « il n'y a rien à reporter » |
+| Réenregistrer sur la même case | remplace, même identifiant, pas de doublon |
+| Souhait « personne » (sortir la case du roulement) | accepté |
+| Marquer comme reportée | statut changé, la ligne passe à l'historique |
+| Un non-coordinateur **lit** le carnet | refusé (après correction) |
+| Un non-coordinateur **écrit** dans le carnet | refusé |
+
 ##### 21. Le modèle final de l'ouverture — l'offre ouvre chaque semaine (03/08/2026)
 
 Signalé par Matthieu, captures à l'appui : `J8` coché — et même **verrouillé**
@@ -1529,7 +1594,7 @@ sous-étape 6G, absente du découpage initial.
 | **6D** | ✓ **FAITE** — Écran Paramètres → Roulement : liste des plans + **grille consultable** à la disposition du fichier (créneaux en lignes, semaines × sites en colonnes). | Non |
 | **6E** | ✓ **FAITE (6E-1 à 6E-3)** — Le `.xlsx` → JSON canonique (Python) ; la fonction d'import `security definer` + la mémoire des correspondances ; l'écran d'import avec correspondances pré-remplies et rapport d'anomalies. | Fait |
 | **6F** | ✓ **FAITE** — Fonction d'activation `security definer` + écran de différentiel (tableau des changements, grille en évidence, choix de la date, confirmation). | Fait |
-| **6G** | **Modifications souhaitées** : collecte depuis une garde, récapitulatif exportable pour report dans le fichier. La contrepartie du verrouillage. | Oui |
+| **6G** | ✓ **FAITE** — **Modifications souhaitées** : collecte depuis une garde, récapitulatif dans la forme du fichier avec copie au presse-papier, suivi du report. La contrepartie du verrouillage. | Fait |
 | **6H** | ✓ **FAITE** — Révisée : « Ouvrir les N prochaines semaines depuis le plan », en remplacement du trio semaine de référence / modèle / duplication. Créneaux hors roulement déduits de l'usage et proposés cochés. | Fait |
 
 #### Le pont plan → gardes existe déjà — relevé le 01/08/2026

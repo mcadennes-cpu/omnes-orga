@@ -1,5 +1,5 @@
 import { Shift } from '../lib/supabase';
-import { Trash2, UserPlus, UserX, Repeat, FileText } from 'lucide-react';
+import { Trash2, UserPlus, UserX, Repeat, FileText, NotebookPen } from 'lucide-react';
 import SeriesActionModal from './SeriesActionModal';
 import EditSeriesModal from './EditSeriesModal';
 import EditValidatedShiftModal from './EditValidatedShiftModal';
@@ -11,6 +11,7 @@ import PendingRequestsList from './shiftDetail/PendingRequestsList';
 import CancelAssignmentModal from './shiftDetail/CancelAssignmentModal';
 import ApplyToRotationWeekModal from './shiftDetail/ApplyToRotationWeekModal';
 import DeletionBlockedModal from './shiftDetail/DeletionBlockedModal';
+import RotationChangeModal from './shiftDetail/RotationChangeModal';
 import { useShiftDetail } from '../hooks/useShiftDetail';
 
 type ShiftDetailModalProps = {
@@ -25,6 +26,8 @@ type ShiftDetailModalProps = {
 };
 
 export default function ShiftDetailModal({ shift, onClose, onSuccess, readOnlyMode = false, hideValidation = false, onAssignDoctor, isCoordinator = false, hideSeriesInfo = false }: ShiftDetailModalProps) {
+  // Modification souhaitee du roulement (6G) : la contrepartie du verrou.
+  const [showRotationChangeModal, setShowRotationChangeModal] = useState(false);
   const {
     loading,
     error,
@@ -132,6 +135,17 @@ export default function ShiftDetailModal({ shift, onClose, onSuccess, readOnlyMo
           >
             Fermer
           </button>
+          {isCoordinator && rotationInfo && (
+            <button
+              onClick={() => setShowRotationChangeModal(true)}
+              disabled={loading}
+              className="flex items-center gap-2 rounded-input border border-border px-5 py-2.5 text-button text-marine transition-colors hover:bg-fond disabled:opacity-50"
+              title="Noter un changement durable du roulement, a reporter dans le fichier"
+            >
+              <NotebookPen className="h-4 w-4" />
+              Signaler un changement permanent
+            </button>
+          )}
           {isCoordinator && (shift.status === 'free' || shift.status === 'pending') && onAssignDoctor && (
             <button
               onClick={onAssignDoctor}
@@ -234,6 +248,15 @@ export default function ShiftDetailModal({ shift, onClose, onSuccess, readOnlyMo
 
       {showDeletionBlockedModal && (
         <DeletionBlockedModal onClose={() => setShowDeletionBlockedModal(false)} />
+      )}
+
+      {showRotationChangeModal && (
+        <RotationChangeModal
+          shiftId={shift.id}
+          shiftLabel={`${shift.shift_type} · ${shift.location}${shift.room ? ' · ' + shift.room : ''}`}
+          doctorActuelNom={shift.assigned_doctor?.full_name ?? null}
+          onClose={() => setShowRotationChangeModal(false)}
+        />
       )}
     </>
   );

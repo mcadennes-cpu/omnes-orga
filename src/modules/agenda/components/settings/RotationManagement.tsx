@@ -5,6 +5,7 @@ import RotationPlanGrid from './RotationPlanGrid';
 import RotationPlanImport from './RotationPlanImport';
 import RotationPlanDiff from './RotationPlanDiff';
 import ConfirmDialog from '../../../../components/common/ConfirmDialog';
+import RotationChangesList from './RotationChangesList';
 
 // ---------------------------------------------------------------------------
 // Consultation des plans de roulement (MOD-1, etape 6C-3).
@@ -150,6 +151,7 @@ export default function RotationManagement() {
   }
 
   return (
+    <>
     <div className="rounded-card border border-border bg-carte p-6 shadow-card">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -178,8 +180,9 @@ export default function RotationManagement() {
           validé par les associés.
           <span className="mt-2 block text-caption">
             Pour faire évoluer le roulement, mettre le fichier à jour puis l'importer en
-            choisissant sa date d'entrée en vigueur. Le plan en cours est alors archivé et
-            reste consultable.
+            choisissant sa date d'entrée en vigueur. Le plan en cours est alors clôturé à
+            la veille de cette date, et continue de s'appliquer aux dates antérieures : les
+            plannings déjà publiés restent explicables.
           </span>
         </p>
       </div>
@@ -319,5 +322,12 @@ export default function RotationManagement() {
         submitting={suppression}
       />
     </div>
+
+    {/* La contrepartie du verrou annonce ci-dessus (6G) : ce que la
+        coordination souhaite changer, en attente de report dans le fichier. */}
+    <div className="mt-6">
+      <RotationChangesList />
+    </div>
+    </>
   );
 }
