@@ -1217,6 +1217,33 @@ chaque ligne de `shifts` et dépassait le délai d'exécution. Extraite dans
 avec « Semaine type hiver » : 118 gardes, 62 pré-affectées, et **2 gardes sur le
 férié**, conformes aux 11 fériés sur 12 observés.
 
+##### 23. « Appliquer aux gardes du roulement » remontait dans le passé (03/08/2026)
+
+Signalé par Matthieu : en assignant une garde de 2027, le message d'erreur
+annonçait un conflit sur le **30/12/2025** — et le bouton « Assigner sur toute
+la semaine de roulement » semblait sans effet.
+
+**Un seul défaut, deux symptômes.** Les deux copies de cette action
+(`useShiftDetail` et `AssignDoctorModal`) annoncent en commentaire « les gardes
+**futures** de la même case du roulement », mais **aucune ne filtrait par
+date** : la requête ramassait tout l'historique. Or **125 gardes passées sont
+encore `free` ou `pending`** en base, du 29/12/2025 au 31/07/2026 — l'héritage
+de l'ancienne application, où des créneaux non pourvus sont simplement restés
+ouverts.
+
+Le déroulé exact : la seule autre garde de la case était le 30/12/2025 ; le
+contrôle de conflit a vu que le médecin travaillait déjà ce jour-là ; la liste
+des gardes à assigner s'est retrouvée vide ; la fonction est sortie en affichant
+l'erreur. Rien ne se passait, et le motif invoqué remontait à quinze mois.
+
+`.gte('date', aujourdhui)` dans les deux copies. **Le commentaire disait déjà
+la bonne règle — c'est le code qui ne la mettait pas en œuvre.**
+
+*Ajout* : quand il n'y a rien à propager, l'écran le dit désormais (message
+neutre, pas une erreur) et rappelle que la garde de départ est bien assignée.
+Auparavant il fermait sans un mot, ce qui se lit comme un bouton sans effet —
+c'est d'ailleurs ce qui a mis Matthieu sur la piste.
+
 ##### 22. Sous-étape 6G — FAITE (03/08/2026)
 
 **La contrepartie du verrou.** Depuis 6B, l'application n'écrit plus jamais le

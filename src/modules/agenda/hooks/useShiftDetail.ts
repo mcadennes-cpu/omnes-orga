@@ -566,6 +566,14 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
         { componentName: 'ShiftDetailModal.handleApplyToRotationWeek', inputOrigin: `shift.date: "${shift.date}"` }
       );
 
+      // ⚠ Bornage au PRESENT (03/08/2026) -- il manquait, alors que le
+      // commentaire ci-dessus annonce « les gardes futures ». Sans lui, la
+      // requete ramassait tout l'historique : 125 gardes passees sont encore
+      // `free` ou `pending` en base (du 29/12/2025 au 31/07/2026). Signale par
+      // Matthieu, qui voyait un conflit annonce sur le 30/12/2025 en assignant
+      // une garde de 2027.
+      const aujourdhui = new Date().toISOString().split('T')[0];
+
       const { data: allShifts, error: fetchError } = await supabase
         .from('shifts')
         .select('id, date, status, assigned_doctor_id')
@@ -573,6 +581,7 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
         .eq('room_id', shift.room_id)
         .eq('shift_type_id', shift.shift_type_id)
         .neq('id', shift.id)
+        .gte('date', aujourdhui)
         .in('status', ['free', 'pending']);
 
       if (fetchError) throw fetchError;

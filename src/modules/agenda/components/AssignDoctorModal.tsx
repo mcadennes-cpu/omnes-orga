@@ -32,6 +32,7 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
   const [selectedDoctorId, setSelectedDoctorId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [showRotationPrompt, setShowRotationPrompt] = useState(false);
   const [assignedShiftId, setAssignedShiftId] = useState<string | null>(null);
   const [rotationInfo, setRotationInfo] = useState<{ week: number; total: number } | null>(null);
@@ -189,6 +190,14 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
         { componentName: 'AssignDoctorModal.handleApplyToRotation', inputOrigin: `shift.date: "${shift.date}"` }
       );
 
+      // ⚠ Bornage au PRESENT (03/08/2026) -- il manquait, alors que le
+      // commentaire ci-dessus annonce « les gardes futures ». Sans lui, la
+      // requete ramassait tout l'historique : 125 gardes passees sont encore
+      // `free` ou `pending` en base (du 29/12/2025 au 31/07/2026). Signale par
+      // Matthieu, qui voyait un conflit annonce sur le 30/12/2025 en assignant
+      // une garde de 2027.
+      const aujourdhui = new Date().toISOString().split('T')[0];
+
       const { data: allShifts, error: fetchError } = await supabase
         .from('shifts')
         .select('id, date, status, assigned_doctor_id')
@@ -196,11 +205,21 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
         .eq('room_id', shift.room_id)
         .eq('shift_type_id', shift.shift_type_id)
         .neq('id', shift.id)
+        .gte('date', aujourdhui)
         .in('status', ['free', 'pending']);
 
       if (fetchError) throw fetchError;
 
-      if (allShifts && allShifts.length > 0) {
+      if (!allShifts || allShifts.length === 0) {
+        // La garde de depart est deja assignee par handleAssign : il n'y a
+        // simplement rien d'autre a propager. Le dire, plutot que de fermer
+        // sans un mot -- on croirait le bouton sans effet.
+        setInfo('Aucune autre garde à venir ne correspond à cette case du roulement.');
+        setLoading(false);
+        return;
+      }
+
+      {
         const matchingShifts = allShifts.filter(s => {
           // Une garde regie par un autre plan n'est pas dans la meme case.
           const sPlan = getPlanForDate(new Date(s.date), plans);
@@ -214,7 +233,13 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
           return shiftRotationWeek === currentRotationWeek && shiftWeekday === currentWeekday;
         });
 
-        if (matchingShifts.length > 0) {
+        if (matchingShifts.length === 0) {
+          setInfo('Aucune autre garde à venir ne correspond à cette case du roulement.');
+          setLoading(false);
+          return;
+        }
+
+        {
           const validShiftIds: string[] = [];
           const conflictDates: string[] = [];
 
@@ -340,13 +365,25 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
           </div>
         )}
 
+        {/* Message neutre, distinct de l'erreur : « rien a propager » n'est pas
+            un echec -- la garde de depart est bien assignee. */}
+        {info && (
+          <div className="mb-4 rounded-input border border-marine/20 bg-marine/5 p-3">
+            <p className="text-body-m text-ink">{info}</p>
+            <p className="mt-1 text-caption">
+              La garde du {new Date(shift.date).toLocaleDateString('fr-FR')} est bien
+              assignée.
+            </p>
+          </div>
+        )}
+
         <div className="space-y-3">
           <button
             onClick={handleOnlyThisShift}
             disabled={loading}
             className="w-full rounded-input border border-border px-4 py-3 text-button text-marine transition-colors hover:bg-fond disabled:opacity-50"
           >
-            Assigner seulement cette garde
+            {info ? 'Terminer' : 'Assigner seulement cette garde'}
           </button>
           <button
             onClick={handleApplyToRotation}
