@@ -1212,6 +1212,64 @@ chaque ligne de `shifts` et dépassait le délai d'exécution. Extraite dans
 avec « Semaine type hiver » : 118 gardes, 62 pré-affectées, et **2 gardes sur le
 férié**, conformes aux 11 fériés sur 12 observés.
 
+##### 21. Le modèle final de l'ouverture — l'offre ouvre chaque semaine (03/08/2026)
+
+Signalé par Matthieu, captures à l'appui : `J8` coché — et même **verrouillé**
+— dans la grille mais absent du calendrier ; `J2 Dijon` manquant le mardi et le
+mercredi de S4 ; `J4` et `J7` manquants le vendredi de S4 ; d'autres cases sur
+S3. Vérifié : les quatre cases partagent le même motif — **le plan couvre ce
+jour de semaine, mais pas cette semaine-là du cycle** — et la règle de la
+veille les fermait alors entièrement.
+
+**C'est ma règle qui était fausse, pas son application.** Le fonctionnement
+historique du cabinet — celui de l'ancienne duplication de modèle — est le
+bon : *une case de la semaine type ouvre chaque semaine ; le roulement y place
+ses médecins quand ses règles tombent sur la date ; le reste demeure libre
+pour les remplaçants.* Un `J2 Dijon` sans associé en S3 ne disparaît pas :
+c'est une garde à prendre.
+
+**L'erreur de diagnostic, nommée pour ne pas la refaire** : avoir pris « le
+nombre de libres doit être constant » pour l'invariant. Le vrai invariant est
+**l'offre constante** — les libres varient avec la semaine du cycle, par
+construction, et c'est précisément l'information utile aux remplaçants. La
+sur-ouverture à 61 gardes qui m'avait fait dévier venait d'ailleurs : l'écran
+envoyait aussi les cases *verrouillées* (déduites du plan mais absentes de la
+semaine type, comme `J4 Beaune`) dans l'offre permanente.
+
+**Le modèle final, en trois phrases :**
+
+1. Les gardes du roulement s'ouvrent **quoi qu'il arrive**, à leur semaine du
+   cycle, avec leur médecin — que la case soit cochée ou non.
+2. Une case **cochée** ouvre **chaque semaine** — affectée si le roulement y
+   place quelqu'un, libre sinon.
+3. **Le verrou disparaît.** Fermer une case ne peut plus priver un associé de
+   sa garde (le point 1 y veille), donc plus rien n'est verrouillé. À la
+   place, un badge ↻ « roulement ». Les cases du plan absentes de la semaine
+   type apparaissent décochées avec ce badge : les cocher les ouvre *en plus*
+   aux remplaçants.
+
+Techniquement : dans `semaine_type`, les lignes issues du plan assurent la
+présence de la case dans la grille mais ne la marquent plus « ouverte »
+d'office ; dans `ouvrir_semaines`, la branche (b) ouvre toutes les cases de
+l'offre et ne déduplique que contre ce que (a) a posé à la même date.
+
+**Contrôle — les cinq cases signalées, après correction : toutes ouvertes et
+libres.** Et le profil des 8 semaines :
+
+| | S1 | S2 | S3 | S4 | S5 | S6 | S7 | S8 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Gardes | 53 | 55 | 54 | 54 | 53 | 56 | 52 | 53 |
+| Affectées | 31 | 37 | 31 | 35 | 30 | 38 | 28 | 34 |
+| Libres | 22 | 18 | 23 | 19 | 23 | 18 | 24 | 19 |
+
+52–56 gardes par semaine — l'ordre de grandeur historique (46–54) —, les
+affectées calquées sur le plan, les libres en sens inverse.
+
+*Note pour Charlotte et Matthieu* : `J8 Dijon` le lundi n'est **pas** dans la
+« Semaine type hiver » (l'écran d'hier le montrait verrouillé-ouvert à tort à
+cause de l'union avec le plan). Il s'affiche désormais décoché avec le badge.
+Le cocher l'ouvrira réellement chaque lundi — et cette fois c'est vrai.
+
 ##### 20. Le bug des créneaux remplaçants manquants (02/08/2026)
 
 **« Pas d'ouverture en cabinet B2 le lundi et le mardi. »** Signalé par Matthieu

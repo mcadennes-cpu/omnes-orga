@@ -229,7 +229,12 @@ as $$
      where i.template_id = p_template_id
      group by 1, 2, 3
     union
-    select r.weekday, r.site_id, r.shift_type_id, true
+    -- Presence seulement (ouvert=false) : une case du plan absente de la
+    -- semaine type doit APPARAITRE dans la grille (avec le badge roulement)
+    -- mais pas rejoindre l'offre permanente d'office. C'est ce `true` qui
+    -- gonflait l'ouverture a 61 gardes : l'ecran renvoyait ces cases dans
+    -- l'offre, et J4 Beaune s'ouvrait chaque semaine en case vide.
+    select r.weekday, r.site_id, r.shift_type_id, false
       from agenda.rotation_plan_rules r
      where r.plan_id = agenda.plan_applicable(p_date)
     union
@@ -359,25 +364,25 @@ begin
   -- b) Les cases de la semaine type que (a) n'a pas deja posees, sans
   --    medecin : ce sont celles des remplacants.
   --
-  --    ⚠ L'exclusion porte sur LE PLAN APPLICABLE A CETTE DATE, et sur
-  --    lui seul. C'est la que deux versions se sont trompees.
+  --    ⚠ MODELE FINAL, arrete le 03/08/2026 apres trois tentatives.
   --
-  --    La premiere lisait « tous les plans actifs » : le V1, qui s'arrete
-  --    au 03/01/2027, contient des « J5 Dijon » le lundi -- ce creneau se
-  --    trouvait donc ferme en janvier 2027, alors que le V2 ne connait
-  --    pas J5 du tout. C'est le bug signale par Matthieu (« pas
-  --    d'ouverture en cabinet B2 le lundi »).
+  --    L'OFFRE (les cases cochees) OUVRE CHAQUE SEMAINE. Le roulement y
+  --    place ses medecins quand ses regles tombent sur la date ; le reste
+  --    demeure libre pour les remplacants. Un J2 Dijon sans associe en S3
+  --    ne disparait pas : c'est une garde a prendre. C'est le
+  --    fonctionnement historique du cabinet (l'ancienne duplication de
+  --    modele faisait exactement cela), et c'est Matthieu qui l'a
+  --    retabli en signalant les cases manquantes.
   --
-  --    La seconde n'ecartait que ce que (a) avait pose CE JOUR-LA. Elle
-  --    ouvrait alors, en case vide, tout creneau du roulement dans les
-  --    semaines du cycle ou le plan ne s'en sert pas : « J4 Beaune » se
-  --    retrouvait libre 7 jeudis sur 8, et la semaine passait de 48 a 61
-  --    gardes.
+  --    Les deux reglages precedents fermaient les cases que le plan
+  --    couvre ce jour de semaine sans s'en servir cette semaine du cycle
+  --    (J2 Dijon disparu le lundi de S3, J4 et J7 disparus le vendredi de
+  --    S4). L'erreur de diagnostic : avoir pris « libres constant » pour
+  --    l'invariant. Le vrai invariant est l'OFFRE constante -- les libres
+  --    varient avec la semaine du cycle, par construction.
   --
-  --    La bonne regle : une case du roulement n'ouvre que quand le
-  --    roulement s'en sert. Sa presence dans le plan, a ce jour de
-  --    semaine, suffit a la retirer de l'offre permanente -- quelle que
-  --    soit la semaine du cycle ou elle sert.
+  --    La seule deduplication necessaire : ne pas ouvrir deux fois la
+  --    case que (a) vient de poser A CETTE DATE.
   insert into tmp_ouverture (date, site_id, room_id, shift_type_id, doctor_id, ferie)
   select j.jour::date, (o ->> 'site_id')::uuid, st.default_room_id,
          (o ->> 'shift_type_id')::uuid, null, null
@@ -387,11 +392,10 @@ begin
    where (o ->> 'weekday')::integer = extract(dow from j.jour)::integer
      and st.is_active
      and not exists (
-           select 1 from agenda.rotation_plan_rules r
-            where r.plan_id       = agenda.plan_applicable(j.jour::date)
-              and r.site_id       = (o ->> 'site_id')::uuid
-              and r.shift_type_id = (o ->> 'shift_type_id')::uuid
-              and r.weekday       = extract(dow from j.jour)::integer)
+           select 1 from tmp_ouverture t
+            where t.date          = j.jour::date
+              and t.site_id       = (o ->> 'site_id')::uuid
+              and t.shift_type_id = (o ->> 'shift_type_id')::uuid)
      and not exists (select 1 from agenda.feries_entre(p_debut, v_fin) f
                       where f.jour = j.jour::date);
 

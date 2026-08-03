@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { CalendarPlus, Loader2, Save, Lock, PartyPopper } from 'lucide-react';
+import { CalendarPlus, Loader2, Save, Repeat, PartyPopper } from 'lucide-react';
 import BottomSheet from './ui/BottomSheet';
 import { supabase } from '../lib/supabase';
 
@@ -17,8 +17,15 @@ import { supabase } from '../lib/supabase';
 // types et il faut pouvoir reconnaitre laquelle on s'apprete a rejouer. D'ou
 // la grille : creneaux en lignes, jours en colonnes, comme la vue Semaine.
 //
-// Les cases du roulement sont VERROUILLEES ouvertes : ne pas les ouvrir
-// priverait un associe de sa garde.
+// MODELE FINAL (03/08/2026, apres trois reglages) : une case COCHEE ouvre
+// CHAQUE semaine -- affectee quand le roulement y place quelqu'un, libre pour
+// les remplacants sinon. Les gardes du roulement s'ouvrent de toute facon, a
+// leur semaine du cycle, meme si la case n'est pas cochee : c'est pourquoi
+// plus AUCUNE case n'est verrouillee -- fermer une case ne peut plus priver un
+// associe de sa garde. Le badge ↻ signale simplement que le roulement passe
+// par la. Les deux reglages precedents fermaient les cases du roulement dans
+// les semaines du cycle ou il ne s'en sert pas (J2 Dijon disparu le lundi de
+// S3) : c'est Matthieu qui a retabli le fonctionnement historique.
 //
 // Les JOURS FERIES ont leur propre colonne, la 8e. Releve du 02/08/2026 : les
 // 18 gardes de week-end posees en semaine tombent toutes sur un ferie, et le
@@ -157,8 +164,13 @@ export default function OpenWeeksModal({ onClose, onOpened }: OpenWeeksModalProp
         const liste = (data ?? []) as Case[];
         setCases(liste);
 
+        // L'offre par defaut = la semaine type seule. Les cases que le plan
+        // couvre sans qu'elles soient dans la semaine type (J4 Beaune...)
+        // apparaissent decochees avec le badge : leurs gardes du roulement
+        // s'ouvriront de toute facon, les cocher les ouvrirait EN PLUS
+        // chaque semaine aux remplacants.
         const defaut = new Set(
-          liste.filter((c) => c.ouvert || c.couvert_par_le_plan)
+          liste.filter((c) => c.ouvert)
                .map((c) => cle(c.weekday, c.site_id, c.shift_type_id)),
         );
         for (const [k, ouverte] of forcees) {
@@ -191,7 +203,8 @@ export default function OpenWeeksModal({ onClose, onOpened }: OpenWeeksModalProp
     return [...vues.values()];
   }, [cases]);
 
-  const verrouillees = useMemo(() => {
+  // Les cases ou le roulement passe : badge d'information, pas un verrou.
+  const duRoulement = useMemo(() => {
     const s = new Set<string>();
     for (const c of cases) {
       if (c.couvert_par_le_plan) s.add(cle(c.weekday, c.site_id, c.shift_type_id));
@@ -233,7 +246,6 @@ export default function OpenWeeksModal({ onClose, onOpened }: OpenWeeksModalProp
   }, [debut, semaines, ouvertes, chargement, ouverturesPayload]);
 
   const basculer = (k: string) => {
-    if (verrouillees.has(k)) return;
     const suivant = new Set(ouvertes);
     const ouvre = !suivant.has(k);
     if (ouvre) suivant.add(k);
@@ -352,10 +364,11 @@ export default function OpenWeeksModal({ onClose, onOpened }: OpenWeeksModalProp
             <div>
               <p className="text-field-label mb-1">Semaine d'ouverture</p>
               <p className="mb-2 text-caption">
-                Cliquer une case pour l'ouvrir ou la fermer. Les cases du roulement sont
-                verrouillées : les fermer priverait un associé de sa garde. La colonne{' '}
-                <strong>Férié</strong> n'est pas un jour — c'est ce qui s'ouvre les jours
-                fériés, à la place de la journée ordinaire.
+                Une case cochée ouvre chaque semaine — affectée quand le roulement y
+                place quelqu'un, libre pour les remplaçants sinon. Les gardes du
+                roulement (badge) s'ouvrent de toute façon, même case décochée. La
+                colonne <strong>Férié</strong> n'est pas un jour — c'est ce qui s'ouvre
+                les jours fériés, à la place de la journée ordinaire.
               </p>
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
@@ -389,7 +402,7 @@ export default function OpenWeeksModal({ onClose, onOpened }: OpenWeeksModalProp
                         {JOURS.map((j) => {
                           const k = cle(j.weekday, l.site_id, l.shift_type_id);
                           const estOuverte = ouvertes.has(k);
-                          const estVerrouillee = verrouillees.has(k);
+                          const roulement = duRoulement.has(k);
                           return (
                             <td
                               key={j.weekday}
@@ -400,11 +413,12 @@ export default function OpenWeeksModal({ onClose, onOpened }: OpenWeeksModalProp
                               <button
                                 type="button"
                                 onClick={() => basculer(k)}
-                                disabled={estVerrouillee}
                                 aria-pressed={estOuverte}
                                 title={
-                                  estVerrouillee
-                                    ? 'Case du roulement — toujours ouverte'
+                                  roulement
+                                    ? estOuverte
+                                      ? 'Roulement + ouverte chaque semaine aux remplaçants — cliquer pour fermer'
+                                      : 'Le roulement ouvrira ses gardes ici à leur semaine du cycle — cliquer pour ouvrir aussi chaque semaine'
                                     : j.weekday === 7
                                       ? estOuverte
                                         ? 'Ouverte les jours fériés — cliquer pour fermer'
@@ -412,15 +426,16 @@ export default function OpenWeeksModal({ onClose, onOpened }: OpenWeeksModalProp
                                       : estOuverte ? 'Ouverte — cliquer pour fermer'
                                                    : 'Fermée — cliquer pour ouvrir'
                                 }
-                                className={`flex h-7 w-full items-center justify-center rounded-pill text-caption transition-colors ${
-                                  estVerrouillee
-                                    ? 'cursor-default bg-canard/25 text-canard'
-                                    : estOuverte
-                                      ? 'bg-canard/10 text-canard hover:bg-canard/20'
-                                      : 'bg-fond text-faint hover:bg-border'
+                                className={`flex h-7 w-full items-center justify-center gap-0.5 rounded-pill text-caption transition-colors ${
+                                  estOuverte
+                                    ? roulement
+                                      ? 'bg-canard/25 text-canard hover:bg-canard/35'
+                                      : 'bg-canard/10 text-canard hover:bg-canard/20'
+                                    : 'bg-fond text-faint hover:bg-border'
                                 }`}
                               >
-                                {estVerrouillee ? <Lock className="h-3 w-3" /> : estOuverte ? '●' : ''}
+                                {roulement && <Repeat className="h-3 w-3" />}
+                                {!roulement && estOuverte ? '●' : ''}
                               </button>
                             </td>
                           );
@@ -433,13 +448,13 @@ export default function OpenWeeksModal({ onClose, onOpened }: OpenWeeksModalProp
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-caption">
                 <span className="flex items-center gap-1">
                   <span className="inline-flex h-4 w-4 items-center justify-center rounded-pill bg-canard/25">
-                    <Lock className="h-2.5 w-2.5 text-canard" />
+                    <Repeat className="h-2.5 w-2.5 text-canard" />
                   </span>
-                  Roulement
+                  Roulement — ses gardes s'ouvrent à leur semaine du cycle, quoi qu'il arrive
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="inline-flex h-4 w-4 items-center justify-center rounded-pill bg-canard/10 text-canard">●</span>
-                  Ouverte pour les remplaçants
+                  Ouverte chaque semaine — libre si le roulement n'y place personne
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="inline-block h-4 w-4 rounded-pill bg-fond" />
