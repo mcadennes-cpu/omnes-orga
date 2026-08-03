@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Shift } from '../lib/supabase';
 import { Trash2, UserPlus, UserX, Repeat, FileText, NotebookPen } from 'lucide-react';
 import SeriesActionModal from './SeriesActionModal';
