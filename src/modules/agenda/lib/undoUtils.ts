@@ -161,13 +161,14 @@ export async function executeUndo(userId: string): Promise<boolean> {
         const { created_shift_ids } = undoAction.payload;
 
         if (created_shift_ids.length > 0) {
+          // Suppression douce (MOD2-B) : annuler une duplication de modele
+          // masque les gardes creees au lieu de les effacer. Le DELETE reel
+          // n'est plus autorise a personne depuis le module.
           const { error } = await supabase
-            .from('shifts')
-            .delete()
-            .in('id', created_shift_ids);
+            .rpc('supprimer_gardes', { p_shift_ids: created_shift_ids });
 
           if (error) throw error;
-          console.log('[Undo] Deleted created shifts:', created_shift_ids.length);
+          console.log('[Undo] Soft-deleted created shifts:', created_shift_ids.length);
         }
         break;
       }

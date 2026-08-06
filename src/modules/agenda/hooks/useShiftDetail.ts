@@ -362,6 +362,13 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
     setLoading(true);
     setError('');
 
+    // Suppression douce (MOD2-B) : la ligne reste, marquee d'un deleted_at.
+    // Restaurer redevient possible sans recreer d'identifiant -- ce qui
+    // cassait les liens vers les demandes et la serie.
+    //
+    // On passe par une fonction plutot que par un UPDATE direct : la policy
+    // de lecture masque les gardes supprimees, et PostgreSQL interdit a un
+    // UPDATE de faire sortir une ligne de sa propre visibilite.
     try {
       if (scope === 'series' && shift.series_id) {
         const { data: shiftsInSeries, error: checkError } = await supabase
@@ -380,18 +387,9 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
         }
 
         const { error: deleteError } = await supabase
-          .from('shifts')
-          .delete()
-          .eq('series_id', shift.series_id);
+          .rpc('supprimer_serie', { p_series_id: shift.series_id });
 
         if (deleteError) throw deleteError;
-
-        const { error: seriesDeleteError } = await supabase
-          .from('fixed_duty_series')
-          .delete()
-          .eq('id', shift.series_id);
-
-        if (seriesDeleteError) throw seriesDeleteError;
       } else {
         if (shift.status === 'assigned' || shift.status === 'pending') {
           setShowDeletionBlockedModal(true);
@@ -400,9 +398,7 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
         }
 
         const { error: deleteError } = await supabase
-          .from('shifts')
-          .delete()
-          .eq('id', shift.id);
+          .rpc('supprimer_gardes', { p_shift_ids: [shift.id] });
 
         if (deleteError) throw deleteError;
       }

@@ -162,10 +162,10 @@ export default function EditSeriesModal({ seriesId, onClose, onSuccess }: EditSe
         .map(s => s.id);
 
       if (shiftsToDelete.length > 0) {
+        // Suppression douce (MOD2-B) : reduire l'etendue d'une serie ne
+        // detruit plus les gardes qui en sortent.
         const { error: deleteError } = await supabase
-          .from('shifts')
-          .delete()
-          .in('id', shiftsToDelete);
+          .rpc('supprimer_gardes', { p_shift_ids: shiftsToDelete });
 
         if (deleteError) throw deleteError;
       }
