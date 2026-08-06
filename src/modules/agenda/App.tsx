@@ -6,6 +6,7 @@ import EnhancedCalendarView from './components/EnhancedCalendarView';
 import MyScheduleView from './components/MyScheduleView';
 import DailyScheduleView from './components/DailyScheduleView';
 import RequestsView from './components/RequestsView';
+import ActivityLogView from './components/ActivityLogView';
 import SettingsView from './components/SettingsView';
 
 type AppProps = {
@@ -100,6 +101,9 @@ function App({ orgaProfile }: AppProps) {
         )}
         {currentView === 'requests' && currentUser.role === 'coordinator' && (
           <RequestsView currentUser={currentUser} />
+        )}
+        {currentView === 'activity' && currentUser.role === 'coordinator' && (
+          <ActivityLogView />
         )}
         {currentView === 'settings' && currentUser.role === 'coordinator' && (
           <SettingsView />

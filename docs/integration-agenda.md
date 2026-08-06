@@ -225,7 +225,14 @@ ALTER TABLE profiles ADD COLUMN agenda_beta_access boolean DEFAULT false;
   - **Le V2 est en base et en vigueur au 04/01/2027** : V1 fermé au 03/01/2027 (266 règles), V2 actif à partir du 04/01 (264 règles). Différentiel mesuré entre les deux : **93 changements**.
   - **Ce que les allers-retours avec Matthieu ont corrigé**, et qu'aucune relecture de code n'aurait trouvé : le trou fonctionnel des **jours fériés** (18 gardes de week-end en semaine, toutes sur un férié), la **contamination par le V1** dans les requêtes « cette case est-elle au roulement ? » (deux plans actifs coexistent depuis 6F), et surtout le **modèle d'ouverture** lui-même — l'offre ouvre chaque semaine, le roulement s'y pose quand ses règles tombent. Trois réglages successifs avant de retrouver le fonctionnement historique du cabinet.
 
-- ⏳ **Étape 6 / MOD-2 — EN COURS.** Arbitrée le 03/08/2026, MOD2-A et MOD2-B livrées le 06/08/2026.
+- ⏳ **Étape 6 / MOD-2 — EN COURS.** Arbitrée le 03/08/2026, MOD2-A à MOD2-C livrées le 06/08/2026.
+  - ✓ **MOD2-C — FAITE (06/08/2026)** — **L'écran « Journal » existe**, onglet coordination, en lecture seule. Script `docs/sql/22-MOD2C-1-agenda-lecture-journal.sql` + `components/ActivityLogView.tsx` + `lib/activityLabels.ts`. Testé : **14 contrôles au vert** (`22-MOD2C-2-test-lecture-journal.py`).
+    - **Deux fonctions de lecture, en `security invoker`** — c'est **l'inverse des portes d'écriture**. Celles-ci doivent contourner la RLS pour agir ; une fonction de **lecture** doit s'y soumettre, sinon elle devient une fuite. Une lecture en `security definer` serait exactement le défaut trouvé en 6G. Vérifié en réel : un médecin qui appelle `journal_activite` reçoit une **liste vide**, pas une erreur et surtout pas les données.
+    - **Projection compacte** : une entrée de 61 gardes pèse plusieurs dizaines de kilo-octets en lignes complètes, l'écran n'a besoin que de six champs. `journal_extrait()` réduit les payloads à un objet **indexé par identifiant** — l'appariement avant/après se fait donc par identifiant, jamais par position.
+    - ⚠ **Défaut latent de MOD2-A corrigé au passage** : `journaliser()` agrégeait `rows_before` et `rows_after` par deux requêtes distinctes, **sans ordre garanti** — rien n'assurait que la 3ᵉ ligne de l'une corresponde à la 3ᵉ de l'autre. Sans effet visible aujourd'hui, mais MOD2-D restaurera en comparant l'état attendu à l'état courant : un appariement par position y aurait été faux, et faux **silencieusement**. Les deux agrégats sont désormais ordonnés par identifiant.
+    - **La mise en mots vit dans `lib/activityLabels.ts`, pas en base.** Le journal stocke des faits ; une phrase figée en base ne se corrigerait qu'avec une migration et dupliquerait la logique métier en SQL.
+    - **Regroupement par transaction, sans deviner** : les entrées d'un même `txid` sont présentées ensemble et **toutes affichées**. Aucune heuristique pour désigner « l'action principale » — l'ordre des écritures d'une transaction ne reflète pas l'intention (constaté : pour une demande de garde la cascade précède l'action d'origine, pour une suppression c'est l'inverse).
+    - **L'écran nomme le défaut trouvé le matin même** : quand une écriture n'a changé aucune valeur, il l'écrit — « a réécrit 45 gardes sans rien y changer ». C'était le but du journal.
   - ✓ **MOD2-B — FAITE (06/08/2026)** — **Supprimer n'efface plus.** Script `docs/sql/22-MOD2B-1-agenda-suppression-douce.sql` : colonne `deleted_at` sur `shifts` et `fixed_duty_series`, contrainte `unique_shift` convertie en **index unique partiel** (`where deleted_at is null`), policies RLS refondues, **suppression réelle fermée à tout le monde** (policies `DELETE` supprimées + `revoke delete`), et quatre points de suppression du code convertis. Testé : **18 contrôles au vert** (`22-MOD2B-2-test-suppression-douce.py`).
     - ⚠ **Le piège qui a fait changer la conception, trouvé en testant et non en relisant** : **PostgreSQL applique la policy de LECTURE à la ligne d'APRÈS lors d'un `UPDATE`** — une ligne ne peut pas sortir de sa propre visibilité (protection délibérée du moteur : sans elle, on pourrait faire disparaître une ligne de la vue d'autrui à volonté). Or la policy de lecture masque justement les gardes supprimées : **elle interdisait donc de les supprimer**. Le message d'erreur (`new row violates row-level security policy`) désigne le `WITH CHECK`, ce qui envoie sur une fausse piste — le `WITH CHECK` était correct. Isolé en neutralisant la policy de lecture : la suppression passait aussitôt.
     - **Conséquence — deux nouvelles portes** : `agenda.supprimer_gardes(uuid[])` et `agenda.supprimer_serie(uuid)` en `security definer`, qui contournent la RLS par construction. Ce sont la **quatrième et la cinquième** portes du module, après les trois du roulement. L'alternative — montrer les gardes supprimées au coordinateur et filtrer dans les ~40 requêtes — annulait tout l'intérêt du filtrage par policy.
@@ -1856,10 +1863,11 @@ second mécanisme de mémorisation, puis à le jeter.
     qu'on touche à une seule requête.
   - À vérifier dans la foulée : interaction avec le déclencheur métier
     `update_shift_status` et avec le `on delete cascade` de `requests`.
-- **MOD2-C — L'écran « Journal d'activité ».** Nouvel onglet coordination, entrées
-  groupées par jour, filtre par type d'action. **Lecture seule à ce stade** — on
-  regarde le journal vivre avant de lui donner des boutons. Consulter le skill
-  `design-system-omnes` avant de dessiner l'écran.
+- **MOD2-C — L'écran « Journal d'activité ».** ✓ FAITE. Onglet coordination,
+  entrées groupées par jour puis par transaction, filtre par nature d'action,
+  détail dépliable, pagination vers le passé. **Lecture seule** — on regarde le
+  journal vivre avant de lui donner des boutons. Détail dans le suivi
+  d'avancement.
 - **MOD2-D — Le garde-fou et la restauration.** Fonction `security definer`
   `agenda.restaurer_action(log_id)` — la **quatrième porte** du module, dans la
   lignée des trois de MOD-1. Elle compare l'état actuel à l'état attendu ; en cas
@@ -1883,6 +1891,38 @@ second mécanisme de mémorisation, puis à le jeter.
 versionnés + trois portes en `security definer`) ; son historique est acquis
 autrement. MOD2-A pose quand même un déclencheur sur `rotation_plans`, pour que le
 journal raconte une histoire complète.
+
+##### ⚠ La première prise du journal — « annuler l'assignation » sur une série (06/08/2026)
+
+Relevé **le jour même de la mise en service du journal**, en relisant les traces
+des tests de Matthieu. Aucune relecture de code ne l'avait vu depuis l'étape 4.
+
+`handleCancelAssignment('series')` (`useShiftDetail.ts`) fait un
+`.eq('series_id', …)` **sans filtre de statut ni de date** : trois actions du
+06/08 à 15:15–15:16 ont chacune **réécrit 45 gardes pour en libérer une ou deux**.
+Les 43-44 autres passent de `free` à `free` — sans effet visible, mais réécrites.
+
+**C'est la même famille que l'incident du 29/07** : un filtre plus large que
+l'intention. Le correctif de l'époque (`findRotationSlotShifts`) n'a couvert que
+le cas `'rotation'` ; le cas `'series'` est resté tel quel.
+
+Deux nuances, relevées dans les données et pas supposées : la série testée était
+**entièrement dans le futur** (07/09 → 06/11/2026), donc rien du passé n'a été
+touché ; et libérer une garde déjà libre ne change rien fonctionnellement. Les
+dégâts réels sont ailleurs :
+- **rien ne borne la requête au présent**, contrairement à celle du roulement
+  corrigée le 03/08 — une série à cheval sur aujourd'hui réécrirait le passé ;
+- **l'`updated_at` de 44 gardes non concernées est écrasé**, ce qui détruit
+  précisément le signal qui avait permis de reconstituer l'incident du 29/07.
+
+**Trou de couverture associé** : ni `'series'` ni `'rotation'` n'enregistrent
+d'action annulable — seul `'single'` le fait. Ces actions à 45 gardes n'étaient
+donc annulables par rien.
+
+**À arbitrer avec Matthieu avant correction** (question fonctionnelle, pas
+technique) : « annuler l'assignation de la série » doit-il libérer **toutes** les
+gardes de la série, ou **seulement celles attribuées au même médecin** — ce que le
+libellé laisse entendre ? Reporté après MOD2-C à sa demande (06/08).
 
 **Rappel de méthode, hérité de MOD-1** : tester par le **chemin du navigateur**
 (jeton JWT signé, appel PostgREST avec `Content-Profile: agenda`), jamais par

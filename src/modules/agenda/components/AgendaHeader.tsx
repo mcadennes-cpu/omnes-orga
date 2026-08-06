@@ -5,6 +5,7 @@ import {
   CalendarDays,
   ChevronLeft,
   ClipboardList,
+  History,
   Settings,
   Stethoscope,
 } from 'lucide-react';
@@ -18,7 +19,13 @@ import { Profile, UserRole } from '../lib/supabase';
 // sur mobile. Version fonctionnelle minimale — la refonte visuelle des
 // vues elles-mêmes est l'objet de l'étape 4.
 
-export type AgendaView = 'calendar' | 'schedule' | 'daily-schedule' | 'requests' | 'settings';
+export type AgendaView =
+  | 'calendar'
+  | 'schedule'
+  | 'daily-schedule'
+  | 'requests'
+  | 'activity'
+  | 'settings';
 
 type Tab = {
   view: AgendaView;
@@ -32,6 +39,7 @@ const TABS: Tab[] = [
   { view: 'schedule', label: 'Mes gardes', icon: CalendarCheck, roles: ['doctor'] },
   { view: 'daily-schedule', label: 'Planning du jour', icon: CalendarDays, roles: ['doctor'] },
   { view: 'requests', label: 'Demandes', icon: ClipboardList, roles: ['coordinator'] },
+  { view: 'activity', label: 'Journal', icon: History, roles: ['coordinator'] },
   { view: 'settings', label: 'Paramètres', icon: Settings, roles: ['coordinator'] },
 ];
 
