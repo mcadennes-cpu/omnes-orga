@@ -120,6 +120,38 @@ async function findRotationSlotShifts(shift: Shift): Promise<{
   return { weekday, rotationWeek, shiftIds };
 }
 
+// Les gardes qu'« annuler l'assignation de la série » doit libérer.
+//
+// Arbitré avec Matthieu le 06/08/2026, après que le journal d'activité eut
+// montré, dès son premier jour, que l'action réécrivait TOUTE la série — tous
+// médecins et toutes dates confondus — pour libérer une seule garde.
+//
+// Deux bornes, alignées sur le correctif du 03/08 pour le roulement :
+//   * le MÊME MÉDECIN que la garde ouverte. On part de la garde du Dr X, on
+//     libère les siennes ; sur la série WE1 Dijon, l'ancien comportement
+//     déshabillait les neuf médecins d'un clic.
+//   * à partir d'AUJOURD'HUI. On ne dé-assigne pas une garde déjà effectuée :
+//     le planning passé est un historique, pas un état modifiable.
+//
+// Renvoie une liste d'identifiants explicite plutôt qu'un filtre ouvert —
+// la leçon de l'incident du 29/07, où un filtre trop large avait libéré
+// 100 gardes d'un seul clic.
+async function findSeriesShiftsToFree(shift: Shift): Promise<string[]> {
+  if (!shift.series_id || !shift.assigned_doctor_id) return [];
+
+  const aujourdhui = new Date().toISOString().slice(0, 10);
+
+  const { data, error } = await supabase
+    .from('shifts')
+    .select('id')
+    .eq('series_id', shift.series_id)
+    .eq('assigned_doctor_id', shift.assigned_doctor_id)
+    .gte('date', aujourdhui);
+
+  if (error) throw error;
+  return (data ?? []).map((candidate) => candidate.id);
+}
+
 export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () => void) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -139,6 +171,7 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
   // Nombre de gardes futures qui seront liberees par "Supprimer la regle de
   // roulement" (compte a titre d'avertissement, calcule a l'ouverture de la modale).
   const [rotationCancelCount, setRotationCancelCount] = useState<number | null>(null);
+  const [seriesCancelCount, setSeriesCancelCount] = useState<number | null>(null);
 
   const isPartOfSeries = !!shift.series_id;
 
@@ -432,16 +465,22 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
 
   const handleCancelAssignmentClick = async () => {
     if (isPartOfSeries || hasRotationRule) {
+      // Avant d'ouvrir la modale, compter ce que l'action large libererait,
+      // pour l'afficher en garde-fou. On passe par le MEME helper que l'action
+      // elle-meme : le compteur annonce donc exactement ce qui sera libere,
+      // sans risque de divergence entre l'annonce et le geste.
       if (hasRotationRule) {
-        // Avant d'ouvrir la modale, compter les gardes que "Supprimer la regle
-        // de roulement" libererait, pour l'afficher en garde-fou. On passe par
-        // le meme helper que l'action elle-meme : le compteur annonce donc
-        // exactement ce qui sera libere, sans risque de divergence.
         try {
           const { shiftIds } = await findRotationSlotShifts(shift);
           setRotationCancelCount(shiftIds.length);
         } catch {
           setRotationCancelCount(null);
+        }
+      } else if (isPartOfSeries) {
+        try {
+          setSeriesCancelCount((await findSeriesShiftsToFree(shift)).length);
+        } catch {
+          setSeriesCancelCount(null);
         }
       }
       setShowCancelAssignmentModal(true);
@@ -490,16 +529,22 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
           `${shiftIds.length} garde${shiftIds.length > 1 ? 's' : ''} future${shiftIds.length > 1 ? 's' : ''} libérée${shiftIds.length > 1 ? 's' : ''}. Le roulement, lui, n'est pas modifié : une garde recréée sur cette case retrouvera le même médecin.`
         );
       } else if (scope === 'series' && shift.series_id) {
-        const { error: updateError } = await supabase
-          .from('shifts')
-          .update({
-            status: 'free',
-            assigned_doctor_id: null,
-            updated_at: new Date().toISOString()
-          })
-          .eq('series_id', shift.series_id);
+        // Voir findSeriesShiftsToFree : même médecin, à partir d'aujourd'hui,
+        // et écriture sur une liste d'identifiants explicite.
+        const shiftIds = await findSeriesShiftsToFree(shift);
 
-        if (updateError) throw updateError;
+        if (shiftIds.length > 0) {
+          const { error: updateError } = await supabase
+            .from('shifts')
+            .update({
+              status: 'free',
+              assigned_doctor_id: null,
+              updated_at: new Date().toISOString()
+            })
+            .in('id', shiftIds);
+
+          if (updateError) throw updateError;
+        }
       } else {
         const { error: updateError } = await supabase
           .from('shifts')
@@ -641,6 +686,7 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
     rotationInfo,
     hasRotationRule,
     rotationCancelCount,
+    seriesCancelCount,
     pendingRequests,
     isPartOfSeries,
     // flags des modales

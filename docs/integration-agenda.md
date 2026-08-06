@@ -1919,10 +1919,28 @@ dégâts réels sont ailleurs :
 d'action annulable — seul `'single'` le fait. Ces actions à 45 gardes n'étaient
 donc annulables par rien.
 
-**À arbitrer avec Matthieu avant correction** (question fonctionnelle, pas
-technique) : « annuler l'assignation de la série » doit-il libérer **toutes** les
-gardes de la série, ou **seulement celles attribuées au même médecin** — ce que le
-libellé laisse entendre ? Reporté après MOD2-C à sa demande (06/08).
+**✓ Arbitré et corrigé le 06/08/2026.** Matthieu retient : **le même médecin, et
+borné à aujourd'hui** — l'arbitrage déjà rendu le 03/08 pour le roulement.
+`findSeriesShiftsToFree()` filtre sur `series_id` + `assigned_doctor_id` +
+`date >= aujourd'hui`, et l'écriture porte sur une **liste d'identifiants
+explicite** plutôt qu'un filtre ouvert (leçon du 29/07). La modale annonce
+désormais le compte exact, calculé **par le même helper que l'action** — pas de
+divergence possible entre ce qui est annoncé et ce qui est fait.
+
+**Mesure sur les données réelles**, série « WE1 Dijon » (la plus exposée :
+31 gardes, 9 médecins) — depuis la garde du Dr Thomas ETIENNE :
+
+| | Avant | Après |
+|---|---:|---:|
+| Gardes libérées | 31 | **4** |
+| Médecins touchés | 9 | **1** |
+
+Les gardes déjà passées ne sont plus jamais touchées. **Le déclencheur** :
+ouvrir une garde appartenant à une série fixe (et **non** au roulement, qui a son
+propre chemin) → « Annuler l'assignation » → « Annuler toute la série ».
+
+**Reste ouvert** : ce chemin n'enregistre toujours aucune action annulable. Volontaire
+— `undo_buffer` meurt en MOD2-E, câbler l'ancien mécanisme serait du travail à jeter.
 
 **Rappel de méthode, hérité de MOD-1** : tester par le **chemin du navigateur**
 (jeton JWT signé, appel PostgREST avec `Content-Profile: agenda`), jamais par

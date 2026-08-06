@@ -3,6 +3,8 @@ import BottomSheet from '../ui/BottomSheet';
 type CancelAssignmentModalProps = {
   hasRotationRule: boolean;
   rotationCancelCount?: number | null;
+  seriesCancelCount?: number | null;
+  doctorName?: string | null;
   isPartOfSeries: boolean;
   loading: boolean;
   onSingle: () => void;
@@ -16,6 +18,8 @@ type CancelAssignmentModalProps = {
 export default function CancelAssignmentModal({
   hasRotationRule,
   rotationCancelCount,
+  seriesCancelCount,
+  doctorName,
   isPartOfSeries,
   loading,
   onSingle,
@@ -23,9 +27,11 @@ export default function CancelAssignmentModal({
   onRotation,
   onClose,
 }: CancelAssignmentModalProps) {
+  const gardes = (n: number) => `${n} garde${n > 1 ? 's' : ''}`;
+
   const countLabel =
     rotationCancelCount != null
-      ? `${rotationCancelCount} garde${rotationCancelCount > 1 ? 's' : ''} future${rotationCancelCount > 1 ? 's' : ''}`
+      ? `${gardes(rotationCancelCount)} future${rotationCancelCount > 1 ? 's' : ''}`
       : null;
 
   return (
@@ -35,6 +41,15 @@ export default function CancelAssignmentModal({
           ? "Cette assignation vient du roulement. Que souhaitez-vous faire ?"
           : "Souhaitez-vous annuler l'assignation uniquement pour cette date, ou pour toute la série ?"}
       </p>
+
+      {!hasRotationRule && isPartOfSeries && seriesCancelCount != null && (
+        <div className="mb-4 rounded-input border border-brique/20 bg-brique/10 px-4 py-3 text-body-m text-brique">
+          « Annuler toute la série » libérera <strong>{gardes(seriesCancelCount)}</strong>
+          {doctorName ? <> attribuées à <strong>{doctorName}</strong></> : null}, à partir
+          d'aujourd'hui. Les gardes des autres médecins et les gardes déjà passées ne sont
+          pas touchées.
+        </div>
+      )}
 
       {hasRotationRule && countLabel && (
         <div className="mb-4 rounded-input border border-brique/20 bg-brique/10 px-4 py-3 text-body-m text-brique">

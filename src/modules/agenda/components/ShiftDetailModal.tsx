@@ -42,6 +42,7 @@ export default function ShiftDetailModal({ shift, onClose, onSuccess, readOnlyMo
     showEditSeriesModal,
     showValidatedConfirm,
     showCancelAssignmentModal,
+    seriesCancelCount,
     showApplyToRotationWeekConfirm,
     showDeletionBlockedModal,
     showConflictError,
@@ -229,6 +230,8 @@ export default function ShiftDetailModal({ shift, onClose, onSuccess, readOnlyMo
         <CancelAssignmentModal
           hasRotationRule={hasRotationRule}
           rotationCancelCount={rotationCancelCount}
+          seriesCancelCount={seriesCancelCount}
+          doctorName={shift.assigned_doctor?.full_name ?? null}
           isPartOfSeries={isPartOfSeries}
           loading={loading}
           onSingle={() => handleCancelAssignment('single')}
