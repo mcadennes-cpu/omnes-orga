@@ -225,6 +225,8 @@ ALTER TABLE profiles ADD COLUMN agenda_beta_access boolean DEFAULT false;
   - **Le V2 est en base et en vigueur au 04/01/2027** : V1 fermé au 03/01/2027 (266 règles), V2 actif à partir du 04/01 (264 règles). Différentiel mesuré entre les deux : **93 changements**.
   - **Ce que les allers-retours avec Matthieu ont corrigé**, et qu'aucune relecture de code n'aurait trouvé : le trou fonctionnel des **jours fériés** (18 gardes de week-end en semaine, toutes sur un férié), la **contamination par le V1** dans les requêtes « cette case est-elle au roulement ? » (deux plans actifs coexistent depuis 6F), et surtout le **modèle d'ouverture** lui-même — l'offre ouvre chaque semaine, le roulement s'y pose quand ses règles tombent. Trois réglages successifs avant de retrouver le fonctionnement historique du cabinet.
 
+- ⏳ **Étape 6 / MOD-2 — ARBITRÉE le 03/08/2026, code non commencé.** Matthieu retient la **piste C (hybride)** : bandeau éphémère pour le geste immédiat, journal d'activité pour la traçabilité et la restauration encadrée, journalisation exhaustive, **suppression douce** (`deleted_at`) sur les gardes. L'audit du code préalable à l'arbitrage a corrigé la doc sur un point important : le bouton « Annuler » couvre en réalité **2 actions et non 6** — les 4 autres types sont du code mort, déjà dans l'appli Bolt. Découpage **2A → 2G** dans la section MOD-2 plus bas ; le journal se construit avant le bandeau, qui s'y adosse.
+
 - ⏳ **Étape 7 — EN COURS (à partir du 30/07/2026)** — Migration vers la base Omnès-Orga, réalisée **avant** l'étape 6 (justification dans l'encadré du plan ci-dessus). Le suivi détaillé de cette étape vit dans un document dédié : **`docs/migration-agenda-etape7.md`** (inventaire du schéma réel, écarts relevés, décisions d'architecture, découpage 7A → 7F).
   - ✓ **7F — FAITE (31/07/2026)** — **Script de resynchronisation** `docs/sql/22-7F-resynchronisation-agenda.py` : recopie complète (plus sûre qu'un différentiel à ce volume), simulation par défaut, `--go` pour exécuter. Garde-fous : refuse de tourner si un profil créé dans Bolt manque au mapping (ses gardes arriveraient sans médecin) ou si l'historique Planning est incohérent. Testé en réel : 5 669 lignes réimportées, écarts avec Planning **exactement égaux aux exclusions volontaires** — aucune dérive. **Ne plus exécuter après la bascule.** Sert aussi à rafraîchir la copie de travail à la demande.
   - ✓ **7E — FAITE (31/07/2026)** — **Le module lit désormais la base Omnès-Orga.** Schéma `agenda` exposé dans l'API (redémarrage PostgREST effectué, appli principale vérifiée intacte, `anon` refusé sur le schéma). Client unique scopé via `.schema('agenda')` : les ~40 fichiers du module sont inchangés. **Écran de liaison, session Planning et variables `VITE_AGENDA_*` supprimés** — l'utilisateur connecté à Omnès-Orga est l'utilisateur de l'agenda, avec le rôle déduit de `is_agenda_coordinator`. **Les vraies photos des médecins s'affichent** (9 des 33 médecins du planning en ont une). Découverte : le temps réel n'a **jamais** fonctionné, dans aucune des deux applis — corrigé côté code, activation proposée en étape 8.
@@ -1692,7 +1694,39 @@ le parseur des deux formats existait déjà et était éprouvé. Détail en 6E-1
 
 #### Le système actuel
 
-Table `undo_buffer` avec **`UNIQUE(user_id)`** : une seule action mémorisée par utilisateur, écrasée à chaque nouvelle action (`upsert`). Réservée au coordinateur. Couvre 6 types d'actions (`assign_shift`, `unassign_shift`, `validate_request`, `bulk_shift_create`, `bulk_shift_delete`, `delete_shift`). Le bouton interroge la base **toutes les 2 secondes** et utilise `alert()` pour les retours.
+Table `undo_buffer` avec **`UNIQUE(user_id)`** : une seule action mémorisée par utilisateur, écrasée à chaque nouvelle action (`upsert`). Réservée au coordinateur. Le bouton interroge la base **toutes les 2 secondes** et utilise `alert()` pour les retours.
+
+> **⚠ Correction apportée par l'audit du code (03/08/2026) : la couverture réelle
+> est de 2 actions, pas de 6.**
+>
+> `undoUtils.ts` sait *rejouer* 6 types d'actions (`assign_shift`,
+> `unassign_shift`, `validate_request`, `bulk_shift_create`,
+> `bulk_shift_delete`, `delete_shift`), mais seuls **deux** endroits du code
+> écrivent dans le tampon :
+>
+> | Action | Enregistrée ? | Où |
+> |---|---|---|
+> | Annulation d'assignation (garde seule) | oui | `hooks/useShiftDetail.ts:520` |
+> | Duplication d'un modèle de semaine | oui | `lib/weekTemplateUtils.ts:252` |
+> | Assignation d'un médecin | **non** | — |
+> | Validation d'une demande | **non** | — |
+> | Suppression d'une garde ou d'une série | **non** | — |
+> | Suppression en masse | **non** | — |
+>
+> Les quatre derniers types sont du **code mort** : la fonction de rejeu existe,
+> rien ne la nourrit. Vérifié dans `reference-agenda/` — **c'était déjà le cas
+> dans l'appli Bolt**, ce n'est donc pas une régression du portage mais une
+> couche jamais branchée (signature de l'empilement de prompts).
+>
+> **Conséquence** : les actions les plus lourdes ne sont pas annulables du tout,
+> y compris « appliquer au roulement » — celle qui a libéré 100 gardes d'un seul
+> clic le 29/07. Le problème n°4 ci-dessous (« couverture partielle ») est donc à
+> lire comme *couverture quasi nulle sur ce qui compte*.
+>
+> **Autre relevé** : `handleDelete` (`useShiftDetail.ts:402`) fait un vrai
+> `DELETE` et n'enregistre rien. Seul garde-fou : la suppression est refusée si la
+> garde est `assigned` ou `pending`. Supprimer une série de gardes libres est
+> définitif, ligne `fixed_duty_series` comprise.
 
 #### Les problèmes
 
@@ -1703,7 +1737,21 @@ Table `undo_buffer` avec **`UNIQUE(user_id)`** : une seule action mémorisée pa
 5. **UX datée** : `alert()` bloquant, mauvaise expérience sur mobile, sondage réseau permanent.
 6. **Ambiguïté du mot « Annuler »** : dans cette appli, il désigne à la fois l'annulation d'une garde, l'annulation d'une demande, et l'annulation d'une action. À clarifier dans le vocabulaire de l'interface.
 
-#### Trois pistes à arbitrer
+#### Trois pistes — arbitrées le 03/08/2026
+
+> **Décision de Matthieu (03/08/2026) : piste C — l'hybride.** Avec deux
+> précisions prises dans le même arbitrage :
+> - **Périmètre** : *journaliser tout, ne proposer « Restaurer » que lorsque
+>   c'est sûr.* Le journal enregistre l'ensemble des actions du coordinateur ; le
+>   bouton de restauration n'apparaît que sur les entrées encore réversibles,
+>   l'état actuel étant comparé à l'état attendu.
+> - **Suppression douce retenue** : colonne `deleted_at` sur les gardes plutôt
+>   que suppression réelle avec copie dans le journal. Motif : une réinsertion
+>   après `DELETE` recrée un identifiant neuf et casse les liens (demandes,
+>   série) — c'est exactement ce qui a rendu la réparation du 29/07 partielle.
+>
+> Les trois pistes restent décrites ci-dessous : elles gardent la trace du
+> raisonnement, et les limites de A et de B expliquent la forme de C.
 
 **Piste A — Le bandeau éphémère (modèle Gmail).**
 Après chaque action, un bandeau apparaît en bas de l'écran : « 12 gardes créées — Annuler », avec un compte à rebours de 10 à 15 secondes, puis il disparaît. Plus de bouton permanent.
@@ -1723,6 +1771,95 @@ Bandeau éphémère pour l'annulation immédiate (couvre la grande majorité des
 
 Autres améliorations à prévoir quelle que soit la piste retenue : remplacer `alert()` par les notifications de l'appli principale, supprimer le sondage toutes les 2 secondes (l'état d'annulation vit côté client, ou via le temps réel Supabase), et raccourci clavier Ctrl/Cmd+Z sur les écrans coordinateur (usage desktop).
 
+#### Deux contraintes techniques relevées avant le découpage (03/08/2026)
+
+**1. La contrainte `unique_shift` interdit la suppression douce en l'état.**
+`agenda.shifts` porte `constraint unique_shift unique (date, location, room,
+shift_type)` (`22-7C-1`, jamais modifiée depuis). Avec un `deleted_at`, une garde
+supprimée **continue d'occuper son créneau** : le coordinateur ne pourrait plus en
+recréer une au même endroit le même jour. Il faut donc remplacer la contrainte par
+un **index unique partiel** `where deleted_at is null`. Point non évident, à
+traiter dans la même migration que la colonne, sans quoi le bug n'apparaîtrait
+qu'au premier « je supprime puis je recrée » en usage réel.
+
+**2. L'appli principale n'a aucun système de message à l'écran.**
+`src/lib/notify.js` envoie des notifications **push** (Firebase, via l'Edge
+Function `send-notification`) — ce n'est pas un afficheur de messages in-app. Il
+n'existe donc rien à réutiliser pour remplacer les `alert()`. En revanche le
+**bandeau éphémère de la piste C est lui-même un afficheur de messages** : une
+fois construit, il sert aussi bien aux retours de succès et d'erreur. Les
+`confirm()`, eux, ont déjà leur remplaçant : `BottomSheet` dans le module,
+`ConfirmModal` dans l'appli principale.
+
+#### MOD-2 — découpage en sous-étapes (arrêté le 03/08/2026)
+
+**Le journal d'abord, le bandeau ensuite.** L'ordre n'est pas neutre : le bandeau
+« Annuler » a besoin de quelque chose à annuler. S'il s'appuie sur la dernière
+entrée du journal et sur la fonction de restauration, il devient presque gratuit
+une fois 2D livrée — alors que l'écrire en premier obligerait à inventer un
+second mécanisme de mémorisation, puis à le jeter.
+
+- **2A — Le journal en base.** Table `agenda.activity_log` (qui, quoi, quand,
+  lignes touchées, état avant / après) alimentée par des **déclencheurs**
+  sur `shifts`, `requests`, `fixed_duty_series` et `rotation_plans`.
+  - *Pourquoi un déclencheur et non un appel applicatif* : l'appel applicatif est
+    exactement ce qui a échoué avec `undo_buffer` — 4 des 6 types n'ont jamais
+    été câblés, et personne ne s'en est aperçu pendant des mois. Un déclencheur
+    ne s'oublie pas, et il capture même les écritures faites hors module
+    (scripts SQL, resynchronisation 7F).
+  - *Pourquoi des déclencheurs **par instruction** (`for each statement` +
+    `referencing new table`) et non par ligne* : côté supabase-js, une action de
+    l'utilisateur est une instruction SQL unique (`.insert([12 lignes])` est une
+    seule instruction). Un déclencheur par instruction produit donc **une** entrée
+    de journal pour les 12 gardes, au lieu de 12 entrées illisibles. Le
+    regroupement par action est obtenu sans variable de session — impossible via
+    PostgREST, où chaque appel est sa propre transaction.
+  - RLS : lecture réservée au coordinateur, **aucune policy d'écriture** pour
+    `authenticated` — seul le déclencheur écrit.
+- **2B — Suppression douce.** `deleted_at` sur `shifts` et `fixed_duty_series`,
+  contrainte `unique_shift` convertie en index partiel (voir ci-dessus),
+  `handleDelete` passe du `DELETE` à un `UPDATE`.
+  - *Pourquoi filtrer par policy RLS et non par `.is('deleted_at', null)`* : le
+    filtre applicatif demanderait de modifier ~40 requêtes réparties dans le
+    module, avec la certitude d'en oublier. Exprimé une fois dans la policy de
+    lecture, le module ne voit tout simplement plus les lignes supprimées, sans
+    qu'on touche à une seule requête.
+  - À vérifier dans la foulée : interaction avec le déclencheur métier
+    `update_shift_status` et avec le `on delete cascade` de `requests`.
+- **2C — L'écran « Journal d'activité ».** Nouvel onglet coordination, entrées
+  groupées par jour, filtre par type d'action. **Lecture seule à ce stade** — on
+  regarde le journal vivre avant de lui donner des boutons. Consulter le skill
+  `design-system-omnes` avant de dessiner l'écran.
+- **2D — Le garde-fou et la restauration.** Fonction `security definer`
+  `agenda.restaurer_action(log_id)` — la **quatrième porte** du module, dans la
+  lignée des trois de MOD-1. Elle compare l'état actuel à l'état attendu ; en cas
+  d'écart, elle refuse ou avertit explicitement, **jamais d'écrasement
+  silencieux**. Elle marque l'entrée `undone_at` / `undone_by` pour interdire la
+  double annulation. Le bouton « Restaurer » n'apparaît que sur les entrées que la
+  fonction accepterait.
+- **2E — Le bandeau éphémère.** Composant `ActionToast` + contexte React monté
+  dans le shell du module, adossé au journal et à `restaurer_action`. Livre aussi
+  l'afficheur de messages qui manque à l'appli. **Suppression de `UndoButton`, de
+  `undoUtils.ts` et de la table `undo_buffer`** : fin du sondage toutes les
+  2 secondes.
+- **2F — Vocabulaire et fin des `alert()` / `confirm()`.** Lever l'ambiguïté du
+  mot « Annuler » (problème n°6) : « Annuler » réservé à *défaire une action*,
+  « Libérer la garde » et « Retirer sa demande » pour le reste. Les 20 `alert()` /
+  `confirm()` restants (8 fichiers) passent au bandeau ou à `BottomSheet`.
+- **2G — Raccourci Ctrl/Cmd+Z** sur les écrans coordinateur. Optionnel, à
+  reconfirmer une fois 2E en main.
+
+**Hors périmètre** : le roulement lui-même est déjà protégé par MOD-1 (plans
+versionnés + trois portes en `security definer`) ; son historique est acquis
+autrement. 2A pose quand même un déclencheur sur `rotation_plans`, pour que le
+journal raconte une histoire complète.
+
+**Rappel de méthode, hérité de MOD-1** : tester par le **chemin du navigateur**
+(jeton JWT signé, appel PostgREST avec `Content-Profile: agenda`), jamais par
+l'API d'administration — une fonction `security definer` testée en rôle
+`postgres` n'est pas testée. Et vérifier les imports à la main à chaque hook
+ajouté : `npm run build` ne les contrôle pas.
+
 ---
 
 ## Éléments à fournir avant l'étape 6
@@ -1733,7 +1870,7 @@ Autres améliorations à prévoir quelle que soit la piste retenue : remplacer `
 - [x] ~~**⚠️ Date réelle de démarrage du roulement V2**~~ — **tranché par Matthieu le 01/08/2026**. Le V2 entre en vigueur le **lundi 04/01/2027**, et cette semaine-là est numérotée **S6** pour ne pas rompre l'ordre habituel (la semaine du 28/12/2026 est S5 dans le roulement en cours). Il en découle **`start_date` = lundi 30/11/2026** (04/01/2027 − 5 semaines) et `effective_from` = 04/01/2027. Détail et vérification dans « Décisions du 01/08/2026 » ci-dessous.
 - [x] ~~**Emails des 9 associés** dans Omnès-Orga, pour relier les initiales aux comptes~~ — établi le 30/07/2026 en 7B-1, et mieux : **la correspondance initiales → comptes est résolue** (`MY` Mireille YUAN, `TE` Thomas ETIENNE, `XB` Xavier BAUDRILLART, `AS` Airelle SAUVAGE, `CB` Christophe BERTRAND, `IEG` Imane EL GARI, `CC` Caroline CHAUVET, `LD` Laurène DAUDIN, `MC` Matthieu CADENNES). Déduite des règles de roulement présentes en base, pas d'une saisie manuelle. Détail dans `migration-agenda-etape7.md`, table de correspondance complète dans `docs/mapping-comptes-agenda.csv`.
 - [x] ~~**État des `shift_types` déjà déclarés dans l'agenda**~~ — vérifié le 30/07/2026 en 7A : **ils ne correspondent pas**. 15 créneaux déclarés, dont le nom inclut le site (`J1 Beaune`, `J2 Dijon`…), aucun `J6`, trois écarts d'horaire avec `desiderata.yaml` et des irrégularités de saisie. Détail et conséquences pour MOD-1 dans `migration-agenda-etape7.md`. **Les trois écarts d'horaire sont arbitrés** (01/08/2026) : `J5 Dijon` → la base fait foi, `J2 Beaune` → `desiderata.yaml` fait foi, `J5 bis Dijon` → désactivé. Voir « Décisions du 01/08/2026 » ci-dessous. La table de correspondance complète (code, site) → `shift_type` vit désormais dans `desiderata.yaml`, section `correspondance_agenda`.
-- [ ] Décision sur la piste d'annulation retenue (A, B ou C).
+- [x] ~~Décision sur la piste d'annulation retenue (A, B ou C).~~ — **tranché par Matthieu le 03/08/2026 : piste C (hybride)**, avec journalisation exhaustive et restauration seulement lorsque l'état le permet encore, et **suppression douce** (`deleted_at`) sur les gardes. Découpage 2A → 2G dans la section MOD-2 ci-dessus.
 - [ ] **Notifications aux médecins** (souhaité par Matthieu, *sans urgence*) — le module n'envoie **aucune** notification aujourd'hui : « les médecins sont notifiés » signifie qu'ils voient leurs gardes apparaître dans « Mes gardes ». Omnès-Orga dispose déjà de Firebase et d'un `fcm_token` par médecin : une fois la migration faite, la validation définitive du planning pourrait déclencher une vraie notification. À placer en étape 8.
 - [x] ~~Confirmation : les associés gérants ont-ils les droits coordinateur sur l'agenda ?~~ — **NON**, tranché par Matthieu le 30/07/2026. **Charlotte Franzino est la seule coordinatrice** (`is_agenda_coordinator = true` sur son compte). Caroline Chauvet, Thomas Étienne et Xavier Baudrillart restent `doctor` sur l'agenda malgré leur rôle `associe_gerant`. Le compte générique `Coordinateur Admin` de Planning, avec lequel Charlotte se connecte aujourd'hui, n'est pas migré.
 
