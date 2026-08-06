@@ -1892,6 +1892,29 @@ versionnés + trois portes en `security definer`) ; son historique est acquis
 autrement. MOD2-A pose quand même un déclencheur sur `rotation_plans`, pour que le
 journal raconte une histoire complète.
 
+##### La création de garde : message brut et séries orphelines (06/08/2026)
+
+Relevé par Matthieu en testant MOD2-B : impossible de créer une série, avec pour
+seule explication `duplicate key value violates unique constraint "unique_shift"`.
+
+**Ce n'était pas une régression.** L'index unique
+`(date, location, room, shift_type)` faisait son travail : la série créée une
+heure plus tôt occupait déjà tous les lundis de la plage demandée. MOD2-B a même
+rendu la règle **plus permissive** — une garde supprimée ne bloque plus son
+créneau. Mais le message brut de PostgreSQL n'apprend rien au coordinateur et
+laisse croire à une panne.
+
+**Un défaut plus sérieux découvert en cherchant** : la ligne `fixed_duty_series`
+était insérée **avant** les gardes, et rien ne la nettoyait si l'insertion
+échouait. **10 séries vides traînaient en base**, dont 5 datant des 26 et 29
+juillet — le défaut est antérieur à MOD-2 et s'accumulait en silence.
+
+**Corrigé** : les dates sont calculées d'abord, les conflits contrôlés ensuite,
+la série n'est créée **qu'après** ; si l'insertion échoue malgré tout (création
+concurrente), la série est supprimée en douceur via `supprimer_serie`. Le message
+nomme désormais le site, la salle, le créneau et les dates en conflit. Les
+10 orphelines ont été passées en suppression douce — traçables, invisibles.
+
 ##### ⚠ La première prise du journal — « annuler l'assignation » sur une série (06/08/2026)
 
 Relevé **le jour même de la mise en service du journal**, en relisant les traces

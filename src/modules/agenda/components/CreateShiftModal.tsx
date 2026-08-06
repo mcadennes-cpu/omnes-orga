@@ -20,6 +20,60 @@ const WEEKDAYS = [
   { value: 6, label: 'Dim', fullLabel: 'Dimanche' }
 ];
 
+const formaterJour = (iso: string) => {
+  const [a, m, j] = iso.split('-');
+  return `${j}/${m}/${a}`;
+};
+
+// ---------------------------------------------------------------------------
+// Le creneau est-il deja pris ?
+//
+// La base porte un index unique sur (date, location, room, shift_type) : deux
+// gardes ne peuvent pas coexister au meme endroit le meme jour. Sans ce
+// controle prealable, la collision ne se manifestait que par le message brut de
+// PostgreSQL — « duplicate key value violates unique constraint "unique_shift" »
+// — qui n'apprend rien au coordinateur et laisse croire a une panne.
+//
+// On interroge sur les MEMES colonnes que l'index (les libelles, pas les
+// identifiants), sur une plage de dates plutot qu'une liste : une serie de six
+// mois produirait une URL a rallonge.
+// ---------------------------------------------------------------------------
+async function trouverConflits(
+  dates: string[],
+  location: string,
+  room: string,
+  shiftType: string
+): Promise<string[]> {
+  if (dates.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('shifts')
+    .select('date')
+    .eq('location', location)
+    .eq('room', room)
+    .eq('shift_type', shiftType)
+    .gte('date', dates[0])
+    .lte('date', dates[dates.length - 1]);
+
+  if (error) throw error;
+
+  const voulues = new Set(dates);
+  return (data ?? [])
+    .map((existante) => existante.date as string)
+    .filter((jour) => voulues.has(jour))
+    .sort();
+}
+
+function messageConflit(jours: string[], site: string, salle: string, creneau: string): string {
+  const apercu = jours.slice(0, 3).map(formaterJour).join(', ');
+  const reste = jours.length > 3 ? ` et ${jours.length - 3} autre${jours.length - 3 > 1 ? 's' : ''}` : '';
+  const debut =
+    jours.length === 1
+      ? `Une garde existe déjà à ${site} / ${salle} / ${creneau} le ${apercu}.`
+      : `${jours.length} gardes existent déjà à ${site} / ${salle} / ${creneau} : ${apercu}${reste}.`;
+  return `${debut} Choisissez une autre salle, un autre créneau, ou une période qui ne recouvre pas l'existant.`;
+}
+
 // Champ date / select a la charte Omnes (focus canard).
 const fieldClass =
   'w-full rounded-input border border-border bg-carte px-4 py-3 text-body-m text-ink ' +
@@ -123,6 +177,34 @@ export default function CreateShiftModal({ coordinatorId, onClose, onSuccess }: 
           throw new Error('La date de fin doit être après la date de début');
         }
 
+        // Les dates d'abord, la série ensuite : jusqu'ici la ligne
+        // fixed_duty_series était insérée AVANT les gardes, et rien ne la
+        // nettoyait si l'insertion échouait. Dix séries vides traînaient ainsi
+        // en base, dont cinq datant de juillet.
+        const joursVises: string[] = [];
+        const currentDate = new Date(startDate);
+
+        while (currentDate <= endDate) {
+          const dayOfWeek = (currentDate.getDay() + 6) % 7;
+          if (selectedWeekdays.includes(dayOfWeek)) {
+            joursVises.push(currentDate.toISOString().split('T')[0]);
+          }
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        if (joursVises.length === 0) {
+          throw new Error('Aucune garde ne correspond aux jours sélectionnés dans la période');
+        }
+
+        const conflits = await trouverConflits(
+          joursVises, selectedSite.name, selectedRoom.name, selectedShiftType.time_range
+        );
+        if (conflits.length > 0) {
+          throw new Error(
+            messageConflit(conflits, selectedSite.name, selectedRoom.name, selectedShiftType.name)
+          );
+        }
+
         const { data: seriesData, error: seriesError } = await supabase
           .from('fixed_duty_series')
           .insert({
@@ -138,34 +220,19 @@ export default function CreateShiftModal({ coordinatorId, onClose, onSuccess }: 
 
         if (seriesError) throw seriesError;
 
-        const shiftsToCreate = [];
-        let currentDate = new Date(startDate);
-
-        while (currentDate <= endDate) {
-          const dayOfWeek = (currentDate.getDay() + 6) % 7;
-
-          if (selectedWeekdays.includes(dayOfWeek)) {
-            shiftsToCreate.push({
-              date: currentDate.toISOString().split('T')[0],
-              location: selectedSite.name,
-              room: selectedRoom.name,
-              shift_type: selectedShiftType.time_range,
-              site_id: selectedSiteId,
-              room_id: selectedRoomId,
-              shift_type_id: selectedShiftTypeId,
-              status: 'free',
-              created_by: coordinatorId,
-              series_id: seriesData.id,
-              series_instance_date: currentDate.toISOString().split('T')[0]
-            });
-          }
-
-          currentDate.setDate(currentDate.getDate() + 1);
-        }
-
-        if (shiftsToCreate.length === 0) {
-          throw new Error('Aucune garde ne correspond aux jours sélectionnés dans la période');
-        }
+        const shiftsToCreate = joursVises.map((jour) => ({
+          date: jour,
+          location: selectedSite.name,
+          room: selectedRoom.name,
+          shift_type: selectedShiftType.time_range,
+          site_id: selectedSiteId,
+          room_id: selectedRoomId,
+          shift_type_id: selectedShiftTypeId,
+          status: 'free',
+          created_by: coordinatorId,
+          series_id: seriesData.id,
+          series_instance_date: jour
+        }));
 
         const shiftsWithRules = await applyRotationRulesToShifts(shiftsToCreate);
 
@@ -173,9 +240,25 @@ export default function CreateShiftModal({ coordinatorId, onClose, onSuccess }: 
           .from('shifts')
           .insert(shiftsWithRules);
 
-        if (insertError) throw insertError;
+        if (insertError) {
+          // Filet de sécurité : le contrôle préalable a laissé passer quelque
+          // chose (création concurrente, autre contrainte). On ne laisse pas
+          // la série vide derrière nous. La suppression réelle étant fermée
+          // depuis MOD2-B, on passe par la porte.
+          await supabase.rpc('supprimer_serie', { p_series_id: seriesData.id });
+          throw insertError;
+        }
 
       } else {
+        const conflits = await trouverConflits(
+          [date], selectedSite.name, selectedRoom.name, selectedShiftType.time_range
+        );
+        if (conflits.length > 0) {
+          throw new Error(
+            messageConflit(conflits, selectedSite.name, selectedRoom.name, selectedShiftType.name)
+          );
+        }
+
         const singleShift = {
           date,
           location: selectedSite.name,
@@ -200,7 +283,15 @@ export default function CreateShiftModal({ coordinatorId, onClose, onSuccess }: 
       onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.message);
+      // Dernier filet : si une collision passe malgré le contrôle préalable
+      // (création concurrente), ne pas renvoyer le message brut du moteur.
+      const brut = err?.message ?? '';
+      setError(
+        brut.includes('unique_shift')
+          ? "Une garde existe déjà à cet endroit, ce jour-là, sur ce créneau. "
+            + 'Rafraîchissez le calendrier : il a pu être modifié entre-temps.'
+          : brut
+      );
     } finally {
       setLoading(false);
     }
