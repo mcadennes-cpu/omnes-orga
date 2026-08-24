@@ -225,7 +225,7 @@ ALTER TABLE profiles ADD COLUMN agenda_beta_access boolean DEFAULT false;
   - **Le V2 est en base et en vigueur au 04/01/2027** : V1 fermé au 03/01/2027 (266 règles), V2 actif à partir du 04/01 (264 règles). Différentiel mesuré entre les deux : **93 changements**.
   - **Ce que les allers-retours avec Matthieu ont corrigé**, et qu'aucune relecture de code n'aurait trouvé : le trou fonctionnel des **jours fériés** (18 gardes de week-end en semaine, toutes sur un férié), la **contamination par le V1** dans les requêtes « cette case est-elle au roulement ? » (deux plans actifs coexistent depuis 6F), et surtout le **modèle d'ouverture** lui-même — l'offre ouvre chaque semaine, le roulement s'y pose quand ses règles tombent. Trois réglages successifs avant de retrouver le fonctionnement historique du cabinet.
 
-- ⏳ **Étape 6 / MOD-2 — EN COURS.** Arbitrée le 03/08/2026 ; MOD2-A à MOD2-C livrées le 06/08/2026, MOD2-D et MOD2-E le 24/08/2026. Restent **MOD2-F** (vocabulaire « Annuler », `alert()`/`confirm()` restants) et **MOD2-G** (Ctrl/Cmd+Z, optionnel).
+- ⏳ **Étape 6 / MOD-2 — EN COURS.** Arbitrée le 03/08/2026 ; MOD2-A à MOD2-C livrées le 06/08/2026, MOD2-D et MOD2-E le 24/08/2026 — **toutes validées en usage réel par Matthieu** au fil des sous-étapes. Restent **MOD2-F** (vocabulaire « Annuler », `alert()`/`confirm()` restants) et **MOD2-G** (Ctrl/Cmd+Z, optionnel).
   - ✓ **MOD2-E — FAITE (24/08/2026)** — **Le bandeau éphémère remplace le bouton, et `undo_buffer` n'existe plus.** Scripts `22-MOD2E-1` (`derniere_action`) et `22-MOD2E-2` (suppression de la table) + `components/ui/ActionToast.tsx`. Testé : **10 contrôles** (`22-MOD2E-3`) ; les cinq suites MOD-2 totalisent **81 contrôles**.
     - **Les cinq défauts de l'ancien dispositif sont clos**, et chacun par une pièce différente : le niveau unique (le journal conserve tout), l'absence de péremption (le bandeau disparaît, et l'écran vérifie la cohérence), l'absence de vérification (`restaurer_action`), la couverture réelle de 2 actions sur 6 annoncées (le déclencheur n'oublie rien), et l'UX datée (`alert()` bloquant, sondage toutes les 2 secondes — **le sondage réseau est supprimé**, l'état vit côté client et n'interroge la base qu'au clic).
     - **`agenda.derniere_action()` retrouve l'action qu'on vient de faire**, plutôt que de faire remonter le `txid` par chaque chemin d'écriture — ce qui aurait imposé de changer la signature de toutes les fonctions existantes et n'est de toute façon pas possible avec les `.insert()` de supabase-js. *Risque assumé et borné* : quelques millisecondes séparent l'action de l'appel, la fenêtre est plafonnée à 2 minutes et l'entrée doit être de l'utilisateur courant. Et si le mauvais `txid` était retenu, **`restaurer_action` ne pourrait pas faire de dégât silencieux** — elle compare et refuse.
@@ -1837,7 +1837,7 @@ entrée du journal et sur la fonction de restauration, il devient presque gratui
 une fois MOD2-D livrée — alors que l'écrire en premier obligerait à inventer un
 second mécanisme de mémorisation, puis à le jeter.
 
-- **MOD2-A — Le journal en base.** Table `agenda.activity_log` (qui, quoi, quand,
+- **MOD2-A — Le journal en base.** ✓ FAITE. Table `agenda.activity_log` (qui, quoi, quand,
   lignes touchées, état avant / après) alimentée par des **déclencheurs**
   sur `shifts`, `requests`, `fixed_duty_series` et `rotation_plans`.
   - *Pourquoi un déclencheur et non un appel applicatif* : l'appel applicatif est
