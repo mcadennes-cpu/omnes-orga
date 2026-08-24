@@ -176,7 +176,7 @@ export default function ShiftDetailModal({ shift, onClose, onSuccess, readOnlyMo
                 className="flex items-center gap-2 rounded-input border border-ocre/40 bg-ocre/10 px-5 py-2.5 text-button text-ocre-fonce transition-colors hover:bg-ocre/20 disabled:opacity-50"
               >
                 <UserX className="h-4 w-4" />
-                Annuler l'assignation
+                Libérer la garde
               </button>
             </>
           )}

@@ -13,8 +13,11 @@ type CancelAssignmentModalProps = {
   onClose: () => void;
 };
 
-// Sous-modale « annuler l'assignation » : portee simple, serie, ou regle de
+// Sous-modale « liberer la garde » : portee simple, serie, ou regle de
 // roulement selon le contexte de la garde.
+//
+// VOCABULAIRE (MOD2-F) : « annuler » est reserve a DEFAIRE UNE ACTION, geste
+// du bandeau ephemere. Retirer un medecin d'une garde, c'est « liberer ».
 export default function CancelAssignmentModal({
   hasRotationRule,
   rotationCancelCount,
@@ -35,16 +38,16 @@ export default function CancelAssignmentModal({
       : null;
 
   return (
-    <BottomSheet title="Annuler l'assignation" onClose={onClose} busy={loading}>
+    <BottomSheet title="Libérer la garde" onClose={onClose} busy={loading}>
       <p className="mb-4 text-body-m text-ink">
         {hasRotationRule
-          ? "Cette assignation vient du roulement. Que souhaitez-vous faire ?"
-          : "Souhaitez-vous annuler l'assignation uniquement pour cette date, ou pour toute la série ?"}
+          ? "Cette attribution vient du roulement. Que souhaitez-vous faire ?"
+          : "Souhaitez-vous libérer uniquement cette date, ou toute la série ?"}
       </p>
 
       {!hasRotationRule && isPartOfSeries && seriesCancelCount != null && (
         <div className="mb-4 rounded-input border border-brique/20 bg-brique/10 px-4 py-3 text-body-m text-brique">
-          « Annuler toute la série » libérera <strong>{gardes(seriesCancelCount)}</strong>
+          « Libérer toute la série » rendra libres <strong>{gardes(seriesCancelCount)}</strong>
           {doctorName ? <> attribuées à <strong>{doctorName}</strong></> : null}, à partir
           d'aujourd'hui. Les gardes des autres médecins et les gardes déjà passées ne sont
           pas touchées.
@@ -65,7 +68,7 @@ export default function CancelAssignmentModal({
           disabled={loading}
           className="w-full rounded-input border border-ocre/40 bg-ocre/10 px-4 py-3 text-button text-ocre-fonce transition-colors hover:bg-ocre/20 disabled:opacity-50"
         >
-          {hasRotationRule ? 'Annuler uniquement cette garde' : 'Annuler uniquement cette date'}
+          {hasRotationRule ? 'Libérer uniquement cette garde' : 'Libérer uniquement cette date'}
         </button>
         {hasRotationRule ? (
           <button
@@ -81,7 +84,7 @@ export default function CancelAssignmentModal({
             disabled={loading}
             className="w-full rounded-input bg-brique px-4 py-3 text-button text-white shadow-button transition-colors hover:bg-brique/90 disabled:opacity-50"
           >
-            Annuler toute la série
+            Libérer toute la série
           </button>
         )}
         <button

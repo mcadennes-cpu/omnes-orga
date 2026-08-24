@@ -120,7 +120,7 @@ async function findRotationSlotShifts(shift: Shift): Promise<{
   return { weekday, rotationWeek, shiftIds };
 }
 
-// Les gardes qu'« annuler l'assignation de la série » doit libérer.
+// Les gardes que « libérer toute la série » doit rendre libres.
 //
 // Arbitré avec Matthieu le 06/08/2026, après que le journal d'activité eut
 // montré, dès son premier jour, que l'action réécrivait TOUTE la série — tous
@@ -489,7 +489,7 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
       }
       setShowCancelAssignmentModal(true);
     } else {
-      if (confirm('Êtes-vous sûr de vouloir annuler cette assignation ? La garde redeviendra libre.')) {
+      if (confirm('Libérer cette garde ? Le médecin en sera retiré et la garde redeviendra libre.')) {
         handleCancelAssignment('single');
       }
     }

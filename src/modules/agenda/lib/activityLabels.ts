@@ -241,7 +241,9 @@ const VERBE_STATUT: Record<string, string> = {
   approved: 'a validé',
   on_hold: 'a pré-validé',
   rejected: 'a refusé',
-  cancelled: 'a annulé',
+  // « retiré » et non « annulé » : dans ce module, annuler = défaire une
+  // action (MOD2-F). Une demande, elle, se retire.
+  cancelled: 'a retiré',
   pending: 'a remis en attente',
 };
 
