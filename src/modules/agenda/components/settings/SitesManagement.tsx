@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { supabase, supabaseOrga, Site } from '../../lib/supabase';
 import { Building2, Plus, Edit2, Check, X, DoorOpen } from 'lucide-react';
 import BottomSheet from '../ui/BottomSheet';
+import ConfirmSheet from '../ui/ConfirmSheet';
+import { useToast } from '../ui/ActionToast';
 
 type SiteWithRoomCount = Site & { roomCount: number };
 
@@ -18,6 +20,9 @@ export default function SitesManagement() {
   const [newSite, setNewSite] = useState({ name: '', color: '#3B82F6', roomCount: 6 });
   const [newRoomCount, setNewRoomCount] = useState(6);
   const [error, setError] = useState('');
+  const [siteToDelete, setSiteToDelete] = useState<SiteWithRoomCount | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const { signaler } = useToast();
 
   useEffect(() => {
     loadSites();
@@ -134,21 +139,70 @@ export default function SitesManagement() {
     }
   };
 
-  const handleDelete = async (site: SiteWithRoomCount) => {
-    if (!confirm(`Êtes-vous sûr de vouloir supprimer le site "${site.name}" ?\n\nCette action supprimera également toutes les salles (${site.roomCount}) et les gardes associées à ce site.`)) {
+  // DEUX VERROUS, ET AUCUN NE SE VOIT DANS LE CODE DU MODULE :
+  //  - la policy RLS « supprime un site sans garde » refuse des qu'une garde
+  //    pointe sur le site ;
+  //  - la cle etrangere rooms.site_id est en RESTRICT : un site qui a encore
+  //    des salles ne part pas non plus.
+  // On les controle avant de poser la question : demander confirmation pour
+  // ne rien faire ensuite est le pire des deux mondes.
+  const handleDeleteClick = async (site: SiteWithRoomCount) => {
+    const { count } = await supabase
+      .from('shifts')
+      .select('id', { count: 'exact', head: true })
+      .eq('site_id', site.id);
+
+    if (count) {
+      signaler(
+        `Impossible de supprimer « ${site.name} » : ${count} garde${count > 1 ? 's y sont rattachées' : ' y est rattachée'}.`,
+        'erreur'
+      );
       return;
     }
 
+    if (site.roomCount > 0) {
+      signaler(
+        `Impossible de supprimer « ${site.name} » : supprimez d'abord ses ${site.roomCount} salle${site.roomCount > 1 ? 's' : ''}.`,
+        'erreur'
+      );
+      return;
+    }
+
+    setSiteToDelete(site);
+  };
+
+  const handleDelete = async () => {
+    if (!siteToDelete) return;
+    setDeleting(true);
+
     try {
-      const { error } = await supabase
+      // Le .select() n'est pas decoratif : une policy RLS qui refuse ne leve
+      // AUCUNE erreur, elle supprime zero ligne. Sans le retour, on annoncerait
+      // un succes alors que rien n'a bouge -- exactement ce qui est arrive au
+      // premier essai de MOD2-F-2.
+      const { data, error } = await supabase
         .from('sites')
         .delete()
-        .eq('id', site.id);
+        .eq('id', siteToDelete.id)
+        .select('id');
 
       if (error) throw error;
+
+      if (!data || data.length === 0) {
+        signaler(
+          `Suppression refusée : « ${siteToDelete.name} » est encore utilisé quelque part.`,
+          'erreur'
+        );
+        return;
+      }
+
+      signaler(`Site « ${siteToDelete.name} » supprimé.`, 'succes');
+      setSiteToDelete(null);
       loadSites();
     } catch (err: any) {
-      alert('Erreur lors de la suppression: ' + err.message);
+      signaler('Suppression impossible : ' + err.message, 'erreur');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -354,7 +408,7 @@ export default function SitesManagement() {
                               <Edit2 className="h-5 w-5" />
                             </button>
                             <button
-                              onClick={() => handleDelete(site)}
+                              onClick={() => handleDeleteClick(site)}
                               className="rounded-pill p-2 text-brique transition-colors hover:bg-brique/10"
                               title="Supprimer"
                             >
@@ -512,6 +566,20 @@ export default function SitesManagement() {
             )}
           </div>
         </BottomSheet>
+      )}
+
+      {siteToDelete && (
+        <ConfirmSheet
+          title="Supprimer ce site ?"
+          confirmLabel="Supprimer le site"
+          danger
+          busy={deleting}
+          onConfirm={handleDelete}
+          onClose={() => setSiteToDelete(null)}
+        >
+          Le site <strong>{siteToDelete.name}</strong> sera supprimé définitivement.
+          Il ne porte aucune garde et aucune salle.
+        </ConfirmSheet>
       )}
     </div>
   );

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { supabase, supabaseOrga, Room, Site } from '../../lib/supabase';
 import { DoorOpen, Plus, Edit2, Trash2, Check, X, AlertCircle } from 'lucide-react';
 import BottomSheet from '../ui/BottomSheet';
+import ConfirmSheet from '../ui/ConfirmSheet';
+import { useToast } from '../ui/ActionToast';
 
 const fieldClass =
   'w-full rounded-input border border-border bg-carte px-3 py-2 text-body-m text-ink ' +
@@ -16,6 +18,9 @@ export default function RoomsManagement() {
   const [newRoom, setNewRoom] = useState({ siteId: '', name: '' });
   const [error, setError] = useState('');
   const [filterSite, setFilterSite] = useState<string>('all');
+  const [roomToDelete, setRoomToDelete] = useState<Room | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const { signaler } = useToast();
 
   useEffect(() => {
     loadData();
@@ -103,32 +108,60 @@ export default function RoomsManagement() {
     }
   };
 
-  const handleDeleteRoom = async (room: Room) => {
-    if (!confirm(`Êtes-vous sûr de vouloir supprimer la salle "${room.name}" ?`)) {
-      return;
-    }
-
-    const { data: shiftsData } = await supabase
+  // Le controle « cette salle porte-t-elle des gardes ? » a lieu AVANT la
+  // question, et non apres : demander confirmation pour repondre ensuite que
+  // c'est impossible n'apprend rien et fait perdre un clic.
+  const handleDeleteRoomClick = async (room: Room) => {
+    const { count } = await supabase
       .from('shifts')
-      .select('id')
-      .eq('room_id', room.id)
-      .limit(1);
+      .select('id', { count: 'exact', head: true })
+      .eq('room_id', room.id);
 
-    if (shiftsData && shiftsData.length > 0) {
-      alert('Impossible de supprimer cette salle car elle contient des gardes assignées.');
+    if (count) {
+      // L'ancien message disait « gardes assignees » alors que ni la requete ni
+      // la policy ne filtrent le statut : une garde libre bloque aussi.
+      signaler(
+        `Impossible de supprimer la salle « ${room.name} » : ${count} garde${count > 1 ? 's y sont rattachées' : ' y est rattachée'}.`,
+        'erreur'
+      );
       return;
     }
 
-    const { error } = await supabase
+    setRoomToDelete(room);
+  };
+
+  const handleDeleteRoom = async () => {
+    if (!roomToDelete) return;
+    setDeleting(true);
+
+    // .select() : la policy RLS « supprime une salle sans garde » refuse sans
+    // lever d'erreur -- elle supprime zero ligne. Le controle prealable
+    // ci-dessus couvre le cas courant, ce retour couvre le reste (garde creee
+    // entre-temps, compte non coordinateur).
+    const { data, error } = await supabase
       .from('rooms')
       .delete()
-      .eq('id', room.id);
+      .eq('id', roomToDelete.id)
+      .select('id');
 
-    if (!error) {
-      loadData();
-    } else {
-      alert('Erreur lors de la suppression: ' + error.message);
+    setDeleting(false);
+
+    if (error) {
+      signaler('Suppression impossible : ' + error.message, 'erreur');
+      return;
     }
+
+    if (!data || data.length === 0) {
+      signaler(
+        `Suppression refusée : la salle « ${roomToDelete.name} » est encore utilisée.`,
+        'erreur'
+      );
+      return;
+    }
+
+    signaler(`Salle « ${roomToDelete.name} » supprimée.`, 'succes');
+    setRoomToDelete(null);
+    loadData();
   };
 
   const handleToggleActive = async (room: Room) => {
@@ -303,7 +336,7 @@ export default function RoomsManagement() {
                               <Edit2 className="h-5 w-5" />
                             </button>
                             <button
-                              onClick={() => handleDeleteRoom(room)}
+                              onClick={() => handleDeleteRoomClick(room)}
                               className="rounded-pill p-2 text-brique transition-colors hover:bg-brique/10"
                             >
                               <Trash2 className="h-5 w-5" />
@@ -389,6 +422,20 @@ export default function RoomsManagement() {
             </div>
           </form>
         </BottomSheet>
+      )}
+
+      {roomToDelete && (
+        <ConfirmSheet
+          title="Supprimer cette salle ?"
+          confirmLabel="Supprimer la salle"
+          danger
+          busy={deleting}
+          onConfirm={handleDeleteRoom}
+          onClose={() => setRoomToDelete(null)}
+        >
+          La salle <strong>{roomToDelete.name}</strong> sera supprimée définitivement.
+          Aucune garde n'y est rattachée.
+        </ConfirmSheet>
       )}
     </div>
   );

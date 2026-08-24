@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { supabase, supabaseOrga, ShiftType } from '../../lib/supabase';
 import { Clock, Plus, Edit2, Check, X, MoveUp, MoveDown } from 'lucide-react';
 import BottomSheet from '../ui/BottomSheet';
+import ConfirmSheet from '../ui/ConfirmSheet';
+import { useToast } from '../ui/ActionToast';
 
 const fieldClass =
   'w-full rounded-input border border-border bg-carte px-3 py-2 text-body-m text-ink ' +
@@ -14,6 +16,9 @@ export default function ShiftTypesManagement() {
   const [editingShiftType, setEditingShiftType] = useState<ShiftType | null>(null);
   const [newShiftType, setNewShiftType] = useState({ name: '', timeRange: '' });
   const [error, setError] = useState('');
+  const [shiftTypeToDelete, setShiftTypeToDelete] = useState<ShiftType | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const { signaler } = useToast();
 
   useEffect(() => {
     loadShiftTypes();
@@ -122,21 +127,71 @@ export default function ShiftTypesManagement() {
     loadShiftTypes();
   };
 
-  const handleDelete = async (shiftType: ShiftType) => {
-    if (!confirm(`Êtes-vous sûr de vouloir supprimer "${shiftType.name}" ?\n\nCette action est irréversible et supprimera également toutes les gardes associées à cet horaire.`)) {
+  // Deux verrous invisibles depuis le module : la policy RLS « supprime un
+  // creneau sans garde », et la cle etrangere rotation_plan_rules.shift_type_id
+  // en RESTRICT -- un creneau cite par un plan de roulement ne part pas.
+  // Controles avant la question, pour ne pas la poser en vain.
+  const handleDeleteClick = async (shiftType: ShiftType) => {
+    const [gardes, regles] = await Promise.all([
+      supabase
+        .from('shifts')
+        .select('id', { count: 'exact', head: true })
+        .eq('shift_type_id', shiftType.id),
+      supabase
+        .from('rotation_plan_rules')
+        .select('id', { count: 'exact', head: true })
+        .eq('shift_type_id', shiftType.id),
+    ]);
+
+    if (gardes.count) {
+      signaler(
+        `Impossible de supprimer « ${shiftType.name} » : ${gardes.count} garde${gardes.count > 1 ? 's utilisent' : ' utilise'} cet horaire.`,
+        'erreur'
+      );
       return;
     }
 
+    if (regles.count) {
+      signaler(
+        `Impossible de supprimer « ${shiftType.name} » : cet horaire est utilisé par le roulement.`,
+        'erreur'
+      );
+      return;
+    }
+
+    setShiftTypeToDelete(shiftType);
+  };
+
+  const handleDelete = async () => {
+    if (!shiftTypeToDelete) return;
+    setDeleting(true);
+
     try {
-      const { error } = await supabase
+      // .select() : une policy RLS qui refuse ne leve pas d'erreur, elle
+      // supprime zero ligne. Le retour est le seul moyen de le savoir.
+      const { data, error } = await supabase
         .from('shift_types')
         .delete()
-        .eq('id', shiftType.id);
+        .eq('id', shiftTypeToDelete.id)
+        .select('id');
 
       if (error) throw error;
+
+      if (!data || data.length === 0) {
+        signaler(
+          `Suppression refusée : « ${shiftTypeToDelete.name} » est encore utilisé quelque part.`,
+          'erreur'
+        );
+        return;
+      }
+
+      signaler(`Horaire « ${shiftTypeToDelete.name} » supprimé.`, 'succes');
+      setShiftTypeToDelete(null);
       loadShiftTypes();
     } catch (err: any) {
-      alert('Erreur lors de la suppression: ' + err.message);
+      signaler('Suppression impossible : ' + err.message, 'erreur');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -279,7 +334,7 @@ export default function ShiftTypesManagement() {
                               <Edit2 className="h-5 w-5" />
                             </button>
                             <button
-                              onClick={() => handleDelete(shiftType)}
+                              onClick={() => handleDeleteClick(shiftType)}
                               className="rounded-pill p-2 text-brique transition-colors hover:bg-brique/10"
                               title="Supprimer"
                             >
@@ -364,6 +419,21 @@ export default function ShiftTypesManagement() {
             </div>
           </form>
         </BottomSheet>
+      )}
+
+      {shiftTypeToDelete && (
+        <ConfirmSheet
+          title="Supprimer cet horaire ?"
+          confirmLabel="Supprimer l'horaire"
+          danger
+          busy={deleting}
+          onConfirm={handleDelete}
+          onClose={() => setShiftTypeToDelete(null)}
+        >
+          L'horaire <strong>{shiftTypeToDelete.name}</strong> ({shiftTypeToDelete.time_range})
+          sera supprimé définitivement. Aucune garde ni aucune règle de roulement ne
+          l'utilise.
+        </ConfirmSheet>
       )}
     </div>
   );
