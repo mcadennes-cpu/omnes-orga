@@ -1,3 +1,5 @@
+import { STATUS_STYLES } from './statusStyles';
+
 // ---------------------------------------------------------------------------
 // Mise en mots du journal d'activité (MOD2-C).
 //
@@ -69,6 +71,35 @@ const LIBELLE_CHAMP: Record<string, string> = {
   coordinator_note: 'la note',
 };
 
+// Les valeurs brutes de la base sont en anglais ; l'écran, lui, parle
+// français. Pour les gardes on reprend les libellés de STATUS_STYLES, source
+// unique des états depuis l'étape 4, plutôt que d'en réécrire une seconde
+// série qui divergerait tôt ou tard.
+//
+// « pending » est le seul cas que STATUS_STYLES ne tranche pas : il y distingue
+// « demandes en attente » de « pré-validé » selon le nombre de demandes, alors
+// que le journal n'a que la valeur de la colonne. On s'en tient au sens de la
+// colonne, sans surinterpréter.
+const STATUT_GARDE: Record<string, string> = {
+  free: STATUS_STYLES.libre.label,
+  assigned: STATUS_STYLES.assigne.label,
+  pending: 'En attente',
+};
+
+const STATUT_DEMANDE: Record<string, string> = {
+  pending: 'En attente',
+  on_hold: 'Pré-validée',
+  approved: 'Validée',
+  rejected: 'Refusée',
+  cancelled: 'Annulée',
+};
+
+export function libelleStatut(table: string, valeur?: string | null): string {
+  if (!valeur) return '—';
+  const table_ = table === 'requests' ? STATUT_DEMANDE : STATUT_GARDE;
+  return table_[valeur] ?? valeur;
+}
+
 /** Met un conflit en français, pour la modale de confirmation. */
 export function lireConflit(c: Conflit, nomMedecin: (id?: string | null) => string): string {
   if (c.motif) return `${formaterJour(c.jour)} — ${c.motif}`;
@@ -78,7 +109,9 @@ export function lireConflit(c: Conflit, nomMedecin: (id?: string | null) => stri
       ? nomMedecin(v)
       : c.champ === 'deleted_at'
         ? (v ? 'supprimée' : 'active')
-        : (v ?? '—');
+        : c.champ === 'status'
+          ? libelleStatut(c.table, v)
+          : (v ?? '—');
   return `${formaterJour(c.jour)} — ${quoi} a changé depuis : `
     + `${valeur(c.attendu)} → ${valeur(c.actuel)}`;
 }

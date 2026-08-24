@@ -11,6 +11,7 @@ import {
   RapportRestauration,
   STYLE_NATURE,
   formaterJour,
+  libelleStatut,
   lireConflit,
   lireEntree,
 } from '../lib/activityLabels';
@@ -512,7 +513,7 @@ function Detail({ entree, nomMedecin }: {
               : medAvant !== medApres
                 ? `${nomMedecin(medAvant)} → ${nomMedecin(medApres)}`
                 : a.statut !== b.statut
-                  ? `${a.statut} → ${b.statut}`
+                  ? `${libelleStatut('shifts', a.statut)} → ${libelleStatut('shifts', b.statut)}`
                   : !a.supprimee && b.supprimee
                     ? 'supprimée'
                     : a.supprimee && !b.supprimee
