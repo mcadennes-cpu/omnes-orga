@@ -1915,6 +1915,38 @@ concurrente), la série est supprimée en douceur via `supprimer_serie`. Le mess
 nomme désormais le site, la salle, le créneau et les dates en conflit. Les
 10 orphelines ont été passées en suppression douce — traçables, invisibles.
 
+##### ⚠ Le SECOND index unique, oublié par MOD2-B (24/08/2026)
+
+Trouvé par Matthieu en retestant la création : `duplicate key value violates
+unique constraint "unique_doctor_per_day"`. Un deuxième message brut, mais une
+cause différente — et un vrai défaut.
+
+`agenda.shifts` porte **deux** index uniques. MOD2-B a converti `unique_shift`
+pour ignorer les gardes supprimées, mais **n'a pas touché le second** :
+
+```
+unique (assigned_doctor_id, date)
+  where assigned_doctor_id is not null and status = 'assigned'
+```
+
+**Conséquence** : une garde supprimée mais restée `assigned` **continuait
+d'occuper la journée de son médecin**. Impossible de lui en attribuer une autre
+ce jour-là, alors que la garde n'existait plus pour personne — un fantôme qui
+interdit sans se montrer. Mesure au moment du correctif : **31 gardes supprimées
+bloquaient 9 médecins**, du 04 au 10/01/2027 (reliquat de l'annulation de
+duplication du 06/08). Corrigé par `22-MOD2B-3` : `and deleted_at is null`.
+
+> **Leçon** : quand on rend une suppression douce, il faut passer en revue **tous**
+> les index uniques de la table, pas seulement celui auquel on pense. La règle
+> avait été appliquée à un seul des deux.
+
+**Au passage** : le contrôle préalable de la création couvre désormais les
+**deux** contraintes. Le conflit médecin/jour vient du roulement, qui pré-affecte
+les médecins — le message nomme donc le médecin et les dates concernées. Ce
+n'était pas la cause de l'erreur du 24/08 (les gardes fantômes étaient hors
+plage) : celle-ci était un vrai conflit de roulement, jusque-là inexplicable
+pour le coordinateur.
+
 ##### ⚠ La première prise du journal — « annuler l'assignation » sur une série (06/08/2026)
 
 Relevé **le jour même de la mise en service du journal**, en relisant les traces

@@ -64,6 +64,69 @@ async function trouverConflits(
     .sort();
 }
 
+// ---------------------------------------------------------------------------
+// Le roulement placerait-il un medecin deja de garde ce jour-la ?
+//
+// Second index unique de la table : (assigned_doctor_id, date) pour les gardes
+// attribuees. Les gardes creees ici recoivent leur medecin du roulement
+// (applyRotationRulesToShifts) : la collision ne vient donc pas d'une saisie,
+// mais du plan qui place quelqu'un deja occupe. Sans ce controle, la seule
+// explication etait le message brut du moteur.
+// ---------------------------------------------------------------------------
+async function trouverConflitsMedecin(
+  shifts: { date: string; status: string; assigned_doctor_id?: string | null }[]
+): Promise<{ jour: string; medecinId: string }[]> {
+  const affectees = shifts.filter((s) => s.status === 'assigned' && s.assigned_doctor_id);
+  if (affectees.length === 0) return [];
+
+  const jours = affectees.map((s) => s.date).sort();
+  const medecins = [...new Set(affectees.map((s) => s.assigned_doctor_id as string))];
+
+  const { data, error } = await supabase
+    .from('shifts')
+    .select('date, assigned_doctor_id')
+    .eq('status', 'assigned')
+    .in('assigned_doctor_id', medecins)
+    .gte('date', jours[0])
+    .lte('date', jours[jours.length - 1]);
+
+  if (error) throw error;
+
+  const occupees = new Set((data ?? []).map((s) => `${s.assigned_doctor_id}|${s.date}`));
+  return affectees
+    .filter((s) => occupees.has(`${s.assigned_doctor_id}|${s.date}`))
+    .map((s) => ({ jour: s.date, medecinId: s.assigned_doctor_id as string }))
+    .sort((a, b) => a.jour.localeCompare(b.jour));
+}
+
+async function chargerNoms(
+  conflits: { medecinId: string }[]
+): Promise<Record<string, string>> {
+  const ids = [...new Set(conflits.map((c) => c.medecinId))];
+  const { data } = await supabase.from('profiles').select('id, full_name').in('id', ids);
+  const noms: Record<string, string> = {};
+  for (const p of data ?? []) noms[p.id] = p.full_name ?? '';
+  return noms;
+}
+
+function messageConflitMedecin(
+  conflits: { jour: string; medecinId: string }[],
+  noms: Record<string, string>
+): string {
+  const apercu = conflits
+    .slice(0, 3)
+    .map((c) => `${formaterJour(c.jour)} (${noms[c.medecinId] ?? 'médecin inconnu'})`)
+    .join(', ');
+  const reste =
+    conflits.length > 3 ? ` et ${conflits.length - 3} autre${conflits.length - 3 > 1 ? 's' : ''}` : '';
+  return (
+    `Le roulement placerait sur cette série un médecin déjà de garde ce jour-là, `
+    + `sur ${conflits.length} date${conflits.length > 1 ? 's' : ''} : ${apercu}${reste}. `
+    + `Un médecin ne peut pas tenir deux gardes le même jour — choisissez d'autres jours `
+    + `de la semaine, ou une période qui évite ces dates.`
+  );
+}
+
 function messageConflit(jours: string[], site: string, salle: string, creneau: string): string {
   const apercu = jours.slice(0, 3).map(formaterJour).join(', ');
   const reste = jours.length > 3 ? ` et ${jours.length - 3} autre${jours.length - 3 > 1 ? 's' : ''}` : '';
@@ -205,6 +268,26 @@ export default function CreateShiftModal({ coordinatorId, onClose, onSuccess }: 
           );
         }
 
+        // Le roulement est appliqué AVANT la création de la série : c'est lui
+        // qui pose les médecins, donc lui qui peut créer un conflit médecin/jour.
+        const candidates = joursVises.map((jour) => ({
+          date: jour,
+          location: selectedSite.name,
+          room: selectedRoom.name,
+          shift_type: selectedShiftType.time_range,
+          site_id: selectedSiteId,
+          room_id: selectedRoomId,
+          shift_type_id: selectedShiftTypeId,
+          status: 'free',
+          created_by: coordinatorId
+        }));
+        const avecRoulement = await applyRotationRulesToShifts(candidates);
+
+        const conflitsMedecin = await trouverConflitsMedecin(avecRoulement);
+        if (conflitsMedecin.length > 0) {
+          throw new Error(messageConflitMedecin(conflitsMedecin, await chargerNoms(conflitsMedecin)));
+        }
+
         const { data: seriesData, error: seriesError } = await supabase
           .from('fixed_duty_series')
           .insert({
@@ -220,21 +303,11 @@ export default function CreateShiftModal({ coordinatorId, onClose, onSuccess }: 
 
         if (seriesError) throw seriesError;
 
-        const shiftsToCreate = joursVises.map((jour) => ({
-          date: jour,
-          location: selectedSite.name,
-          room: selectedRoom.name,
-          shift_type: selectedShiftType.time_range,
-          site_id: selectedSiteId,
-          room_id: selectedRoomId,
-          shift_type_id: selectedShiftTypeId,
-          status: 'free',
-          created_by: coordinatorId,
+        const shiftsWithRules = avecRoulement.map((garde) => ({
+          ...garde,
           series_id: seriesData.id,
-          series_instance_date: jour
+          series_instance_date: garde.date
         }));
-
-        const shiftsWithRules = await applyRotationRulesToShifts(shiftsToCreate);
 
         const { error: insertError } = await supabase
           .from('shifts')
@@ -273,6 +346,11 @@ export default function CreateShiftModal({ coordinatorId, onClose, onSuccess }: 
 
         const [shiftWithRule] = await applyRotationRulesToShifts([singleShift]);
 
+        const conflitsMedecin = await trouverConflitsMedecin([shiftWithRule]);
+        if (conflitsMedecin.length > 0) {
+          throw new Error(messageConflitMedecin(conflitsMedecin, await chargerNoms(conflitsMedecin)));
+        }
+
         const { error: insertError } = await supabase
           .from('shifts')
           .insert(shiftWithRule);
@@ -286,12 +364,17 @@ export default function CreateShiftModal({ coordinatorId, onClose, onSuccess }: 
       // Dernier filet : si une collision passe malgré le contrôle préalable
       // (création concurrente), ne pas renvoyer le message brut du moteur.
       const brut = err?.message ?? '';
-      setError(
-        brut.includes('unique_shift')
-          ? "Une garde existe déjà à cet endroit, ce jour-là, sur ce créneau. "
-            + 'Rafraîchissez le calendrier : il a pu être modifié entre-temps.'
-          : brut
-      );
+      let message = brut;
+      if (brut.includes('unique_doctor_per_day')) {
+        message =
+          'Le roulement placerait un médecin qui a déjà une garde ce jour-là. '
+          + 'Rafraîchissez le calendrier : il a pu être modifié entre-temps.';
+      } else if (brut.includes('unique_shift')) {
+        message =
+          'Une garde existe déjà à cet endroit, ce jour-là, sur ce créneau. '
+          + 'Rafraîchissez le calendrier : il a pu être modifié entre-temps.';
+      }
+      setError(message);
     } finally {
       setLoading(false);
     }
