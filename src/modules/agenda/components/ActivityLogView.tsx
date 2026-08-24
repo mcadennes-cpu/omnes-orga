@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, History } from 'lucide-react';
+import { ChevronDown, ChevronRight, History, Undo2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import Avatar from '../../../components/common/Avatar';
+import BottomSheet from './ui/BottomSheet';
 import {
+  Conflit,
   EntreeJournal,
   LigneGarde,
   Nature,
+  RapportRestauration,
   STYLE_NATURE,
   formaterJour,
+  lireConflit,
   lireEntree,
 } from '../lib/activityLabels';
 
@@ -54,6 +58,13 @@ export default function ActivityLogView() {
   const [fin, setFin] = useState(false);
   const [filtre, setFiltre] = useState<Nature | 'tout'>('tout');
   const [deplies, setDeplies] = useState<Set<number>>(new Set());
+  const [eligibles, setEligibles] = useState<Record<number, boolean>>({});
+  const [confirmation, setConfirmation] = useState<{
+    txid: number;
+    resume: string;
+    rapport: RapportRestauration | null;
+  } | null>(null);
+  const [travail, setTravail] = useState(false);
 
   const charger = useCallback(async (avantId: number | null) => {
     const { data, error } = await supabase.rpc('journal_activite', {
@@ -153,6 +164,73 @@ export default function ActivityLogView() {
     return jours;
   }, [groupesFiltres]);
 
+  // Éligibilité en un seul appel pour toute la liste : demander la
+  // vérification complète de chaque action à l'affichage ferait autant
+  // d'allers-retours que d'entrées. La cohérence, elle, se vérifie au clic —
+  // elle dépend de l'état au moment où l'on agit, pas au chargement.
+  useEffect(() => {
+    const txids = [...new Set(entrees.map((e) => e.txid))];
+    if (txids.length === 0) return;
+    let annule = false;
+    (async () => {
+      const { data, error } = await supabase.rpc('actions_restaurables', { p_txids: txids });
+      if (annule || error) return;
+      const carte: Record<number, boolean> = {};
+      for (const ligne of data ?? []) carte[ligne.txid] = ligne.restaurable;
+      setEligibles(carte);
+    })();
+    return () => { annule = true; };
+  }, [entrees]);
+
+  const demanderRestauration = async (g: Groupe) => {
+    const resume = g.entrees.map((e) => lireEntree(e).texte).join(', puis ');
+    setConfirmation({ txid: g.txid, resume, rapport: null });
+    setTravail(true);
+    try {
+      // Mode vérification : la fonction n'écrit rien et rend son rapport.
+      const { data, error } = await supabase.rpc('restaurer_action', {
+        p_txid: g.txid,
+        p_verifier_seulement: true,
+      });
+      if (error) throw error;
+      setConfirmation({ txid: g.txid, resume, rapport: data as RapportRestauration });
+    } catch (err: any) {
+      setConfirmation(null);
+      setErreur(err.message);
+    } finally {
+      setTravail(false);
+    }
+  };
+
+  const confirmerRestauration = async () => {
+    if (!confirmation) return;
+    setTravail(true);
+    setErreur('');
+    try {
+      const { data, error } = await supabase.rpc('restaurer_action', {
+        p_txid: confirmation.txid,
+        p_verifier_seulement: false,
+      });
+      if (error) throw error;
+      const rapport = data as RapportRestauration;
+      // La fonction peut encore refuser ici : l'état a pu changer entre la
+      // vérification et le clic. On réaffiche alors le rapport, sans fermer.
+      if (!rapport.ok) {
+        setConfirmation({ ...confirmation, rapport });
+        return;
+      }
+      setConfirmation(null);
+      setChargement(true);
+      setEntrees(await charger(null));
+    } catch (err: any) {
+      setErreur(err.message);
+      setConfirmation(null);
+    } finally {
+      setTravail(false);
+      setChargement(false);
+    }
+  };
+
   const basculer = (txid: number) =>
     setDeplies((precedents) => {
       const suivants = new Set(precedents);
@@ -216,10 +294,14 @@ export default function ActivityLogView() {
                 const detaillable = g.entrees.some(
                   (e) => !e.payload_truncated && (e.avant || e.apres)
                 );
+                const annulee = g.entrees.find((e) => e.undone_at);
+                const restaurable = eligibles[g.txid] === true;
                 return (
                   <article
                     key={g.txid}
-                    className="rounded-card border border-border bg-carte shadow-card"
+                    className={`rounded-card border border-border bg-carte shadow-card ${
+                      annulee ? 'opacity-70' : ''
+                    }`}
                   >
                     <div className="flex items-start gap-3 p-4">
                       <Avatar
@@ -250,6 +332,21 @@ export default function ActivityLogView() {
                             </p>
                           ) : null;
                         })}
+                        {annulee && (
+                          <p className="text-caption mt-1 text-olive">
+                            Action annulée
+                            {annulee.undone_par ? ` par ${annulee.undone_par}` : ''}
+                          </p>
+                        )}
+                        {restaurable && !annulee && (
+                          <button
+                            onClick={() => demanderRestauration(g)}
+                            className="mt-2 inline-flex items-center gap-1.5 rounded-pill border border-border px-3 py-1 text-button text-marine transition-colors hover:border-canard hover:text-canard"
+                          >
+                            <Undo2 size={14} strokeWidth={2} />
+                            Restaurer
+                          </button>
+                        )}
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
                         <span className="text-caption tabular-nums">
@@ -287,6 +384,70 @@ export default function ActivityLogView() {
             </div>
           </section>
         ))
+      )}
+
+      {confirmation && (
+        <BottomSheet
+          title="Restaurer cette action"
+          onClose={() => setConfirmation(null)}
+          busy={travail}
+          footer={
+            <>
+              <button
+                onClick={() => setConfirmation(null)}
+                disabled={travail}
+                className="h-12 flex-1 rounded-input border border-border text-button text-marine disabled:opacity-50"
+              >
+                {confirmation.rapport && !confirmation.rapport.ok ? 'Fermer' : 'Annuler'}
+              </button>
+              {confirmation.rapport?.ok && (
+                <button
+                  onClick={confirmerRestauration}
+                  disabled={travail}
+                  className="h-12 flex-1 rounded-input bg-marine text-button text-white shadow-button transition-colors hover:bg-marine/90 disabled:opacity-50"
+                >
+                  {travail ? 'Restauration…' : 'Restaurer'}
+                </button>
+              )}
+            </>
+          }
+        >
+          <p className="mb-3 text-body-m text-ink">
+            <span className="font-semibold">Action :</span> {confirmation.resume}
+          </p>
+
+          {!confirmation.rapport ? (
+            <p className="text-body-m text-muted">Vérification de l'état actuel…</p>
+          ) : confirmation.rapport.ok ? (
+            <p className="rounded-input border border-olive/30 bg-olive/10 p-3 text-body-m text-ink">
+              Rien n'a changé depuis. {confirmation.rapport.lignes}{' '}
+              {confirmation.rapport.lignes > 1 ? 'lignes seront rétablies' : 'ligne sera rétablie'}{' '}
+              dans leur état précédent.
+            </p>
+          ) : (
+            <div className="rounded-input border border-brique/30 bg-brique/10 p-3">
+              <p className="mb-2 text-body-m font-semibold text-brique">
+                Restauration impossible : la situation a changé depuis.
+              </p>
+              <ul className="space-y-1">
+                {confirmation.rapport.conflits.slice(0, 8).map((c: Conflit, i) => (
+                  <li key={i} className="text-caption text-ink">
+                    {lireConflit(c, nomMedecin)}
+                  </li>
+                ))}
+              </ul>
+              {confirmation.rapport.conflits.length > 8 && (
+                <p className="text-caption mt-2 text-muted">
+                  … et {confirmation.rapport.conflits.length - 8} autres écarts
+                </p>
+              )}
+              <p className="text-caption mt-3 text-muted">
+                Rien n'a été modifié. Reprenez ces gardes une à une depuis le calendrier si
+                vous voulez revenir en arrière.
+              </p>
+            </div>
+          )}
+        </BottomSheet>
       )}
 
       {!fin && groupes.length > 0 && (

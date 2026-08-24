@@ -38,9 +38,50 @@ export type EntreeJournal = {
   operation: 'INSERT' | 'UPDATE' | 'DELETE';
   row_count: number;
   payload_truncated: boolean;
+  undone_at: string | null;
+  undone_par: string | null;
   avant: Record<string, any> | null;
   apres: Record<string, any> | null;
 };
+
+/** Un écart relevé par le garde-fou de `restaurer_action`. */
+export type Conflit = {
+  id: string;
+  table: string;
+  jour?: string;
+  champ?: string;
+  attendu?: string | null;
+  actuel?: string | null;
+  motif?: string;
+};
+
+export type RapportRestauration = {
+  ok: boolean;
+  ecrit: boolean;
+  lignes: number;
+  conflits: Conflit[];
+};
+
+const LIBELLE_CHAMP: Record<string, string> = {
+  status: 'le statut',
+  assigned_doctor_id: 'le médecin',
+  deleted_at: 'la suppression',
+  coordinator_note: 'la note',
+};
+
+/** Met un conflit en français, pour la modale de confirmation. */
+export function lireConflit(c: Conflit, nomMedecin: (id?: string | null) => string): string {
+  if (c.motif) return `${formaterJour(c.jour)} — ${c.motif}`;
+  const quoi = LIBELLE_CHAMP[c.champ ?? ''] ?? c.champ;
+  const valeur = (v?: string | null) =>
+    c.champ === 'assigned_doctor_id'
+      ? nomMedecin(v)
+      : c.champ === 'deleted_at'
+        ? (v ? 'supprimée' : 'active')
+        : (v ?? '—');
+  return `${formaterJour(c.jour)} — ${quoi} a changé depuis : `
+    + `${valeur(c.attendu)} → ${valeur(c.actuel)}`;
+}
 
 /** Nature de l'action, pour la pastille de couleur et le filtre. */
 export type Nature =
