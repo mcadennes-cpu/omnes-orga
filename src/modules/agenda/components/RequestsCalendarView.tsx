@@ -6,7 +6,6 @@ import WeekView from './calendar/WeekView';
 import MonthView from './calendar/MonthView';
 import ShiftDetailModal from './ShiftDetailModal';
 import AssignDoctorModal from './AssignDoctorModal';
-import UndoButton from './UndoButton';
 import BulkAssignPrevalidatedModal from './BulkAssignPrevalidatedModal';
 import ExportPlanningModal from './ExportPlanningModal';
 import StatusBadge from './ui/StatusBadge';
@@ -48,8 +47,15 @@ export default function RequestsCalendarView({ currentUser }: RequestsCalendarVi
       })
       .subscribe();
 
+    // Annulation depuis le bandeau ephemere (MOD2-E), qui vit au-dessus des
+    // vues. Le temps reel ferait double emploi, mais il n'est pas encore
+    // active en beta -- on ne depend donc pas de lui.
+    const recharger = () => loadShifts();
+    window.addEventListener('agenda:rafraichir', recharger);
+
     return () => {
       subscription.unsubscribe();
+      window.removeEventListener('agenda:rafraichir', recharger);
     };
   }, [selectedDate, viewMode, locationFilter, roomFilter, doctorFilter, shiftTypeFilter]);
 
@@ -248,7 +254,6 @@ export default function RequestsCalendarView({ currentUser }: RequestsCalendarVi
             </div>
           </div>
 
-          <UndoButton userId={currentUser.id} onUndoComplete={loadShifts} />
         </div>
 
         <CalendarFilters

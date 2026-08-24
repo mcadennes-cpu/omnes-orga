@@ -11,10 +11,10 @@ import SaveWeekTemplateModal from './SaveWeekTemplateModal';
 import DeleteWeekTemplateModal from './DeleteWeekTemplateModal';
 import DuplicateWeekTemplateModal from './DuplicateWeekTemplateModal';
 import OpenWeeksModal from './OpenWeeksModal';
-import UndoButton from './UndoButton';
 import StatusBadge from './ui/StatusBadge';
 import { AgendaStatusKey } from '../lib/statusStyles';
 import { saveWeekAsTemplate, duplicateWeekTemplate } from '../lib/weekTemplateUtils';
+import { useToast } from './ui/ActionToast';
 
 type EnhancedCalendarViewProps = {
   currentUser: Profile;
@@ -38,8 +38,19 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
   // Ouverture des semaines depuis le plan de roulement (6H).
   const [showOpenWeeksModal, setShowOpenWeeksModal] = useState(false);
   const [availableDoctors, setAvailableDoctors] = useState<Array<{ id: string; name: string }>>([]);
+  const { signaler, signalerAction } = useToast();
 
   const isMobile = currentUser.role === 'doctor';
+
+  // Le bandeau vit au-dessus des vues : quand on y annule une action, il
+  // previent par un evenement plutot que par un rappel a faire descendre dans
+  // tout le module. Le temps reel ferait double emploi, mais il n'est pas
+  // encore active en beta (etape 8) -- on ne depend donc pas de lui.
+  useEffect(() => {
+    const recharger = () => loadShifts();
+    window.addEventListener('agenda:rafraichir', recharger);
+    return () => window.removeEventListener('agenda:rafraichir', recharger);
+  }, [selectedDate, viewMode, locationFilter, roomFilter, doctorFilter, shiftTypeFilter]);
 
   useEffect(() => {
     loadShifts();
@@ -209,12 +220,14 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
     startOfWeek.setDate(date.getDate() - date.getDay() + 1);
 
     await saveWeekAsTemplate(startOfWeek, templateName, currentUser.id);
-    alert('Modèle de semaine sauvegardé avec succès!');
+    signaler('Modèle de semaine enregistré.', 'succes');
   };
 
   const handleDuplicateTemplate = async (templateId: string, startDate: string, endDate: string) => {
     const result = await duplicateWeekTemplate(templateId, startDate, endDate);
-    alert(`Duplication terminée!\nCréées: ${result.created}\nIgnorées: ${result.skipped}`);
+    signalerAction(
+      `${result.created} garde${result.created > 1 ? 's' : ''} créée${result.created > 1 ? 's' : ''} depuis le modèle.`
+    );
     loadShifts();
   };
 
@@ -236,7 +249,6 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
 
           {currentUser.role === 'coordinator' && (
             <div className="flex items-center gap-3">
-              <UndoButton userId={currentUser.id} onUndoComplete={loadShifts} />
               <button
                 onClick={() => setShowCreateModal(true)}
                 className="flex items-center gap-2 rounded-input bg-marine px-4 py-2.5 text-button text-white shadow-button transition-colors hover:bg-marine/90"

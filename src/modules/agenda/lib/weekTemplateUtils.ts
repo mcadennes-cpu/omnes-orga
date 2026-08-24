@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { getRotationPlans, getPlanForDate, getRotationWeek } from './rotationUtils';
-import { saveUndoAction, getCurrentUserId } from './undoUtils';
+
 
 export async function saveWeekAsTemplate(
   weekStart: Date,
@@ -245,19 +245,9 @@ export async function duplicateWeekTemplate(
       console.error('[WeekTemplate] Error creating shifts:', insertError);
       throw new Error('Erreur lors de la création des gardes');
     }
-
-    const userId = await getCurrentUserId();
-    if (userId && insertedShifts) {
-      const createdIds = insertedShifts.map(s => s.id);
-      await saveUndoAction(
-        userId,
-        `Duplication de modèle (${createdIds.length} gardes créées)`,
-        {
-          type: 'bulk_shift_create',
-          created_shift_ids: createdIds
-        }
-      );
-    }
+    // Plus rien a memoriser ici depuis MOD2-E : le declencheur de journal
+    // enregistre l'insertion tout seul, et le bandeau retrouve l'action par
+    // agenda.derniere_action(). C'est l'appelant qui signale.
   }
 
   console.log('[WeekTemplate] Duplication completed:', { created, skipped });

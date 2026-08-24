@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { buildAgendaUser, OrgaProfile } from './lib/userAdapter';
 import { UserRole } from './lib/supabase';
 import AgendaHeader, { AgendaView } from './components/AgendaHeader';
+import { ToastProvider } from './components/ui/ActionToast';
 import EnhancedCalendarView from './components/EnhancedCalendarView';
 import MyScheduleView from './components/MyScheduleView';
 import DailyScheduleView from './components/DailyScheduleView';
@@ -82,6 +83,7 @@ function App({ orgaProfile }: AppProps) {
   }
 
   return (
+    <ToastProvider>
     <div className="min-h-screen bg-fond">
       <AgendaHeader
         currentUser={currentUser}
@@ -114,6 +116,7 @@ function App({ orgaProfile }: AppProps) {
         <p className="text-caption">© 2025 OMNÈS MÉDECINS • une équipe • 7j/7 • sur rendez-vous</p>
       </footer>
     </div>
+    </ToastProvider>
   );
 }
 

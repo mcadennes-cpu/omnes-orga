@@ -6,7 +6,7 @@ import {
   getRotationWeek,
   getRotationSlot,
 } from '../lib/rotationUtils';
-import { saveUndoAction, getCurrentUserId } from '../lib/undoUtils';
+import { useToast } from '../components/ui/ActionToast';
 import { checkDoctorDailyConflict } from '../lib/shiftValidation';
 
 // Boite regroupant toute la "mecanique" de la fenetre de detail d'une garde
@@ -172,6 +172,7 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
   // roulement" (compte a titre d'avertissement, calcule a l'ouverture de la modale).
   const [rotationCancelCount, setRotationCancelCount] = useState<number | null>(null);
   const [seriesCancelCount, setSeriesCancelCount] = useState<number | null>(null);
+  const { signalerAction } = useToast();
 
   const isPartOfSeries = !!shift.series_id;
 
@@ -436,6 +437,9 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
         if (deleteError) throw deleteError;
       }
 
+      signalerAction(
+        scope === 'series' ? 'Série supprimée.' : 'Garde supprimée.'
+      );
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -497,7 +501,7 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
     setError('');
 
     try {
-      const userId = await getCurrentUserId();
+      let liberees = 1;
 
       if (scope === 'rotation') {
         // Libere les gardes futures de la MEME case de roulement (jour +
@@ -525,9 +529,7 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
           if (updateError) throw updateError;
         }
 
-        alert(
-          `${shiftIds.length} garde${shiftIds.length > 1 ? 's' : ''} future${shiftIds.length > 1 ? 's' : ''} libérée${shiftIds.length > 1 ? 's' : ''}. Le roulement, lui, n'est pas modifié : une garde recréée sur cette case retrouvera le même médecin.`
-        );
+        liberees = shiftIds.length;
       } else if (scope === 'series' && shift.series_id) {
         // Voir findSeriesShiftsToFree : même médecin, à partir d'aujourd'hui,
         // et écriture sur une liste d'identifiants explicite.
@@ -545,6 +547,8 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
 
           if (updateError) throw updateError;
         }
+
+        liberees = shiftIds.length;
       } else {
         const { error: updateError } = await supabase
           .from('shifts')
@@ -556,20 +560,15 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
           .eq('id', shift.id);
 
         if (updateError) throw updateError;
-
-        if (userId) {
-          await saveUndoAction(
-            userId,
-            'Annulation d\'assignation',
-            {
-              type: 'unassign_shift',
-              shift_id: shift.id,
-              previous_assigned_doctor_id: shift.assigned_doctor_id,
-              previous_status: shift.status
-            }
-          );
-        }
       }
+
+      const gardes = `${liberees} garde${liberees > 1 ? 's' : ''} libérée${liberees > 1 ? 's' : ''}`;
+      signalerAction(
+        scope === 'rotation'
+          // Le rappel que portait l'alert() bloquant reste, sans barrer l'écran.
+          ? `${gardes}. Le roulement n'est pas modifié : une garde recréée sur cette case retrouvera le même médecin.`
+          : `${gardes}.`
+      );
 
       onSuccess();
       onClose();
