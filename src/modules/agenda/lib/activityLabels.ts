@@ -13,7 +13,25 @@ import { STATUS_STYLES } from './statusStyles';
 // ce qu'on veut voir.
 // ---------------------------------------------------------------------------
 
-export type TableJournalisee = 'shifts' | 'requests' | 'fixed_duty_series' | 'rotation_plans';
+export type TableJournalisee =
+  | 'shifts'
+  | 'requests'
+  | 'fixed_duty_series'
+  | 'rotation_plans'
+  // Tables de parametrage, journalisees depuis MOD2-F-4.
+  | 'sites'
+  | 'rooms'
+  | 'shift_types';
+
+/** Forme commune aux trois tables de parametrage (voir journal_extrait). */
+export type LigneParametre = {
+  nom?: string;
+  actif?: boolean;
+  horaire?: string;
+  couleur?: string;
+  ordre?: number;
+  site?: string;
+};
 
 export type LigneGarde = {
   jour?: string;
@@ -315,6 +333,59 @@ function lirePlans(e: EntreeJournal): ActionLue {
   return { nature: 'roulement', texte: `a modifié ${intitule}` };
 }
 
+// --- Paramètres : sites, salles, horaires (MOD2-F-4) ------------------------
+
+// Ces trois tables partagent « nom » et « actif », d'où un lecteur unique.
+// Elles n'ont pas de suppression douce : un DELETE y est définitif, et c'est
+// exactement pourquoi le journal les couvre depuis le 24/08/2026 — la
+// suppression de « J6 Beaune » n'avait laissé aucune trace.
+const INTITULE_PARAMETRE: Record<string, { article: string; nom: string }> = {
+  sites: { article: 'le', nom: 'site' },
+  rooms: { article: 'la', nom: 'salle' },
+  shift_types: { article: "l'", nom: 'horaire' },
+};
+
+function lireParametres(e: EntreeJournal): ActionLue {
+  const { article, nom: quoi } = INTITULE_PARAMETRE[e.table_name];
+  const apres = premiereValeur(e.apres) as LigneParametre | undefined;
+  const avant = premiereValeur(e.avant) as LigneParametre | undefined;
+
+  const nom = apres?.nom ?? avant?.nom;
+  const horaire = e.table_name === 'shift_types' ? (apres?.horaire ?? avant?.horaire) : undefined;
+  const suffixe = horaire ? ` (${horaire})` : '';
+  const intitule = nom
+    ? `${article}${article === "l'" ? '' : ' '}${quoi} « ${nom} »${suffixe}`
+    : s(e.row_count, quoi);
+
+  if (e.operation === 'INSERT') return { nature: 'creation', texte: `a créé ${intitule}` };
+  if (e.operation === 'DELETE') {
+    return {
+      nature: 'suppression',
+      texte: `a supprimé ${intitule}`,
+      // Ces tables n'ont pas de deleted_at : rien à restaurer d'un clic. On le
+      // dit ici plutôt que de laisser croire le contraire.
+      precision: 'Suppression définitive — non restaurable depuis le Journal',
+    };
+  }
+
+  // UPDATE : on nomme ce qui a bougé plutôt que d'écrire « a modifié ».
+  if (avant && apres) {
+    if (avant.actif && !apres.actif) return { nature: 'autre', texte: `a désactivé ${intitule}` };
+    if (!avant.actif && apres.actif) return { nature: 'autre', texte: `a réactivé ${intitule}` };
+    if (avant.nom && apres.nom && avant.nom !== apres.nom) {
+      return { nature: 'autre', texte: `a renommé ${article}${article === "l'" ? '' : ' '}${quoi} « ${avant.nom} » en « ${apres.nom} »` };
+    }
+    if (avant.horaire && apres.horaire && avant.horaire !== apres.horaire) {
+      return {
+        nature: 'autre',
+        texte: `a changé l'horaire de « ${apres.nom ?? avant.nom} »`,
+        precision: `${avant.horaire} → ${apres.horaire}`,
+      };
+    }
+  }
+  return { nature: 'autre', texte: `a modifié ${intitule}` };
+}
+
 // --- Entrée publique --------------------------------------------------------
 
 export function lireEntree(e: EntreeJournal): ActionLue {
@@ -330,6 +401,9 @@ export function lireEntree(e: EntreeJournal): ActionLue {
     case 'requests': return lireDemandes(e);
     case 'fixed_duty_series': return lireSeries(e);
     case 'rotation_plans': return lirePlans(e);
+    case 'sites':
+    case 'rooms':
+    case 'shift_types': return lireParametres(e);
     default: return { nature: 'autre', texte: `a modifié ${s(e.row_count, 'ligne')}` };
   }
 }
