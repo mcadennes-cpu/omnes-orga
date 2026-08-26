@@ -6,6 +6,7 @@ import EditSeriesModal from './EditSeriesModal';
 import EditValidatedShiftModal from './EditValidatedShiftModal';
 import ConflictErrorModal from './ConflictErrorModal';
 import BottomSheet from './ui/BottomSheet';
+import ConfirmSheet from './ui/ConfirmSheet';
 import ShiftInfoRows from './shiftDetail/ShiftInfoRows';
 import CoordinatorNoteEditor from './shiftDetail/CoordinatorNoteEditor';
 import PendingRequestsList from './shiftDetail/PendingRequestsList';
@@ -14,6 +15,15 @@ import ApplyToRotationWeekModal from './shiftDetail/ApplyToRotationWeekModal';
 import DeletionBlockedModal from './shiftDetail/DeletionBlockedModal';
 import RotationChangeModal from './shiftDetail/RotationChangeModal';
 import { useShiftDetail } from '../hooks/useShiftDetail';
+
+// Meme idiome que ShiftInfoRows : chaque composant formate sa date localement.
+function formatDateFr(dateStr: string) {
+  return new Date(dateStr).toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+}
 
 type ShiftDetailModalProps = {
   shift: Shift;
@@ -45,6 +55,8 @@ export default function ShiftDetailModal({ shift, onClose, onSuccess, readOnlyMo
     seriesCancelCount,
     showApplyToRotationWeekConfirm,
     showDeletionBlockedModal,
+    showDeleteConfirm,
+    showFreeShiftConfirm,
     showConflictError,
     conflictErrorMessage,
     setShowSeriesModal,
@@ -55,6 +67,8 @@ export default function ShiftDetailModal({ shift, onClose, onSuccess, readOnlyMo
     setShowCancelAssignmentModal,
     setShowApplyToRotationWeekConfirm,
     setShowDeletionBlockedModal,
+    setShowDeleteConfirm,
+    setShowFreeShiftConfirm,
     setShowConflictError,
     setConflictErrorMessage,
     handleApproveClick,
@@ -65,6 +79,7 @@ export default function ShiftDetailModal({ shift, onClose, onSuccess, readOnlyMo
     handleSeriesActionSelect,
     handleCancelAssignmentClick,
     handleCancelAssignment,
+    handleDelete,
     handleApplyToRotationWeek,
   } = useShiftDetail(shift, onSuccess, onClose);
 
@@ -252,6 +267,44 @@ export default function ShiftDetailModal({ shift, onClose, onSuccess, readOnlyMo
 
       {showDeletionBlockedModal && (
         <DeletionBlockedModal onClose={() => setShowDeletionBlockedModal(false)} />
+      )}
+
+      {/* Les deux confirmations qui restaient en confirm() (MOD2-F). Elles ne
+          concernent que la garde seule : hors serie et hors roulement, les
+          portees larges ayant leurs propres modales, plus explicites. */}
+      {showDeleteConfirm && (
+        <ConfirmSheet
+          title="Supprimer cette garde ?"
+          confirmLabel="Supprimer la garde"
+          danger
+          busy={loading}
+          onConfirm={() => handleDelete('single')}
+          onClose={() => setShowDeleteConfirm(false)}
+        >
+          La garde du <strong>{formatDateFr(shift.date)}</strong> ({shift.shift_type} ·{' '}
+          {shift.location}) sera retirée du planning. Elle reste récupérable depuis le
+          Journal.
+        </ConfirmSheet>
+      )}
+
+      {showFreeShiftConfirm && (
+        <ConfirmSheet
+          title="Libérer la garde ?"
+          confirmLabel="Libérer la garde"
+          danger
+          busy={loading}
+          onConfirm={() => handleCancelAssignment('single')}
+          onClose={() => setShowFreeShiftConfirm(false)}
+        >
+          {shift.assigned_doctor?.full_name ? (
+            <>
+              <strong>{shift.assigned_doctor.full_name}</strong> sera retiré de cette garde,
+              qui redeviendra libre.
+            </>
+          ) : (
+            <>Cette garde redeviendra libre.</>
+          )}
+        </ConfirmSheet>
       )}
 
       {showRotationChangeModal && (

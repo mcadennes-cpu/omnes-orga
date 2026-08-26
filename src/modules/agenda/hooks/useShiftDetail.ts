@@ -161,6 +161,10 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
   const [showCancelAssignmentModal, setShowCancelAssignmentModal] = useState(false);
   const [showApplyToRotationWeekConfirm, setShowApplyToRotationWeekConfirm] = useState(false);
   const [showDeletionBlockedModal, setShowDeletionBlockedModal] = useState(false);
+  // MOD2-F : les deux confirmations qui passaient encore par confirm(). Un hook
+  // ne rend rien -- il porte le drapeau, ShiftDetailModal affiche la feuille.
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showFreeShiftConfirm, setShowFreeShiftConfirm] = useState(false);
   const [seriesAction, setSeriesAction] = useState<'modify' | 'delete' | null>(null);
   const [rotationInfo, setRotationInfo] = useState<{ week: number; total: number } | null>(null);
   const [hasRotationRule, setHasRotationRule] = useState(false);
@@ -393,6 +397,7 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
   };
 
   const handleDelete = async (scope: 'single' | 'series') => {
+    setShowDeleteConfirm(false);
     setLoading(true);
     setError('');
 
@@ -455,9 +460,7 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
       setSeriesAction('delete');
       setShowSeriesModal(true);
     } else {
-      if (confirm('Êtes-vous sûr de vouloir supprimer cette garde ?')) {
-        handleDelete('single');
-      }
+      setShowDeleteConfirm(true);
     }
   };
 
@@ -489,14 +492,13 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
       }
       setShowCancelAssignmentModal(true);
     } else {
-      if (confirm('Libérer cette garde ? Le médecin en sera retiré et la garde redeviendra libre.')) {
-        handleCancelAssignment('single');
-      }
+      setShowFreeShiftConfirm(true);
     }
   };
 
   const handleCancelAssignment = async (scope: 'single' | 'series' | 'rotation') => {
     setShowCancelAssignmentModal(false);
+    setShowFreeShiftConfirm(false);
     setLoading(true);
     setError('');
 
@@ -696,6 +698,8 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
     showCancelAssignmentModal,
     showApplyToRotationWeekConfirm,
     showDeletionBlockedModal,
+    showDeleteConfirm,
+    showFreeShiftConfirm,
     showConflictError,
     conflictErrorMessage,
     // setters utilises par le rendu (ouverture / fermeture des modales)
@@ -707,10 +711,13 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
     setShowCancelAssignmentModal,
     setShowApplyToRotationWeekConfirm,
     setShowDeletionBlockedModal,
+    setShowDeleteConfirm,
+    setShowFreeShiftConfirm,
     setShowConflictError,
     setConflictErrorMessage,
     // actions
     handleApproveClick,
+    handleDelete,
     handleSetOnHoldClick,
     handleRemovePrevalidation,
     handleValidatedConfirm,

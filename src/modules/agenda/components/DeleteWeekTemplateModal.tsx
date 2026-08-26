@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Trash2, AlertTriangle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import BottomSheet from './ui/BottomSheet';
+import { useToast } from './ui/ActionToast';
 
 type WeekTemplate = {
   id: string;
@@ -23,6 +24,7 @@ export default function DeleteWeekTemplateModal({ onClose, onSuccess }: DeleteWe
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { signaler } = useToast();
 
   useEffect(() => {
     loadTemplates();
@@ -69,7 +71,7 @@ export default function DeleteWeekTemplateModal({ onClose, onSuccess }: DeleteWe
 
       if (templateError) throw templateError;
 
-      alert(`Le modèle « ${selectedTemplate?.name} » a été supprimé.`);
+      signaler(`Modèle « ${selectedTemplate?.name} » supprimé.`, 'succes');
       onSuccess();
       onClose();
     } catch (err: any) {

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Calendar, ChevronDown, ChevronUp, CheckSquare, Square, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useToast } from './ui/ActionToast';
 
 interface Shift {
   id: string;
@@ -44,6 +45,7 @@ export default function DoctorWeekSummaryView({
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const [selectedShifts, setSelectedShifts] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
+  const { signaler } = useToast();
 
   const getDayData = (): DayData[] => {
     const days: DayData[] = [];
@@ -151,18 +153,29 @@ export default function DoctorWeekSummaryView({
       }
 
       if (successCount > 0) {
-        alert(`✅ Demandes envoyées (${successCount} garde${successCount > 1 ? 's' : ''}).`);
+        // signaler() et non signalerAction() : cette vue est cote medecin, et
+        // derniere_action() est en security invoker -- la policy de lecture du
+        // journal reserve le journal au coordinateur. Un medecin n'obtiendrait
+        // rien, donc aucun bouton « Annuler » a proposer. Pour retirer une
+        // demande, il passe par « Mes gardes ».
+        signaler(
+          `Demande envoyée pour ${successCount} garde${successCount > 1 ? 's' : ''}.`,
+          'succes'
+        );
         setSelectedShifts(new Set());
         setExpandedDay(null);
         onRequestsSubmitted();
       }
 
       if (failedCount > 0) {
-        alert(`⚠️ ${failedCount} demande${failedCount > 1 ? 's ont' : ' a'} échoué. Veuillez réessayer.`);
+        signaler(
+          `${failedCount} demande${failedCount > 1 ? 's n\'ont' : " n'a"} pas pu être envoyée${failedCount > 1 ? 's' : ''}. Réessayez.`,
+          'erreur'
+        );
       }
     } catch (error) {
       console.error('Error submitting requests:', error);
-      alert('❌ Erreur lors de l\'envoi des demandes.');
+      signaler("Erreur pendant l'envoi des demandes.", 'erreur');
     } finally {
       setSubmitting(false);
     }
