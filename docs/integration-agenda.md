@@ -289,7 +289,11 @@ ALTER TABLE profiles ADD COLUMN agenda_beta_access boolean DEFAULT false;
   - Matthieu retient la **piste C (hybride)** : bandeau éphémère pour le geste immédiat, journal d'activité pour la traçabilité et la restauration encadrée, journalisation exhaustive, **suppression douce** (`deleted_at`) sur les gardes. L'audit du code préalable à l'arbitrage a corrigé la doc sur un point important : le bouton « Annuler » couvre en réalité **2 actions et non 6** — les 4 autres types sont du code mort, déjà dans l'appli Bolt. Découpage **MOD2-A → MOD2-G** dans la section MOD-2 plus bas ; le journal se construit avant le bandeau, qui s'y adosse.
 
 - ⏳ **Étape 7 — EN COURS (à partir du 30/07/2026)** — Migration vers la base Omnès-Orga, réalisée **avant** l'étape 6 (justification dans l'encadré du plan ci-dessus). Le suivi détaillé de cette étape vit dans un document dédié : **`docs/migration-agenda-etape7.md`** (inventaire du schéma réel, écarts relevés, décisions d'architecture, découpage 7A → 7F).
-  - ✓ **7F — FAITE (31/07/2026)** — **Script de resynchronisation** `docs/sql/22-7F-resynchronisation-agenda.py` : recopie complète (plus sûre qu'un différentiel à ce volume), simulation par défaut, `--go` pour exécuter. Garde-fous : refuse de tourner si un profil créé dans Bolt manque au mapping (ses gardes arriveraient sans médecin) ou si l'historique Planning est incohérent. Testé en réel : 5 669 lignes réimportées, écarts avec Planning **exactement égaux aux exclusions volontaires** — aucune dérive. **Ne plus exécuter après la bascule.** Sert aussi à rafraîchir la copie de travail à la demande.
+  - ⚠ **7F — FAITE (31/07/2026), mais DEVENUE DESTRUCTRICE — ne pas l'exécuter en l'état** — **Script de resynchronisation** `docs/sql/22-7F-resynchronisation-agenda.py` : recopie complète (plus sûre qu'un différentiel à ce volume), simulation par défaut, `--go` pour exécuter. Garde-fous : refuse de tourner si un profil créé dans Bolt manque au mapping ou si l'historique Planning est incohérent. Testé en réel le 31/07 : 5 669 lignes réimportées, aucune dérive.
+    - ⚠ **Constat du 26/08/2026 — le script ne peut plus être lancé tel quel.** Il fait une **purge puis recopie** de 13 tables, dont `sites`, `rooms`, `shift_types`, `shifts` et `requests`. C'était sans danger le 31/07 ; ça ne l'est plus depuis le **lendemain**, car la copie Orga a divergé de Planning **volontairement** à partir de 6A. Mesuré en lecture seule sur les deux bases : `shift_types` = **15 côté Planning, 19 côté Orga** ; `shifts` = 2 683 contre 2 807.
+    - **Ce qu'une exécution détruirait aujourd'hui** : les 4 créneaux de Beaune créés par `22-6A-2` (J4, J6, J7, J8 — dont J6 Beaune, remis le 26/08) ; les renommages de `22-6A-1` (Bolt a toujours `Pré J2 Dijon `, `WE1 Dijon ` et `WE 2 Dijon ` avec leurs espaces parasites) ; et **tous les `deleted_at`** de MOD2-B, la colonne n'existant pas côté Planning — dont les 155 gardes non pourvues closes par `23-5`.
+    - **Conséquence pour l'étape 8** : la bascule prévoit une **dernière exécution de 7F**, le piège est donc armé pour le soir J. **Le script doit être repensé avant** : recopier ce que Bolt a de neuf (attributions, demandes) sans écraser les corrections structurelles côté Orga — donc exclure `sites` / `rooms` / `shift_types` et préserver `deleted_at`. À traiter en tête de l'étape 8.
+    - La phrase « sert aussi à rafraîchir la copie de travail à la demande » **était vraie à l'écriture et ne l'est plus** : elle est conservée ici barrée du sens, pas supprimée, parce que c'est exactement le genre d'affirmation périmée qui fait commettre l'erreur.
   - ✓ **7E — FAITE (31/07/2026)** — **Le module lit désormais la base Omnès-Orga.** Schéma `agenda` exposé dans l'API (redémarrage PostgREST effectué, appli principale vérifiée intacte, `anon` refusé sur le schéma). Client unique scopé via `.schema('agenda')` : les ~40 fichiers du module sont inchangés. **Écran de liaison, session Planning et variables `VITE_AGENDA_*` supprimés** — l'utilisateur connecté à Omnès-Orga est l'utilisateur de l'agenda, avec le rôle déduit de `is_agenda_coordinator`. **Les vraies photos des médecins s'affichent** (9 des 33 médecins du planning en ont une). Découverte : le temps réel n'a **jamais** fonctionné, dans aucune des deux applis — corrigé côté code, activation proposée en étape 8.
   - ✓ **7D — FAITE (30/07/2026)** — **5 664 lignes importées** dans le schéma `agenda` (2 681 gardes, 2 481 demandes, 282 règles de roulement…), identifiants de profils remappés, trigger métier désactivé pendant l'import puis réactivé. Contrôles préalables et postérieurs tous au vert (0 orpheline, 0 incohérence de statut). Découverte : `Coordinateur Admin` n'était pas un compte de test mais **le compte de travail de Charlotte** (259 gardes, les 282 règles de roulement, 2 modèles) — tout lui a été rattaché nominativement. **La copie est déjà périmée** : Charlotte a validé 199 demandes pendant l'import, ce qui confirme la nécessité du script de resynchronisation 7F.
   - ✓ **7C — FAITE (30/07/2026)** — Schéma `agenda` complet dans la base Omnès-Orga : **14 tables et 75 index** (7C-1, identiques au schéma Planning colonne par colonne), **2 fonctions et 10 triggers** dont le circuit métier `update_shift_status` migré à l'identique et testé de bout en bout (7C-2), **57 policies RLS** exprimées via deux fonctions centralisées `peut_acceder()` / `est_coordinateur()` et validées par usurpation d'identité (7C-3). Charlotte Franzino désignée coordinatrice. Le schéma n'est **pas encore exposé** dans l'API : aucun impact sur l'appli principale. Détail dans `migration-agenda-etape7.md`.
@@ -829,6 +833,36 @@ n'y sera pas.
 *Piste plus simple, à confirmer avec Matthieu* : demander à Charlotte de ne plus
 utiliser « appliquer à la semaine de roulement » dans Bolt d'ici la bascule. Le
 contrôle reste nécessaire — une consigne humaine ne se vérifie pas toute seule.
+
+> **✓ La comparaison est faite (26/08/2026), et elle est rassurante : zéro écart.**
+> Script `docs/sql/23-6-comparer-roulement-bolt-plan-v1.py`, **en lecture seule sur
+> les deux bases** — il ne resynchronise rien et peut être relancé à tout moment,
+> notamment le soir de la bascule.
+>
+> **Résultat : 280 règles dans Bolt, 266 dans le plan V1, et aucun vrai écart.** Les
+> 14 de différence sont exactement les règles **écartées volontairement par 6B-2** —
+> les « J3 Dijon » du samedi et du dimanche, ancienne façon d'enregistrer la garde
+> de week-end à Dijon avant la création du créneau `WE1 Dijon`. L'arbitrage a déjà
+> été rendu le 01/08/2026, et le plan les remplace par 7 samedis + 7 dimanches en
+> `WE1 Dijon`. Le script les nomme comme telles au lieu de les compter en écarts —
+> les présenter comme 14 arbitrages à rendre serait faux.
+>
+> **Charlotte n'a donc rien modifié au roulement depuis le 01/08** (elle est par
+> ailleurs en congés la semaine du 24/08, ce qui fige le delta). Reste à relancer le
+> script le soir de la bascule pour confirmer : c'est une minute, et c'est ce qui
+> permet d'exécuter 6C-4 sans arbitrage.
+>
+> **Deux pièges traités dans le script**, tous deux invisibles si l'on compare
+> naïvement : les identifiants ne se correspondent pas d'une base à l'autre (les
+> médecins sont rapprochés par `mapping-comptes-agenda.csv`, jamais par leur nom),
+> et les créneaux ont été **renommés** côté Orga par 6A-1 (`Pré J2 Dijon` → `J6
+> Dijon`, espaces parasites) — comparer sur les noms bruts produirait un écart sur
+> chaque ligne.
+>
+> **Précision pour 6C-4** : la suppression devra aussi retirer `getRotationSettings()`
+> (`lib/rotationUtils.ts`), qui interroge encore `rotation_settings`. Elle n'est
+> appelée nulle part — rien ne casserait — mais une fonction qui pointe vers une
+> table inexistante fait perdre une heure à qui la relira dans six mois.
 
 ##### 7. Sous-étape 6B — FAITE (01/08/2026)
 
