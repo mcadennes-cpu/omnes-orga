@@ -35,6 +35,27 @@
 -- RE-EXECUTABLE. Chaque mois en ajoute une vingtaine : ce script peut
 -- etre rejoue tel quel, ses conditions ne rattrapent que ce qui reste.
 --
+-- ⚠⚠ ORDRE IMPERATIF, TANT QUE BOLT TOURNE : RESYNCHRONISER D'ABORD.
+--
+-- Ce script decide « non pourvue » a partir de la copie Orga. Si la copie
+-- a du retard sur Bolt, il clot des gardes qui ont ete pourvues entre
+-- temps -- et comme la resynchronisation ne reveille jamais une garde
+-- close, l'erreur ne se corrige pas toute seule.
+--
+-- Ce n'est pas theorique : le 26/08/2026, la premiere execution a ferme
+-- la garde du 11/08 (Dijon, Cabinet B2) parce que la copie datait du
+-- 31/07. Dans Bolt, la garde de Mireille YUAN avait CHANGE DE SALLE
+-- depuis -- de B5 vers B2. La copie voyait donc B2 libre et B5 attribuee,
+-- l'inverse de la realite. Une garde close a tort sur 155 ; rouverte a la
+-- main le jour meme.
+--
+-- Sequence correcte :
+--   1. python3 docs/sql/22-8A-1-resynchronisation-differentielle.py --go
+--   2. puis seulement ce script
+--
+-- Apres la bascule, la question disparait : Orga fait autorite et il n'y
+-- a plus de copie a rafraichir.
+--
 -- A executer sur le projet ydihrgnixthrraprclox.
 -- =====================================================================
 
