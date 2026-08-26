@@ -45,6 +45,10 @@ export type Profile = {
   nom?: string | null;
   photo_url?: string | null;
   updated_at?: string | null;
+  // « Peut tenir une garde » (23-3), a ne pas confondre avec `role`, qui porte
+  // les permissions. Les deux sont independants : le coordinateur qui exerce
+  // est les deux a la fois.
+  is_agenda_doctor?: boolean;
 };
 
 export type ShiftStatus = 'free' | 'pending' | 'assigned';

@@ -71,11 +71,13 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
     };
   }, [selectedDate, viewMode, locationFilter, roomFilter, doctorFilter, shiftTypeFilter]);
 
+  // is_agenda_doctor : « qui peut tenir une garde », a ne pas confondre avec
+  // le role, qui porte les permissions (voir 23-3).
   const loadDoctors = async () => {
     const { data } = await supabase
       .from('profiles')
       .select('id, full_name')
-      .eq('role', 'doctor')
+      .eq('is_agenda_doctor', true)
       .order('full_name');
 
     if (data) {

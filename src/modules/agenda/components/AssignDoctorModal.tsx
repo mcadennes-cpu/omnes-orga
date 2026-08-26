@@ -64,11 +64,15 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
     }
   };
 
+  // is_agenda_doctor et non role='doctor' : le role porte les PERMISSIONS et
+  // vaut 'coordinator' ou 'doctor', jamais les deux -- il excluait donc le
+  // coordinateur qui exerce (Matthieu, 156 gardes) et laissait passer le poste
+  // de bureau. Voir docs/sql/23-3-agenda-designation-medecins.sql.
   const loadDoctors = async () => {
     const { data, error } = await supabase
       .from('profiles')
       .select('id, full_name, email')
-      .eq('role', 'doctor')
+      .eq('is_agenda_doctor', true)
       .order('full_name', { ascending: true });
 
     if (!error && data) {
