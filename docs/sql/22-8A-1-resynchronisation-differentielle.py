@@ -207,6 +207,27 @@ for t in ("shifts", "requests"):
 # Une garde de Bolt referencant un site, une salle, un creneau ou une serie
 # que Orga ne connait pas ferait echouer l'insertion -- ou pire, passerait
 # si la colonne est nullable. Verifie AVANT d'ecrire quoi que ce soit.
+# Types reels des colonnes, pour les casts de la mise a jour groupee.
+#
+# POURQUOI C'EST NECESSAIRE : dans « update ... from (values ...) », les
+# colonnes de la liste VALUES sont typees TEXT par defaut. Postgres refuse
+# alors d'ecrire dans une colonne date ou uuid -- « column "date" is of
+# type date but expression is of type text ». L'INSERT, lui, n'a pas ce
+# probleme : il deduit les types de la table cible.
+# Les types sont lus dans le catalogue plutot qu'ecrits en dur : une
+# colonne qui changerait de type ne ferait pas echouer le script en
+# silence.
+types = {}
+for t in ("shifts", "requests"):
+    d, err = sql(ORGA, f"""
+        select a.attname, format_type(a.atttypid, a.atttypmod) as type
+          from pg_attribute a
+         where a.attrelid = 'agenda.{t}'::regclass
+           and a.attnum > 0 and not a.attisdropped;""")
+    if err:
+        stop(f"lecture des types de {t} : {err}")
+    types[t] = {r["attname"]: r["type"] for r in d}
+
 connus = {}
 for table, colonne in (("sites", "site_id"), ("rooms", "room_id"),
                        ("shift_types", "shift_type_id"),
@@ -301,6 +322,27 @@ try:
     for t in ("shifts", "requests"):
         a_inserer, a_modifier, _, _ = plan[t]
 
+        # LIBERER AVANT D'ATTRIBUER.
+        #
+        # agenda.shifts porte un index unique (assigned_doctor_id, date)
+        # sur les gardes attribuees. Quand Charlotte deplace un medecin
+        # d'une salle a une autre le meme jour -- ce qui arrive -- le lot
+        # contient a la fois « B5 devient libre » et « B2 recoit ce
+        # medecin ». Dans UNE instruction, l'index est verifie ligne a
+        # ligne : si l'attribution passe avant la liberation, elle se
+        # heurte a l'ancienne ligne encore en place.
+        #
+        # Constate en reel le 26/08/2026 : Dr Mireille YUAN, 11/08, garde
+        # deplacee de Cabinet B5 vers Cabinet B2.
+        #
+        # On applique donc d'abord toutes les liberations, puis toutes les
+        # attributions. Toute permutation se resout ainsi, y compris un
+        # echange entre deux gardes. Meme raisonnement que restaurer_action
+        # (MOD2-D), qui traite les demandes avant les gardes.
+        if t == "shifts":
+            a_modifier = ([r for r in a_modifier if not r.get("assigned_doctor_id")]
+                          + [r for r in a_modifier if r.get("assigned_doctor_id")])
+
         for depart in range(0, len(a_inserer), 200):
             lot = a_inserer[depart:depart + 200]
             cols = ["id"] + CHAMPS[t]
@@ -317,10 +359,11 @@ try:
             collist = ", ".join(f'"{c}"' for c in cols)
             vals = ",\n".join("(" + ", ".join(lit(r.get(c)) for c in cols) + ")"
                               for r in lot)
-            maj = ", ".join(f'"{c}" = v."{c}"' for c in CHAMPS[t])
             # update ... from (values ...) : un seul aller-retour par lot.
-            # Le cast explicite evite que Postgres devine « text » sur les
-            # colonnes uuid et date.
+            # Chaque colonne est castee vers son type reel -- sans quoi
+            # Postgres les traite toutes comme du texte et refuse d'ecrire
+            # dans une colonne date ou uuid.
+            maj = ", ".join(f'"{c}" = v."{c}"::{types[t][c]}' for c in CHAMPS[t])
             _, err = sql(ORGA, f"""
                 update agenda.{t} cible
                    set {maj}

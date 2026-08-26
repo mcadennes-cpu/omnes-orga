@@ -75,6 +75,19 @@
 -- lieu pour ce medecin, la demande n'a plus d'objet. Sans cette cloture,
 -- un futur bilan par medecin les compterait comme des gardes obtenues.
 -- ---------------------------------------------------------------------
+-- ⚠ PAS de « s.deleted_at is null » ici, contrairement au bloc 3.
+--    Au premier passage, la condition ne genait pas : les gardes etaient
+--    encore ouvertes. Mais des le deuxieme, elles sont closes par le
+--    bloc 3 -- et le nettoyage ne pouvait plus les atteindre. Constate le
+--    26/08/2026 : 37 demandes orphelines revenues et irrattrapables.
+--    Une demande approuvee sur une garde passee et sans medecin est sans
+--    objet, que la garde soit close ou non.
+--
+-- ⚠ CE NETTOYAGE EST DEFAIT PAR CHAQUE RESYNCHRONISATION, tant que Bolt
+--    tourne : Bolt fait autorite sur les demandes et les y garde
+--    « approved ». Il doit donc etre rejoue APRES la resynchronisation --
+--    et, definitivement, apres la derniere d'entre elles le soir de la
+--    bascule.
 update agenda.requests rq
    set status = 'cancelled',
        reviewed_at = now(),
@@ -83,7 +96,6 @@ update agenda.requests rq
  where s.id = rq.shift_id
    and rq.status = 'approved'
    and s.date < current_date
-   and s.deleted_at is null
    and s.status in ('free', 'pending')
    and s.assigned_doctor_id is null;
 
