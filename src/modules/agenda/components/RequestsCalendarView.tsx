@@ -249,7 +249,7 @@ export default function RequestsCalendarView({ currentUser }: RequestsCalendarVi
               <ClipboardList className="w-6 h-6 text-canard" />
             </div>
             <div>
-              <h2 className="text-h2 text-ink">Calendrier des gardes</h2>
+              <h2 className="text-h2 text-ink">Validation des demandes</h2>
               <p className="text-caption">
                 {pendingCount > 0 ? `${pendingCount} ${pendingCount === 1 ? 'demande' : 'demandes'} en attente` : 'Aucune demande en attente'}
               </p>
@@ -286,7 +286,7 @@ export default function RequestsCalendarView({ currentUser }: RequestsCalendarVi
               <ClipboardList className="h-8 w-8 text-faint" />
             </div>
             <p className="text-muted">Aucune garde pour cette période</p>
-            <p className="mt-2 text-caption">Créez de nouvelles gardes depuis l'onglet Planning</p>
+            <p className="mt-2 text-caption">Créez de nouvelles gardes depuis l'onglet « Ouvertures »</p>
           </div>
         ) : (
           <>

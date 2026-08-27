@@ -24,7 +24,8 @@ type PendingRequestsListProps = {
 };
 
 // Liste des demandes (avec actions de validation) ou simple resume si
-// hideValidation (la validation se fait alors depuis l'onglet Demandes).
+// hideValidation (la validation se fait alors depuis l'onglet « Validation »,
+// nomme d'apres ce partage des roles depuis 8B-2).
 export default function PendingRequestsList({
   pendingRequests,
   shiftStatus,
@@ -49,7 +50,7 @@ export default function PendingRequestsList({
               {onHoldCount > 0 && <>, {onHoldCount} en pré-validation</>}
             </div>
             <div className="mt-1 text-body-m text-ocre-fonce/80">
-              Pour valider ou refuser les demandes, utilisez l'onglet « Demandes »
+              Pour valider ou refuser les demandes, utilisez l'onglet « Validation »
             </div>
           </div>
         </div>

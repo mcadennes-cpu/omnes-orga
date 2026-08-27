@@ -34,11 +34,21 @@ type Tab = {
   roles: UserRole[];
 };
 
+// L'ordre du tableau est l'ordre d'affichage : le filtre par role le conserve.
+// « Validation » vient donc en premier pour le coordinateur (l'ecran qu'il
+// ouvre plusieurs fois par jour) sans changer l'ordre vu par un medecin, qui
+// n'a pas cet onglet.
+//
+// Les libelles (8B-2) disent le GESTE et non le contenant : on ouvre des
+// semaines d'un cote, on valide des demandes de l'autre. Les deux onglets
+// affichent pourtant la meme grille -- c'est justement ce que « Calendrier »
+// et « Demandes » ne permettaient pas de distinguer. Les identifiants `view`
+// restent inchanges : eux seuls pilotent le rendu.
 const TABS: Tab[] = [
-  { view: 'calendar', label: 'Calendrier', icon: Calendar, roles: ['coordinator', 'doctor'] },
+  { view: 'requests', label: 'Validation', icon: ClipboardList, roles: ['coordinator'] },
+  { view: 'calendar', label: 'Ouvertures', icon: Calendar, roles: ['coordinator', 'doctor'] },
   { view: 'schedule', label: 'Mes gardes', icon: CalendarCheck, roles: ['doctor'] },
   { view: 'daily-schedule', label: 'Planning du jour', icon: CalendarDays, roles: ['doctor'] },
-  { view: 'requests', label: 'Demandes', icon: ClipboardList, roles: ['coordinator'] },
   { view: 'activity', label: 'Journal', icon: History, roles: ['coordinator'] },
   { view: 'settings', label: 'Paramètres', icon: Settings, roles: ['coordinator'] },
 ];

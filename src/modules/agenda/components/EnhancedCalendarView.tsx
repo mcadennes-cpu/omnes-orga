@@ -246,9 +246,20 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
             <div className="p-2 bg-canard/10 rounded-pill">
               <CalendarIcon className="w-6 h-6 text-canard" />
             </div>
+            {/* Le meme composant sert les deux roles, et l'onglet « Ouvertures »
+                ne veut pas dire la meme chose de part et d'autre : le
+                coordinateur ouvre les creneaux, le medecin regarde ceux qui
+                sont ouverts. Le titre le dit, sinon l'ecran de validation et
+                celui-ci portaient le meme (8B-2). */}
             <div>
-              <h2 className="text-h2 text-ink">Calendrier des gardes</h2>
-              <p className="text-caption">Merci de donner vos disponibilités</p>
+              <h2 className="text-h2 text-ink">
+                {currentUser.role === 'coordinator' ? 'Ouverture des gardes' : 'Gardes ouvertes'}
+              </h2>
+              <p className="text-caption">
+                {currentUser.role === 'coordinator'
+                  ? 'Ouvrez les semaines et suivez le planning'
+                  : 'Merci de donner vos disponibilités'}
+              </p>
             </div>
           </div>
 

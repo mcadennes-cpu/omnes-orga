@@ -27,9 +27,19 @@ function readStoredViewAs(): UserRole | null {
   }
 }
 
-function App({ orgaProfile }: AppProps) {
-  const [currentView, setCurrentView] = useState<AgendaView>('calendar');
+// L'onglet d'accueil dépend du rôle (8B-2) : le coordinateur arrive sur la
+// validation, l'écran qu'il ouvre plusieurs fois par jour ; le médecin sur les
+// ouvertures.
+//
+// ⚠️ Ce ne peut PAS être une constante : « Validation » n'existe pas pour un
+// médecin, et le `main` ne rend rien quand l'onglet courant ne correspond pas
+// au rôle — ce serait un écran vide sous le header, sans la moindre erreur.
+// Le repli est `calendar`, seul onglet commun aux deux rôles.
+function vueParDefaut(role: UserRole | undefined): AgendaView {
+  return role === 'coordinator' ? 'requests' : 'calendar';
+}
 
+function App({ orgaProfile }: AppProps) {
   // L'utilisateur du module est l'utilisateur connecté à Omnès-Orga
   // (cf. userAdapter.ts). Plus de session ni de profil séparés depuis
   // l'étape 7E.
@@ -60,6 +70,13 @@ function App({ orgaProfile }: AppProps) {
     return { ...realUser, role: viewAs };
   }, [realUser, isRealCoordinator, viewAs]);
 
+  // Déclaré APRÈS `currentUser` : l'onglet d'accueil se calcule depuis le rôle
+  // effectif. L'initialiseur ne joue qu'au premier rendu, et la page /planning
+  // ne monte ce composant qu'une fois le profil chargé.
+  const [currentView, setCurrentView] = useState<AgendaView>(() =>
+    vueParDefaut(currentUser?.role)
+  );
+
   const handleViewAsChange = (role: UserRole) => {
     setViewAs(role);
     try {
@@ -67,9 +84,12 @@ function App({ orgaProfile }: AppProps) {
     } catch {
       // stockage indisponible : la bascule reste valable pour cette session
     }
-    // Les onglets diffèrent d'un rôle à l'autre — revenir au calendrier, seul
-    // onglet commun, évite de rester sur une vue que le nouveau rôle n'a plus.
-    setCurrentView('calendar');
+    // Les onglets diffèrent d'un rôle à l'autre : rester sur le même risquerait
+    // une vue que le nouveau rôle n'a pas, donc un `main` vide. On repart de
+    // son onglet d'accueil — « Validation » en coordination, « Ouvertures » en
+    // médecin. Retomber systématiquement sur `calendar`, comme avant 8B-2,
+    // ferait atterrir le coordinateur sur le second onglet à chaque retour.
+    setCurrentView(vueParDefaut(role));
   };
 
   // La page /planning ne rend ce composant qu'une fois le profil chargé ;
