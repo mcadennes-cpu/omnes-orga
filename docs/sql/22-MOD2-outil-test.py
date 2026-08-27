@@ -102,21 +102,33 @@ def rest(methode, chemin, uid, corps=None, prefer=None):
 # ---------------------------------------------------------------------
 # Comptes
 #
-# ⚠ Les 2 seuls comptes ayant agenda_beta_access (Matthieu et Charlotte)
-# sont AUSSI coordinateurs depuis 6A. Sans compte « medecin », toute
-# verification de cloison passe A VIDE en affichant OK : peut_acceder()
-# bloque en amont, et on croit tester une policy qu'on n'atteint jamais.
+# Il faut un compte COORDINATEUR et un compte MEDECIN. Sans le second,
+# toute verification de cloison passe A VIDE en affichant OK :
+# peut_acceder() bloque en amont, et on croit tester une policy qu'on
+# n'atteint jamais. Le defaut a ete rencontre pour de vrai en MOD2-A.
 #
-# On ouvre donc l'acces beta a un associe le temps du test, et on le
-# retire dans tous les cas (atexit). Le jour ou un troisieme compte beta
-# non coordinateur existera, cette manipulation deviendra inutile.
+# Jusqu'au 27/08/2026, aucun compte beta n'etait non coordinateur : le
+# harnais ouvrait donc l'acces a un associe le temps du test, puis le
+# refermait. Depuis 23-7, un troisieme compte beta existe (Airelle
+# Sauvage) et l'emprunt n'a plus lieu d'etre -- on ne touche plus a la
+# table des profils.
+#
+# L'emprunt est CONSERVE en secours, pour le cas ou ce compte perdrait
+# son acces : le harnais doit continuer de fonctionner sans intervention.
 # ---------------------------------------------------------------------
 _coord = sql("""select id, prenom||' '||nom as nom from public.profiles
                  where is_agenda_coordinator order by nom limit 1""")[0]
-_medecin = sql("""select id, prenom||' '||nom as nom from public.profiles
-                   where coalesce(is_agenda_coordinator,false)=false
-                     and actif and coalesce(agenda_beta_access,false)=false
-                   order by nom limit 1""")[0]
+
+_titulaires = sql("""select id, prenom||' '||nom as nom from public.profiles
+                      where coalesce(is_agenda_coordinator,false)=false
+                        and actif and agenda_beta_access
+                      order by nom limit 1""")
+_EMPRUNT = not _titulaires
+_medecin = _titulaires[0] if _titulaires else sql(
+    """select id, prenom||' '||nom as nom from public.profiles
+        where coalesce(is_agenda_coordinator,false)=false
+          and actif and coalesce(agenda_beta_access,false)=false
+        order by nom limit 1""")[0]
 
 COORDINATEUR = _coord["id"]
 MEDECIN = _medecin["id"]
@@ -125,16 +137,18 @@ NOM_MEDECIN = _medecin["nom"]
 
 _BETA_ATTENDUS = sql(
     "select count(*) as n from public.profiles where agenda_beta_access")[0]["n"]
-sql(f"update public.profiles set agenda_beta_access = true where id = '{MEDECIN}'")
 
+if _EMPRUNT:
+    sql(f"update public.profiles set agenda_beta_access = true where id = '{MEDECIN}'")
 
-@atexit.register
-def _rendre_letat_initial():
-    sql(f"update public.profiles set agenda_beta_access = false where id = '{MEDECIN}'")
-    reste = sql("select count(*) as n from public.profiles "
-                "where agenda_beta_access")[0]["n"]
-    etat = "OK" if reste == _BETA_ATTENDUS else f"ANOMALIE (attendu {_BETA_ATTENDUS})"
-    print(f"\nAcces beta rendu -- {reste} compte(s) en beta : {etat}")
+    @atexit.register
+    def _rendre_letat_initial():
+        sql("update public.profiles set agenda_beta_access = false "
+            f"where id = '{MEDECIN}'")
+        reste = sql("select count(*) as n from public.profiles "
+                    "where agenda_beta_access")[0]["n"]
+        etat = "OK" if reste == _BETA_ATTENDUS else f"ANOMALIE (attendu {_BETA_ATTENDUS})"
+        print(f"\nAcces beta rendu -- {reste} compte(s) en beta : {etat}")
 
 
 # ---------------------------------------------------------------------
@@ -161,4 +175,6 @@ def bilan():
 
 def entete():
     print(f"Coordinateur : {NOM_COORDINATEUR}")
-    print(f"Medecin      : {NOM_MEDECIN}  (acces beta ouvert le temps du test)\n")
+    print(f"Medecin      : {NOM_MEDECIN}"
+          + ("  (acces beta ouvert le temps du test)" if _EMPRUNT
+             else "  (compte beta permanent, 23-7)") + "\n")
