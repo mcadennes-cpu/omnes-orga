@@ -95,7 +95,10 @@ function codeCourt(creneau: string, site: string): string {
   return creneau.replace(new RegExp(site, 'i'), '').replace(/\s+/g, ' ').trim() || creneau;
 }
 
-type OpenWeeksModalProps = { onClose: () => void; onOpened: () => void };
+// `onOpened` recoit le nombre de gardes ecrites : l'appelant en fait un bandeau
+// avec « Annuler » (8B-1b). Le compte vient du rapport de verification, calcule
+// juste avant par la meme fonction avec les memes parametres.
+type OpenWeeksModalProps = { onClose: () => void; onOpened: (gardesCreees: number) => void };
 
 export default function OpenWeeksModal({ onClose, onOpened }: OpenWeeksModalProps) {
   const [debut, setDebut] = useState('');
@@ -282,7 +285,7 @@ export default function OpenWeeksModal({ onClose, onOpened }: OpenWeeksModalProp
         p_ouvertures: ouverturesPayload(), p_verifier_seulement: false,
       });
       if (error) throw error;
-      onOpened();
+      onOpened(rapport?.total ?? 0);
       onClose();
     } catch (err: any) {
       setErreur(err.message);

@@ -292,6 +292,13 @@ ALTER TABLE profiles ADD COLUMN agenda_beta_access boolean DEFAULT false;
   - Matthieu retient la **piste C (hybride)** : bandeau éphémère pour le geste immédiat, journal d'activité pour la traçabilité et la restauration encadrée, journalisation exhaustive, **suppression douce** (`deleted_at`) sur les gardes. L'audit du code préalable à l'arbitrage a corrigé la doc sur un point important : le bouton « Annuler » couvre en réalité **2 actions et non 6** — les 4 autres types sont du code mort, déjà dans l'appli Bolt. Découpage **MOD2-A → MOD2-G** dans la section MOD-2 plus bas ; le journal se construit avant le bandeau, qui s'y adosse.
 
 - ⏳ **Étape 8 — PRÉPARATION COMMENCÉE (26/08/2026).**
+  - ✓ **8B-1 — FAITE (27/08/2026)** — **La duplication de modèle est supprimée ; « Ouvrir des semaines » est le seul chemin d'ouverture.** Relevé par Matthieu en regardant la barre d'outils de la vue Semaine : deux boutons ouvraient des semaines en y posant le roulement. Sept suites de test rejouées : **125/125**.
+    - **Ce n'était pas qu'un doublon.** L'audit a montré que le chemin retiré était **inférieur sur trois points**, et que deux d'entre eux annulaient des corrections déjà livrées : `duplicateWeekTemplate` n'avait **aucune notion de jour férié** (un 25 décembre ouvrait les consultations ordinaires — le trou que 6H-2 avait bouché), et **n'ouvrait pas les gardes du roulement absentes de la semaine type** (sa boucle ne parcourt que les items du modèle — le modèle d'ouverture que 6H-3 avait rétabli). Troisième point, mineur : elle écrivait **sans aperçu**, là où `ouvrir_semaines` affiche total / affectées / libres / fériés avant d'écrire. **Garder ce bouton, c'était garder une porte qui contourne les deux corrections.**
+    - **Ce qu'on perd, nommé plutôt que découvert plus tard** : la duplication reprenait la **salle enregistrée dans le modèle**, `ouvrir_semaines` prend `shift_types.default_room_id`. Écart mesuré nul en pratique (contrôle de 6H : 42/42 gardes dans la salle par défaut de leur créneau), mais la conséquence est que `opening_week_template_items.room_id` devient une colonne **écrite et plus jamais lue** — le texte de la modale d'enregistrement, qui promettait de retenir les salles, a été corrigé en conséquence. Second écart : la période se compte désormais en **semaines entières** (1 à 52), plus en date de fin libre.
+    - ⚠ **Le piège de cette suppression, repéré avant de toucher au code** : la barre d'outils entière était conditionnée à `onDuplicateTemplate` (`WeekView`). Retirer la prop sans corriger la garde **faisait disparaître les quatre boutons, dont « Ouvrir des semaines »** — sans erreur, sans échec de build. La barre ne dépend plus que de `onOpenWeeks`, le seul bouton qui ouvre des gardes, et chaque bouton secondaire porte sa propre garde. Un commentaire le dit sur place.
+    - **Aucune migration.** Les tables `opening_week_templates` / `opening_week_template_items` restent : ce sont les semaines types que consomme `ouvrir_semaines`. Aucune des 7 suites ne touchait à la duplication — vérifié avant, pas supposé.
+    - ✓ **8B-1b — le bandeau couvre enfin l'ouverture.** `handleDuplicateTemplate` était le **seul** appel à `signalerAction` du calendrier, alors que « Ouvrir des semaines » écrit bien davantage — plusieurs centaines de gardes — **et le faisait en silence**. `onOpened` remonte désormais le nombre de gardes du rapport de vérification, et l'appelant en fait un bandeau avec « Annuler ». L'annulation fonctionne par construction : `restaurer_action` pose `deleted_at` sur un `INSERT` de gardes — c'est exactement ce qui avait défait la duplication du 06/08, et qui a laissé les 81 gardes de janvier 2027 en suppression douce.
+    - ✓ **8B-1c — « modèle » devient « semaine type ».** Le mot « modèle » avait un sens tant qu'on le *dupliquait* ; l'écran qui les consomme disait « semaine type » partout. Les deux boutons conservés, les titres et messages des deux modales, et les deux bandeaux sont alignés. Même esprit que MOD2-F-1 : un mot, un geste.
   - ✓ **8A-1 — La resynchronisation différentielle** : `docs/sql/22-8A-1-resynchronisation-differentielle.py`, **écrit, exécuté et éprouvé sur les données réelles le 26/08/2026**. Remplace 7F, devenu destructeur (voir l'étape 7).
     - **L'argument de 7F s'est inversé.** Il justifiait la recopie complète par « c'est plus sûr qu'un différentiel ». Vrai le 31/07, quand la copie n'était qu'une copie ; faux dès le lendemain, la copie ayant divergé volontairement à partir de 6A. Mesure du 26/08 : **2 681 gardes communes, 2 seulement dans Bolt, 126 seulement dans Orga** (45 ouvertes par MOD-1 en septembre-novembre 2026, 81 de janvier 2027 en suppression douce). 7F les détruirait.
     - **Le nouveau script ne touche qu'à `shifts` et `requests`** — les seules tables dont Bolt possède encore quelque chose. `sites`, `rooms`, `shift_types` sont figés (Orga fait autorité depuis 6A) ; c'est possible parce que **les identifiants sont partagés** : les 15 créneaux, 2 sites et 12 salles de Bolt existent tous côté Orga avec le **même `id`** — vérifié, pas supposé. `deleted_at` n'est jamais écrasé.
@@ -1262,9 +1269,17 @@ case et par jour — ~380 allers-retours enchaînés pour 8 semaines — alors q
 venait de vérifier que la période était **vide**. Ces requêtes ne pouvaient rien
 trouver. Supprimées.
 
-*L'ancien chemin (modèle de semaine) n'est pas retiré* : Charlotte peut s'y
+~~*L'ancien chemin (modèle de semaine) n'est pas retiré* : Charlotte peut s'y
 appuyer, et le supprimer sortirait du cadre de MOD-1. Il est simplement passé en
-bouton secondaire, « Ouvrir des semaines » devenant le chemin principal.
+bouton secondaire, « Ouvrir des semaines » devenant le chemin principal.~~
+
+> ⚠ **Périmé le 27/08/2026 — la duplication de modèle est supprimée (8B-1a).**
+> La phrase était vraie tant qu'on ne savait pas si le nouveau chemin couvrait
+> tous les usages ; elle est conservée barrée plutôt que supprimée, comme celle
+> de 7F. Ce qui l'a renversée : la duplication ne se contentait pas de faire
+> doublon, elle **contournait les corrections de 6H-2 et 6H-3** — pas de jours
+> fériés, et pas d'ouverture des gardes du roulement absentes de la semaine
+> type. Détail sous « Étape 8 » dans le suivi d'avancement.
 
 ##### 17. Sous-étape 6H-2 — la révision qui corrige 6H-1 (02/08/2026)
 

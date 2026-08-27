@@ -1,6 +1,16 @@
 import { supabase } from './supabase';
-import { getRotationPlans, getPlanForDate, getRotationWeek } from './rotationUtils';
 
+// ---------------------------------------------------------------------------
+// Une semaine type dit QUELLES CASES sont ouvertes -- l'offre. Le plan de
+// roulement dit QUI les occupe -- l'affectation. Ce fichier ne s'occupe que de
+// la premiere : enregistrer la semaine affichee comme semaine type reutilisable.
+//
+// `duplicateWeekTemplate` vivait ici jusqu'au 27/08/2026 (8B-1a). Elle rejouait
+// une semaine type sur une periode, en posant le roulement par-dessus -- ce que
+// fait desormais `agenda.ouvrir_semaines` (6H), et mieux : elle ignorait les
+// jours feries et n'ouvrait pas les gardes du roulement absentes de la semaine
+// type. Les deux trous que 6H-2 et 6H-3 avaient justement bouches.
+// ---------------------------------------------------------------------------
 
 export async function saveWeekAsTemplate(
   weekStart: Date,
@@ -41,7 +51,7 @@ export async function saveWeekAsTemplate(
 
   if (templateError || !template) {
     console.error('[WeekTemplate] Error creating template:', templateError);
-    throw new Error('Erreur lors de la création du modèle');
+    throw new Error('Erreur lors de la création de la semaine type');
   }
 
   const uniqueOpenings = new Map<string, any>();
@@ -84,173 +94,4 @@ export async function saveWeekAsTemplate(
     templateId: template.id,
     itemsCount: items.length
   });
-}
-
-export async function duplicateWeekTemplate(
-  templateId: string,
-  startDate: string,
-  endDate: string
-): Promise<{ created: number; skipped: number }> {
-  console.log('[WeekTemplate] Starting duplication:', { templateId, startDate, endDate });
-
-  const start = new Date(startDate + 'T12:00:00');
-  if (start.getDay() !== 1) {
-    console.error('[WeekTemplate] blocked reason=not_monday, weekday=', start.getDay());
-    throw new Error('La duplication de modèle de semaine doit commencer un LUNDI. Veuillez choisir un lundi comme premier jour.');
-  }
-
-  const { data: existingShifts, error: checkError } = await supabase
-    .from('shifts')
-    .select('id')
-    .gte('date', startDate)
-    .lte('date', endDate)
-    .limit(1);
-
-  if (checkError) {
-    console.error('[WeekTemplate] Error checking existing shifts:', checkError);
-    throw new Error('Erreur lors de la vérification du calendrier');
-  }
-
-  if (existingShifts && existingShifts.length > 0) {
-    console.error('[WeekTemplate] blocked reason=calendar_not_empty');
-    throw new Error('La duplication de modèle de semaine n\'est possible que sur un calendrier VIDE. La période sélectionnée contient déjà des ouvertures.');
-  }
-
-  const { data: items, error: itemsError } = await supabase
-    .from('opening_week_template_items')
-    .select('weekday, site_id, room_id, shift_type_id')
-    .eq('template_id', templateId);
-
-  if (itemsError || !items) {
-    console.error('[WeekTemplate] Error loading template items:', itemsError);
-    throw new Error('Erreur lors du chargement du modèle');
-  }
-
-  const rotationPlans = await getRotationPlans();
-  const { data: rotationRules } = await supabase
-    .from('rotation_plan_rules')
-    .select('plan_id, doctor_id, site_id, shift_type_id, weekday, rotation_week');
-
-  const { data: sites } = await supabase
-    .from('sites')
-    .select('id, name');
-
-  const { data: rooms } = await supabase
-    .from('rooms')
-    .select('id, name');
-
-  const { data: shiftTypes } = await supabase
-    .from('shift_types')
-    .select('id, name, time_range');
-
-  const siteMap = new Map(sites?.map(s => [s.id, s.name]) || []);
-  const roomMap = new Map(rooms?.map(r => [r.id, r.name]) || []);
-  const shiftTypeMap = new Map(shiftTypes?.map(st => [st.id, st.time_range || st.name]) || []);
-
-  let created = 0;
-  // Toujours 0 depuis 6H : la periode est vide, rien ne peut etre saute.
-  const skipped = 0;
-  const shiftsToCreate: any[] = [];
-
-  const currentDate = new Date(startDate + 'T12:00:00');
-  const endDateObj = new Date(endDate + 'T12:00:00');
-
-  while (currentDate <= endDateObj) {
-    const year = currentDate.getFullYear();
-    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-    const day = String(currentDate.getDate()).padStart(2, '0');
-    const dateStr = `${year}-${month}-${day}`;
-    const localWeekday = currentDate.getDay();
-    const weekday = localWeekday === 0 ? 6 : localWeekday - 1;
-
-    const matchingItems = items.filter(item => item.weekday === weekday);
-
-    for (const item of matchingItems) {
-      // Plus de requete d'existence par case et par jour (6H, 02/08/2026) :
-      // la periode vient d'etre verifiee VIDE plus haut, et les items du
-      // modele sont uniques par (weekday, site, salle, creneau). Ces requetes
-      // ne pouvaient donc jamais rien trouver -- elles coutaient ~380
-      // allers-retours enchaines pour 8 semaines, et c'est ce qui rendait
-      // l'ouverture lente. `skipped` reste dans le retour par compatibilite.
-      let assignedDoctorId = null;
-      let status = 'free';
-
-      // Chaque jour genere resout son propre plan : une periode a cheval sur
-      // deux roulements applique le bon de part et d'autre.
-      const plan = rotationRules ? getPlanForDate(currentDate, rotationPlans) : null;
-
-      if (plan && rotationRules) {
-        const rotationWeek = getRotationWeek(
-          currentDate,
-          plan,
-          { componentName: 'weekTemplateUtils.applyWeekTemplate', inputOrigin: `generated shift date: ${currentDate.toString()}` }
-        );
-        const jsWeekday = localWeekday;
-
-        // Plus de comparaison de salle depuis 6B-3 : elle appartient au
-        // creneau, pas au roulement.
-        const matchingRule = rotationRules.find(rule =>
-          rule.plan_id === plan.id &&
-          rule.site_id === item.site_id &&
-          rule.shift_type_id === item.shift_type_id &&
-          rule.weekday === jsWeekday &&
-          rule.rotation_week === rotationWeek
-        );
-
-        if (matchingRule) {
-          assignedDoctorId = matchingRule.doctor_id;
-          status = 'assigned';
-          console.log('[WeekTemplate] Auto-assigned via rotation rule:', {
-            date: dateStr,
-            rotationWeek,
-            doctorId: assignedDoctorId
-          });
-        } else {
-          console.log('[WeekTemplate] No rotation rule found, creating free shift:', {
-            date: dateStr,
-            rotationWeek,
-            weekday: jsWeekday
-          });
-        }
-      }
-
-      const siteName = siteMap.get(item.site_id);
-      const roomName = roomMap.get(item.room_id);
-      const shiftTypeName = shiftTypeMap.get(item.shift_type_id);
-
-      shiftsToCreate.push({
-        date: dateStr,
-        location: siteName || 'Dijon',
-        room: roomName || 'Unknown',
-        shift_type: shiftTypeName || 'Unknown',
-        site_id: item.site_id,
-        room_id: item.room_id,
-        shift_type_id: item.shift_type_id,
-        status,
-        assigned_doctor_id: assignedDoctorId
-      });
-      created++;
-    }
-
-    currentDate.setDate(currentDate.getDate() + 1);
-  }
-
-  if (shiftsToCreate.length > 0) {
-    const { data: insertedShifts, error: insertError } = await supabase
-      .from('shifts')
-      .insert(shiftsToCreate)
-      .select('id');
-
-    if (insertError) {
-      console.error('[WeekTemplate] Error creating shifts:', insertError);
-      throw new Error('Erreur lors de la création des gardes');
-    }
-    // Plus rien a memoriser ici depuis MOD2-E : le declencheur de journal
-    // enregistre l'insertion tout seul, et le bandeau retrouve l'action par
-    // agenda.derniere_action(). C'est l'appelant qui signale.
-  }
-
-  console.log('[WeekTemplate] Duplication completed:', { created, skipped });
-
-  return { created, skipped };
 }

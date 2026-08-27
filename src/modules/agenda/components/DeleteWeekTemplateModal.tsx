@@ -38,7 +38,7 @@ export default function DeleteWeekTemplateModal({ onClose, onSuccess }: DeleteWe
 
     if (error) {
       console.error('Error loading templates:', error);
-      setError('Erreur lors du chargement des modèles');
+      setError('Erreur lors du chargement des semaines types');
       return;
     }
 
@@ -47,7 +47,7 @@ export default function DeleteWeekTemplateModal({ onClose, onSuccess }: DeleteWe
 
   const handleDelete = async () => {
     if (!selectedTemplateId) {
-      setError('Veuillez sélectionner un modèle à supprimer.');
+      setError('Veuillez sélectionner une semaine type à supprimer.');
       return;
     }
 
@@ -71,7 +71,7 @@ export default function DeleteWeekTemplateModal({ onClose, onSuccess }: DeleteWe
 
       if (templateError) throw templateError;
 
-      signaler(`Modèle « ${selectedTemplate?.name} » supprimé.`, 'succes');
+      signaler(`Semaine type « ${selectedTemplate?.name} » supprimée.`, 'succes');
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -93,7 +93,7 @@ export default function DeleteWeekTemplateModal({ onClose, onSuccess }: DeleteWe
 
   return (
     <BottomSheet
-      title="Supprimer un modèle de semaine"
+      title="Supprimer une semaine type"
       onClose={onClose}
       busy={loading}
       maxWidthClass="max-w-2xl"
@@ -113,7 +113,7 @@ export default function DeleteWeekTemplateModal({ onClose, onSuccess }: DeleteWe
               className="flex h-12 flex-1 items-center justify-center gap-2 rounded-input bg-brique text-button text-white shadow-button transition-colors hover:bg-brique/90 disabled:opacity-50"
             >
               <Trash2 className="h-5 w-5" />
-              Supprimer le modèle
+              Supprimer la semaine type
             </button>
           )}
         </>
@@ -123,20 +123,20 @@ export default function DeleteWeekTemplateModal({ onClose, onSuccess }: DeleteWe
         <div className="py-8 text-center">
           <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-faint" />
           <p className="text-body-l text-muted">
-            Aucun modèle n'est disponible pour suppression.
+            Aucune semaine type n'est disponible pour suppression.
           </p>
         </div>
       ) : (
         <div className="space-y-4">
           <div>
-            <label className="mb-2 block text-field-label">Sélectionner un modèle</label>
+            <label className="mb-2 block text-field-label">Sélectionner une semaine type</label>
             <select
               value={selectedTemplateId}
               onChange={(e) => setSelectedTemplateId(e.target.value)}
               className={fieldClass}
               disabled={loading}
             >
-              <option value="">Sélectionner un modèle</option>
+              <option value="">Sélectionner une semaine type</option>
               {templates.map((template) => (
                 <option key={template.id} value={template.id}>
                   {template.name} ({formatDate(template.created_at)})
@@ -151,10 +151,10 @@ export default function DeleteWeekTemplateModal({ onClose, onSuccess }: DeleteWe
                 <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-brique" />
                 <div className="flex-1">
                   <p className="mb-1 font-medium text-brique">
-                    Êtes-vous sûr de vouloir supprimer le modèle « {selectedTemplate.name} ({formatDate(selectedTemplate.created_at)}) » ?
+                    Êtes-vous sûr de vouloir supprimer la semaine type « {selectedTemplate.name} ({formatDate(selectedTemplate.created_at)}) » ?
                   </p>
                   <p className="text-body-m text-brique/80">
-                    Cette action est définitive et ne supprimera PAS les gardes déjà créées à partir de ce modèle.
+                    Cette action est définitive et ne supprimera PAS les gardes déjà ouvertes à partir de cette semaine type.
                   </p>
                 </div>
               </div>

@@ -21,7 +21,7 @@ export default function SaveWeekTemplateModal({
 
   const handleSave = async () => {
     if (!templateName.trim()) {
-      setError('Veuillez saisir un nom pour le modèle');
+      setError('Veuillez saisir un nom pour la semaine type');
       return;
     }
 
@@ -32,7 +32,7 @@ export default function SaveWeekTemplateModal({
       await onSave(templateName.trim());
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Erreur lors de la sauvegarde');
+      setError(err.message || "Erreur lors de l'enregistrement");
     } finally {
       setSaving(false);
     }
@@ -40,7 +40,7 @@ export default function SaveWeekTemplateModal({
 
   return (
     <BottomSheet
-      title="Sauvegarder comme modèle de semaine"
+      title="Enregistrer la semaine affichée comme semaine type"
       onClose={onClose}
       busy={saving}
       footer={
@@ -58,14 +58,14 @@ export default function SaveWeekTemplateModal({
             className="flex h-12 flex-1 items-center justify-center gap-2 rounded-input bg-marine text-button text-white shadow-button transition-colors hover:bg-marine/90 disabled:opacity-50"
           >
             <Save className="h-4 w-4" />
-            {saving ? 'Sauvegarde…' : 'Sauvegarder'}
+            {saving ? 'Enregistrement…' : 'Enregistrer'}
           </button>
         </>
       }
     >
       <div className="space-y-4">
         <div>
-          <label className="mb-2 block text-field-label">Nom du modèle</label>
+          <label className="mb-2 block text-field-label">Nom de la semaine type</label>
           <input
             type="text"
             value={templateName}
@@ -83,8 +83,9 @@ export default function SaveWeekTemplateModal({
         )}
 
         <div className="rounded-input border border-marine/20 bg-marine/5 p-3 text-body-m text-ink">
-          La structure d'ouverture de la semaine affichée sera sauvegardée (sites, salles, types de garde).
-          Les affectations et demandes ne seront pas incluses.
+          Les créneaux ouverts dans la semaine affichée seront enregistrés (sites et
+          horaires), sans les affectations ni les demandes. Cette semaine type sera
+          proposée dans « Ouvrir des semaines ».
         </div>
       </div>
     </BottomSheet>

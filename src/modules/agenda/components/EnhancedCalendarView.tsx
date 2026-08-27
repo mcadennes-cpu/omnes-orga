@@ -9,11 +9,10 @@ import CreateShiftModal from './CreateShiftModal';
 import ShiftDetailModal from './ShiftDetailModal';
 import SaveWeekTemplateModal from './SaveWeekTemplateModal';
 import DeleteWeekTemplateModal from './DeleteWeekTemplateModal';
-import DuplicateWeekTemplateModal from './DuplicateWeekTemplateModal';
 import OpenWeeksModal from './OpenWeeksModal';
 import StatusBadge from './ui/StatusBadge';
 import { AgendaStatusKey } from '../lib/statusStyles';
-import { saveWeekAsTemplate, duplicateWeekTemplate } from '../lib/weekTemplateUtils';
+import { saveWeekAsTemplate } from '../lib/weekTemplateUtils';
 import { useToast } from './ui/ActionToast';
 
 type EnhancedCalendarViewProps = {
@@ -34,8 +33,8 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
   const [showDeleteTemplateModal, setShowDeleteTemplateModal] = useState(false);
-  const [showDuplicateTemplateModal, setShowDuplicateTemplateModal] = useState(false);
-  // Ouverture des semaines depuis le plan de roulement (6H).
+  // Ouverture des semaines depuis le plan de roulement (6H) -- seul chemin
+  // d'ouverture depuis 8B-1a.
   const [showOpenWeeksModal, setShowOpenWeeksModal] = useState(false);
   const [availableDoctors, setAvailableDoctors] = useState<Array<{ id: string; name: string }>>([]);
   const { signaler, signalerAction } = useToast();
@@ -222,13 +221,17 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
     startOfWeek.setDate(date.getDate() - date.getDay() + 1);
 
     await saveWeekAsTemplate(startOfWeek, templateName, currentUser.id);
-    signaler('Modèle de semaine enregistré.', 'succes');
+    signaler('Semaine type enregistrée.', 'succes');
   };
 
-  const handleDuplicateTemplate = async (templateId: string, startDate: string, endDate: string) => {
-    const result = await duplicateWeekTemplate(templateId, startDate, endDate);
+  // Le bandeau et son « Annuler » etaient jusqu'ici le privilege de la
+  // duplication de modele, retiree en 8B-1a. L'ouverture ecrit pourtant bien
+  // davantage -- plusieurs centaines de gardes -- et le faisait en silence.
+  // Annuler repose sur restaurer_action, qui pose `deleted_at` sur un INSERT
+  // de gardes : c'est exactement ce qui avait defait la duplication du 06/08.
+  const handleWeeksOpened = (gardesCreees: number) => {
     signalerAction(
-      `${result.created} garde${result.created > 1 ? 's' : ''} créée${result.created > 1 ? 's' : ''} depuis le modèle.`
+      `${gardesCreees} garde${gardesCreees > 1 ? 's' : ''} ouverte${gardesCreees > 1 ? 's' : ''}.`
     );
     loadShifts();
   };
@@ -346,7 +349,6 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
                     isCoordinator={currentUser.role === 'coordinator'}
                     onSaveAsTemplate={() => setShowSaveTemplateModal(true)}
                     onDeleteTemplate={() => setShowDeleteTemplateModal(true)}
-                    onDuplicateTemplate={() => setShowDuplicateTemplateModal(true)}
                     onOpenWeeks={() => setShowOpenWeeksModal(true)}
                   />
                 )}
@@ -403,17 +405,10 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
         />
       )}
 
-      {showDuplicateTemplateModal && (
-        <DuplicateWeekTemplateModal
-          onClose={() => setShowDuplicateTemplateModal(false)}
-          onDuplicate={handleDuplicateTemplate}
-        />
-      )}
-
       {showOpenWeeksModal && (
         <OpenWeeksModal
           onClose={() => setShowOpenWeeksModal(false)}
-          onOpened={loadShifts}
+          onOpened={handleWeeksOpened}
         />
       )}
     </div>

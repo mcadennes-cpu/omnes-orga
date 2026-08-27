@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Shift } from '../../lib/supabase';
-import { ChevronLeft, ChevronRight, Repeat, Save, Copy, Trash2, CalendarPlus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Repeat, Save, Trash2, CalendarPlus } from 'lucide-react';
 import { getRotationPlans, getPlanForDate, getRotationWeek } from '../../lib/rotationUtils';
 
 type WeekViewProps = {
@@ -13,7 +13,6 @@ type WeekViewProps = {
   isCoordinator?: boolean;
   onSaveAsTemplate?: () => void;
   onDeleteTemplate?: () => void;
-  onDuplicateTemplate?: () => void;
   onOpenWeeks?: () => void;
 };
 
@@ -27,7 +26,6 @@ export default function WeekView({
   isCoordinator = false,
   onSaveAsTemplate,
   onDeleteTemplate,
-  onDuplicateTemplate,
   onOpenWeeks
 }: WeekViewProps) {
   const [rotationInfo, setRotationInfo] = useState<{ week: number; total: number } | null>(null);
@@ -236,41 +234,38 @@ export default function WeekView({
             </div>
           </div>
         )}
-        {isCoordinator && onSaveAsTemplate && onDeleteTemplate && onDuplicateTemplate && (
+        {/* Depuis 8B-1a la barre ne depend plus que de « Ouvrir des semaines » :
+            c'est le seul chemin qui ouvre des gardes. Les deux autres boutons
+            gerent les semaines types qu'il consomme. Ne pas remettre ici de
+            garde sur une prop retiree -- conditionner la barre entiere a une
+            prop absente la ferait disparaitre sans erreur. */}
+        {isCoordinator && onOpenWeeks && (
           <div className="flex flex-wrap items-center justify-center gap-3 px-4 pb-4">
-            {/* Chemin principal depuis 6H : le plan de roulement decrit deja les
-                cases des associes, plus besoin de fabriquer une semaine de
-                reference puis de la dupliquer. */}
-            {onOpenWeeks && (
+            <button
+              onClick={onOpenWeeks}
+              className="flex items-center gap-2 rounded-input bg-marine px-4 py-2 text-button text-white shadow-button transition-colors hover:bg-marine/90"
+            >
+              <CalendarPlus className="h-4 w-4" />
+              Ouvrir des semaines
+            </button>
+            {onSaveAsTemplate && (
               <button
-                onClick={onOpenWeeks}
-                className="flex items-center gap-2 rounded-input bg-marine px-4 py-2 text-button text-white shadow-button transition-colors hover:bg-marine/90"
+                onClick={onSaveAsTemplate}
+                className="flex items-center gap-2 rounded-input border border-border bg-carte px-4 py-2 text-button text-marine transition-colors hover:bg-fond"
               >
-                <CalendarPlus className="h-4 w-4" />
-                Ouvrir des semaines
+                <Save className="h-4 w-4" />
+                Enregistrer une semaine type
               </button>
             )}
-            <button
-              onClick={onSaveAsTemplate}
-              className="flex items-center gap-2 rounded-input border border-border bg-carte px-4 py-2 text-button text-marine transition-colors hover:bg-fond"
-            >
-              <Save className="h-4 w-4" />
-              Sauvegarder comme modèle
-            </button>
-            <button
-              onClick={onDuplicateTemplate}
-              className="flex items-center gap-2 rounded-input border border-border bg-carte px-4 py-2 text-button text-marine transition-colors hover:bg-fond"
-            >
-              <Copy className="h-4 w-4" />
-              Dupliquer un modèle
-            </button>
-            <button
-              onClick={onDeleteTemplate}
-              className="flex items-center gap-2 rounded-input border border-brique/30 bg-brique/10 px-4 py-2 text-button text-brique transition-colors hover:bg-brique/20"
-            >
-              <Trash2 className="h-4 w-4" />
-              Supprimer un modèle
-            </button>
+            {onDeleteTemplate && (
+              <button
+                onClick={onDeleteTemplate}
+                className="flex items-center gap-2 rounded-input border border-brique/30 bg-brique/10 px-4 py-2 text-button text-brique transition-colors hover:bg-brique/20"
+              >
+                <Trash2 className="h-4 w-4" />
+                Supprimer une semaine type
+              </button>
+            )}
           </div>
         )}
       </div>
