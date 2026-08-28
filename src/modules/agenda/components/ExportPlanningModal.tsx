@@ -1,13 +1,17 @@
 import { useState } from 'react';
-import { Download } from 'lucide-react';
-import { exportPlanningToCSV, exportPlanningMatrixToCSV } from '../lib/exportUtils';
+import { Download, Printer } from 'lucide-react';
+import { exportPlanningToCSV } from '../lib/exportUtils';
+import { construirePlanningImprimable } from '../lib/printPlanning';
 import BottomSheet from './ui/BottomSheet';
 
 type ExportPlanningModalProps = {
   onClose: () => void;
 };
 
-type ExportFormat = 'list' | 'matrix';
+// « matrix » (CSV en tableau) a ete remplace par « print » en 8B-3 : le tableur
+// n'en faisait rien de lisible, et le format melangeait un nombre de demandes
+// avec des noms de medecins dans la meme colonne.
+type ExportFormat = 'list' | 'print';
 
 const fieldClass =
   'w-full rounded-input border border-border bg-carte px-3 py-2 text-body-m text-ink ' +
@@ -16,7 +20,7 @@ const fieldClass =
 export default function ExportPlanningModal({ onClose }: ExportPlanningModalProps) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [exportFormat, setExportFormat] = useState<ExportFormat>('matrix');
+  const [exportFormat, setExportFormat] = useState<ExportFormat>('print');
   const [siteFilter, setSiteFilter] = useState<'all' | 'Dijon' | 'Beaune'>('all');
   const [includeFreeShifts, setIncludeFreeShifts] = useState(true);
   const [includeAssignedShifts, setIncludeAssignedShifts] = useState(true);
@@ -41,25 +45,49 @@ export default function ExportPlanningModal({ onClose }: ExportPlanningModalProp
       return;
     }
 
+    // ⚠️ La fenêtre s'ouvre AVANT le chargement des données. Ouverte après un
+    // `await`, elle serait bloquée comme une fenêtre publicitaire : le droit
+    // d'en ouvrir une vient du clic, et il ne survit pas à l'attente réseau
+    // (Safari est le plus strict). D'où ce découpage — la fenêtre d'abord, le
+    // document ensuite.
+    let fenetre: Window | null = null;
+    if (exportFormat === 'print') {
+      fenetre = window.open('', '_blank');
+      if (!fenetre) {
+        setError(
+          "Le navigateur a bloqué l'ouverture de la fenêtre. Autorisez les fenêtres surgissantes pour ce site, puis réessayez."
+        );
+        return;
+      }
+      fenetre.document.write('<p style="font-family:sans-serif">Préparation du planning…</p>');
+    }
+
     setIsExporting(true);
 
     try {
-      let result;
+      if (exportFormat === 'print') {
+        const result = await construirePlanningImprimable({ startDate, endDate });
 
-      if (exportFormat === 'matrix') {
-        result = await exportPlanningMatrixToCSV({
-          startDate,
-          endDate,
-        });
-      } else {
-        result = await exportPlanningToCSV({
-          startDate,
-          endDate,
-          siteFilter,
-          includeFreeShifts,
-          includeAssignedShifts,
-        });
+        if (!result.success || !result.html) {
+          fenetre?.close();
+          setError(result.error || "Une erreur est survenue lors de la préparation.");
+          return;
+        }
+
+        fenetre!.document.open();
+        fenetre!.document.write(result.html);
+        fenetre!.document.close();
+        onClose();
+        return;
       }
+
+      const result = await exportPlanningToCSV({
+        startDate,
+        endDate,
+        siteFilter,
+        includeFreeShifts,
+        includeAssignedShifts,
+      });
 
       if (!result.success) {
         setError(result.error || 'Une erreur est survenue lors de l\'exportation.');
@@ -68,6 +96,7 @@ export default function ExportPlanningModal({ onClose }: ExportPlanningModalProp
       }
     } catch (err) {
       console.error('Export error:', err);
+      fenetre?.close();
       setError('Une erreur inattendue est survenue.');
     } finally {
       setIsExporting(false);
@@ -96,7 +125,12 @@ export default function ExportPlanningModal({ onClose }: ExportPlanningModalProp
             {isExporting ? (
               <>
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                <span>Export…</span>
+                <span>{exportFormat === 'print' ? 'Préparation…' : 'Export…'}</span>
+              </>
+            ) : exportFormat === 'print' ? (
+              <>
+                <Printer className="h-4 w-4" />
+                <span>Ouvrir</span>
               </>
             ) : (
               <>
@@ -116,14 +150,14 @@ export default function ExportPlanningModal({ onClose }: ExportPlanningModalProp
             onChange={(e) => setExportFormat(e.target.value as ExportFormat)}
             className={fieldClass}
           >
-            <option value="list">Liste classique</option>
-            <option value="matrix">Matrice (Tableau)</option>
+            <option value="print">À imprimer</option>
+            <option value="list">Liste (tableur)</option>
           </select>
-          {exportFormat === 'matrix' && (
-            <p className="mt-1 text-caption">
-              Export en format tableau : salles en lignes, jours en colonnes
-            </p>
-          )}
+          <p className="mt-1 text-caption">
+            {exportFormat === 'print'
+              ? "Le planning s'ouvre dans un nouvel onglet, à la disposition de la vue Semaine : salles en lignes, jours en colonnes. Noir et blanc, une semaine par page."
+              : 'Un fichier CSV, une ligne par garde — pour retravailler les données dans un tableur.'}
+          </p>
         </div>
 
         <div>
