@@ -26,6 +26,20 @@ export type OrgaProfile = {
   is_agenda_coordinator?: boolean;
 };
 
+// Rôles applicatifs Orga qui exercent au cabinet à demeure, par opposition aux
+// remplaçants. `super_admin` en fait partie : Matthieu est l'un des 9 associés
+// du roulement (cf. 23-3, la désignation porte sur des faits, pas sur des noms).
+const ROLES_ASSOCIE = ['super_admin', 'associe_gerant', 'associe'];
+
+// Côté agenda, les 9 associés et les 26 remplaçants sont TOUS `doctor` : le rôle
+// du module ne permet pas de les distinguer. Or ils n'ouvrent pas le module pour
+// la même raison — un associé veut voir qui exerce aujourd'hui, un remplaçant
+// quelles gardes il peut demander. D'où ce critère, lu sur le rôle Orga, qui
+// décide de l'onglet d'accueil (03/09/2026, demande de Matthieu).
+export function estAssocieOrga(orgaProfile: OrgaProfile | null | undefined): boolean {
+  return !!orgaProfile && ROLES_ASSOCIE.includes(orgaProfile.role);
+}
+
 // Construit l'utilisateur passé aux vues du module.
 // Doit produire exactement ce que renvoie la vue `agenda.profiles`, pour que
 // l'utilisateur courant et les médecins lus en base aient la même forme.

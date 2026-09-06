@@ -140,19 +140,21 @@ export default function MyScheduleView({ currentUser }: MyScheduleViewProps) {
     (req) => req.shift !== null && req.status === 'pending'
   );
 
-  // Lignes lieu / salle / horaire d'une garde, communes aux deux vues.
+  // Lieu, salle et horaire d'une garde, communs aux deux bascules (confirmees /
+  // en attente). L'horaire est ici : la couleur du creneau est reduite a un
+  // lisere en pied de carte, qui ne porte aucun texte.
   const shiftInfoGrid = (shift: Shift) => (
     <div className="grid grid-cols-3 gap-4">
       <div className="flex items-center gap-2">
-        <MapPin className="h-4 w-4 text-muted" />
+        <MapPin className="h-4 w-4 flex-shrink-0 text-muted" />
         <span className="text-body-m font-medium text-ink">{shift.location}</span>
       </div>
       <div className="flex items-center gap-2">
-        <Calendar className="h-4 w-4 text-muted" />
+        <Calendar className="h-4 w-4 flex-shrink-0 text-muted" />
         <span className="text-body-m font-medium text-ink">{shift.room}</span>
       </div>
       <div className="flex items-center gap-2">
-        <Clock className="h-4 w-4 text-muted" />
+        <Clock className="h-4 w-4 flex-shrink-0 text-muted" />
         <span className="text-body-m font-medium text-ink">{shift.shift_type}</span>
       </div>
     </div>
@@ -185,24 +187,35 @@ export default function MyScheduleView({ currentUser }: MyScheduleViewProps) {
     </div>
   );
 
-  // Carte de garde : date sur bande couleur (selon le creneau) en tete, puis
-  // lieu / salle / horaire sur fond blanc. Une carte par garde (le cas normal
-  // etant une garde par jour ; d'eventuels doublons apparaissent en deux cartes).
+  // Carte de garde : tout en noir sur blanc, et la couleur du creneau reduite a
+  // un lisere de 3 px en L — bord bas + bord droit (essai du 03/09/2026, a
+  // comparer avec le bandeau plein reste en place dans "Planning du jour").
+  // Une carte par garde (le cas normal etant une garde par jour ; d'eventuels
+  // doublons apparaissent en deux cartes).
   const shiftCard = (shift: Shift, extra?: JSX.Element | null) => {
     const style = getHoraireStyle(shift.shift_type, shift.date);
     return (
       <div
         key={shift.id}
-        className="overflow-hidden rounded-card border border-border bg-carte shadow-card"
+        className="relative overflow-hidden rounded-card border border-border bg-carte shadow-card"
       >
-        <div className={`px-4 py-2.5 ${style.bandClass}`}>
-          <span className="text-body-l font-semibold capitalize">{formatDate(shift.date)}</span>
-        </div>
         <div className="bg-carte px-4 py-3">
+          <p className="mb-3 text-body-l font-semibold capitalize text-ink">
+            {formatDate(shift.date)}
+          </p>
           {shiftInfoGrid(shift)}
           {shift.coordinator_note && coordinatorNote(shift.coordinator_note)}
           {extra && <div className="mt-3">{extra}</div>}
         </div>
+        {/* Lisere en L : une BORDURE bas + droite, pas deux rectangles poses.
+            Un rectangle ne peut pas suivre un arrondi — les deux se croisaient
+            en angle droit dans le coin bas-droit. La bordure, elle, epouse le
+            rayon a epaisseur constante, et s'estompe en biseau la ou elle
+            rencontre les cotes sans bordure (coins bas-gauche et haut-droit).
+            Posee en surimpression pour ne rien deplacer dans la carte. */}
+        <div
+          className={`pointer-events-none absolute inset-0 rounded-card border-b-[3px] border-r-[3px] ${style.borderClass}`}
+        />
       </div>
     );
   };

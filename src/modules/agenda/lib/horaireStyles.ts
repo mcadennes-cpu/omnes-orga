@@ -3,16 +3,23 @@
 // a 5 couleurs de marque (comme la palette d'avatars) — deroge au principe
 // "une couleur d'accent par module", assume et documente.
 //
-// Mapping decide avec Matthieu (couleurs "jour / nuit", maj 26/07/2026) :
+// Mapping decide avec Matthieu (couleurs "jour / nuit", maj 03/09/2026) :
 //   08:00-14:00 (matin court, J6)      -> ocre   (jaune)
 //   08:00-16:00 (matin, J1)            -> olive  (vert de la marque)
 //   08:00-18:30 (journee)              -> canard (bleu ciel)
 //   14:00+ (apres-midi / soir, J2...)  -> marine (bleu fonce)
+//   fin a 22:00 ou plus tard (nuit)    -> marine (bleu fonce)
 //   samedi / dimanche (week-end)       -> brique (rouge)
 //   non reconnu                        -> neutre
 //
-// La couleur sert de bandeau plein "teinte soutenue" (fond + texte) en tete de
-// la carte de garde, dans "Mes gardes" et "Planning du jour".
+// La couleur est portee par un lisere en L — bordure basse + bordure droite,
+// 3 px — sur la carte de garde, dans "Mes gardes" et "Planning du jour"
+// (03/09/2026). Auparavant c'etait un bandeau plein ; le champ `bandClass` qui
+// le servait a ete retire avec lui, faute d'usage.
+//
+// Pourquoi une BORDURE et non un rectangle pose : seule une bordure epouse
+// l'arrondi des coins a epaisseur constante. Deux rectangles se croisent
+// forcement en angle droit dans le coin bas-droit, ce qui se voit.
 //
 // IMPORTANT : les classes Tailwind sont ecrites en toutes lettres (jamais
 // construites dynamiquement) sinon le purge Tailwind ne les inclut pas.
@@ -21,17 +28,17 @@ export type HoraireKey = 'matinCourt' | 'matin' | 'journee' | 'apresMidi' | 'wee
 
 export interface HoraireStyle {
   key: HoraireKey;
-  /** Bandeau plein (fond + couleur de texte) en tete de la carte de garde. */
-  bandClass: string;
+  /** Couleur de bordure, pour le lisere en L de la carte de garde. */
+  borderClass: string;
 }
 
 export const HORAIRE_STYLES: Record<HoraireKey, HoraireStyle> = {
-  matinCourt: { key: 'matinCourt', bandClass: 'bg-ocre text-marine' },
-  matin:      { key: 'matin',      bandClass: 'bg-olive text-white' },
-  journee:    { key: 'journee',    bandClass: 'bg-canard text-white' },
-  apresMidi:  { key: 'apresMidi',  bandClass: 'bg-marine text-white' },
-  weekend:    { key: 'weekend',    bandClass: 'bg-brique text-white' },
-  autre:      { key: 'autre',      bandClass: 'bg-fond text-ink' },
+  matinCourt: { key: 'matinCourt', borderClass: 'border-ocre' },
+  matin:      { key: 'matin',      borderClass: 'border-olive' },
+  journee:    { key: 'journee',    borderClass: 'border-canard' },
+  apresMidi:  { key: 'apresMidi',  borderClass: 'border-marine' },
+  weekend:    { key: 'weekend',    borderClass: 'border-brique' },
+  autre:      { key: 'autre',      borderClass: 'border-border' },
 };
 
 // Jour de la semaine sans decalage de fuseau (dateStr = 'YYYY-MM-DD').
@@ -59,6 +66,12 @@ export function resolveHoraire(shiftType: string, dateStr: string): HoraireKey {
   if (!range) return 'autre';
 
   if (range.start >= 14 * 60) return 'apresMidi';
+  // Garde de nuit : finir a 22:00 ou plus tard suffit, meme en commencant le
+  // matin. Cas reel : J2 Beaune, dont les gardes portent "10:00-22:00" — sans
+  // cette regle elle tombait en "journee" (canard) faute de demarrer apres
+  // 14:00. Le seuil est bien 22:00 et non 20:00, sinon J5 Dijon (12:00-20:00)
+  // et les week-ends (08:00-20:00) basculeraient aussi.
+  if (range.end >= 22 * 60) return 'apresMidi';
   if (range.end <= 14 * 60) return 'matinCourt';
   if (range.end <= 16 * 60) return 'matin';
   return 'journee';

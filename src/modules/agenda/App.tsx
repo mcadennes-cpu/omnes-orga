@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { buildAgendaUser, OrgaProfile } from './lib/userAdapter';
+import { buildAgendaUser, estAssocieOrga, OrgaProfile } from './lib/userAdapter';
 import { UserRole } from './lib/supabase';
-import AgendaHeader, { AgendaView } from './components/AgendaHeader';
+import AgendaHeader, { AgendaView, vueParDefaut } from './components/AgendaHeader';
 import { ToastProvider } from './components/ui/ActionToast';
 import EnhancedCalendarView from './components/EnhancedCalendarView';
 import MyScheduleView from './components/MyScheduleView';
@@ -27,17 +27,10 @@ function readStoredViewAs(): UserRole | null {
   }
 }
 
-// L'onglet d'accueil dépend du rôle (8B-2) : le coordinateur arrive sur la
-// validation, l'écran qu'il ouvre plusieurs fois par jour ; le médecin sur les
-// ouvertures.
-//
-// ⚠️ Ce ne peut PAS être une constante : « Validation » n'existe pas pour un
-// médecin, et le `main` ne rend rien quand l'onglet courant ne correspond pas
-// au rôle — ce serait un écran vide sous le header, sans la moindre erreur.
-// Le repli est `calendar`, seul onglet commun aux deux rôles.
-function vueParDefaut(role: UserRole | undefined): AgendaView {
-  return role === 'coordinator' ? 'requests' : 'calendar';
-}
+// L'onglet d'accueil (8B-2) vit désormais dans AgendaHeader, avec la barre
+// d'onglets : c'est toujours le PREMIER onglet du rôle, donc les deux ne
+// peuvent plus se contredire. Le coordinateur arrive sur « Validation », le
+// médecin associé sur « Planning du jour », le remplaçant sur « Ouvertures ».
 
 function App({ orgaProfile }: AppProps) {
   // L'utilisateur du module est l'utilisateur connecté à Omnès-Orga
@@ -61,6 +54,10 @@ function App({ orgaProfile }: AppProps) {
   // Ce n'est pas un bac à sable, et ce n'est pas un contrôle de sécurité :
   // c'est un confort d'affichage, doublé d'un outil de test des vues médecin.
   // ---------------------------------------------------------------------
+  // Lu sur le profil Orga et non sur le rôle agenda : côté module, associés et
+  // remplaçants sont indistinctement `doctor`. Ne pilote que l'ordre des onglets.
+  const estAssocie = estAssocieOrga(orgaProfile);
+
   const isRealCoordinator = realUser?.role === 'coordinator';
   const [viewAs, setViewAs] = useState<UserRole>(() => readStoredViewAs() ?? 'coordinator');
 
@@ -74,7 +71,7 @@ function App({ orgaProfile }: AppProps) {
   // effectif. L'initialiseur ne joue qu'au premier rendu, et la page /planning
   // ne monte ce composant qu'une fois le profil chargé.
   const [currentView, setCurrentView] = useState<AgendaView>(() =>
-    vueParDefaut(currentUser?.role)
+    vueParDefaut(currentUser?.role, estAssocie)
   );
 
   const handleViewAsChange = (role: UserRole) => {
@@ -89,7 +86,7 @@ function App({ orgaProfile }: AppProps) {
     // son onglet d'accueil — « Validation » en coordination, « Ouvertures » en
     // médecin. Retomber systématiquement sur `calendar`, comme avant 8B-2,
     // ferait atterrir le coordinateur sur le second onglet à chaque retour.
-    setCurrentView(vueParDefaut(role));
+    setCurrentView(vueParDefaut(role, estAssocie));
   };
 
   // La page /planning ne rend ce composant qu'une fois le profil chargé ;
@@ -108,6 +105,7 @@ function App({ orgaProfile }: AppProps) {
       <AgendaHeader
         currentUser={currentUser}
         currentView={currentView}
+        estAssocie={estAssocie}
         onViewChange={setCurrentView}
         viewAs={isRealCoordinator ? viewAs : undefined}
         onViewAsChange={isRealCoordinator ? handleViewAsChange : undefined}

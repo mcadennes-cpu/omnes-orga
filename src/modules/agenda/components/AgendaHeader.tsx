@@ -27,7 +27,7 @@ export type AgendaView =
   | 'activity'
   | 'settings';
 
-type Tab = {
+export type Tab = {
   view: AgendaView;
   label: string;
   icon: typeof Calendar;
@@ -53,10 +53,49 @@ const TABS: Tab[] = [
   { view: 'settings', label: 'Paramètres', icon: Settings, roles: ['coordinator'] },
 ];
 
+// Ordre des onglets medecin pour un ASSOCIE (03/09/2026) : il ouvre le module
+// pour voir qui exerce aujourd'hui, puis ses propres gardes ; l'ouverture de
+// gardes vient en dernier. Un remplacant lit la meme barre dans l'autre sens —
+// il vient d'abord chercher des gardes a demander — et garde donc l'ordre de
+// TABS, inchange.
+const ORDRE_ASSOCIE: AgendaView[] = ['daily-schedule', 'schedule', 'calendar'];
+
+function rangAssocie(view: AgendaView): number {
+  const rang = ORDRE_ASSOCIE.indexOf(view);
+  // Onglet non nomme ci-dessus : renvoye en fin de barre plutot qu'a une place
+  // arbitraire. Le tri de JS etant stable, ceux-la gardent entre eux l'ordre
+  // de TABS.
+  return rang === -1 ? ORDRE_ASSOCIE.length : rang;
+}
+
+// Onglets visibles, dans l'ordre d'affichage, pour un utilisateur donne.
+// Le coordinateur n'est pas concerne : sa barre suit l'ordre de TABS (8B-2).
+export function ongletsVisibles(role: UserRole, estAssocie: boolean): Tab[] {
+  const tabs = TABS.filter((tab) => tab.roles.includes(role));
+  if (role !== 'doctor' || !estAssocie) return tabs;
+  return [...tabs].sort((a, b) => rangAssocie(a.view) - rangAssocie(b.view));
+}
+
+// L'onglet d'accueil EST le premier onglet de la barre, par construction : les
+// deux ne peuvent donc pas diverger. C'est precisement ce que 8B-2 avait du
+// corriger, l'accueil etant alors une constante independante de la barre.
+//
+// ⚠️ Le repli sur `calendar` compte : le `main` d'App.tsx ne rend RIEN quand
+// l'onglet courant ne correspond pas au role — ce serait un ecran vide sous le
+// header, sans la moindre erreur. `calendar` est le seul onglet commun aux deux
+// roles.
+export function vueParDefaut(role: UserRole | undefined, estAssocie: boolean): AgendaView {
+  if (!role) return 'calendar';
+  return ongletsVisibles(role, estAssocie)[0]?.view ?? 'calendar';
+}
+
 type AgendaHeaderProps = {
   currentUser: Profile;
   currentView: AgendaView;
   onViewChange: (view: AgendaView) => void;
+  // Associe au sens du role applicatif Orga (cf. userAdapter). Ne change que
+  // l'ORDRE des onglets, aucun droit : la barre n'ouvre rien que la RLS refuse.
+  estAssocie: boolean;
   // Bascule d'affichage, rendue uniquement aux vrais coordinateurs (cf. App.tsx).
   // Absente pour tous les autres : un medecin ne doit pas voir ce controle.
   viewAs?: UserRole;
@@ -67,11 +106,12 @@ export default function AgendaHeader({
   currentUser,
   currentView,
   onViewChange,
+  estAssocie,
   viewAs,
   onViewAsChange,
 }: AgendaHeaderProps) {
   const navigate = useNavigate();
-  const tabs = TABS.filter((tab) => tab.roles.includes(currentUser.role));
+  const tabs = ongletsVisibles(currentUser.role, estAssocie);
 
   return (
     <header className="bg-carte sticky top-0 z-40 border-b border-border relative overflow-hidden">

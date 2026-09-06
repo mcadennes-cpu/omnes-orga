@@ -185,19 +185,26 @@ export default function DailyScheduleView() {
               return (
                 <div
                   key={shift.id}
-                  className="overflow-hidden rounded-card border border-border bg-carte shadow-card"
+                  className="relative overflow-hidden rounded-card border border-border bg-carte shadow-card"
                 >
                   <div className="flex items-stretch">
-                    {/* Avatar seul a gauche (pattern trombinoscope). */}
-                    <div className="flex flex-shrink-0 items-center px-4">
-                      <Avatar profile={shift.assigned_doctor} size={52} alt={doctorName} />
+                    {/* Avatar seul a gauche, taille 72 comme MedecinCard dont
+                        cette carte reprend le pattern. Le texte ne perd rien :
+                        12 (pl) + 72 + 16 (px de la colonne droite) = 100 px,
+                        exactement l'ancien 16 + 52 + 16 + 16. Le py-3 garantit
+                        de l'air au-dessus et en dessous quand les infos tiennent
+                        sur une seule ligne (ecran large) — sans lui l'avatar
+                        toucherait les bords de la carte. */}
+                    <div className="flex flex-shrink-0 items-center py-3 pl-3">
+                      <Avatar profile={shift.assigned_doctor} size={72} alt={doctorName} />
                     </div>
-                    {/* Colonne droite : nom (bande couleur du creneau) + infos (blanc). */}
+                    {/* Colonne droite : nom, puis lieu / salle / horaire, tout
+                        en noir sur blanc. La couleur du creneau est portee par
+                        le lisere en L de la carte (03/09/2026 — un bandeau
+                        plein coiffait le nom auparavant). */}
                     <div className="min-w-0 flex-1">
-                      <div className={`px-4 py-2.5 ${style.bandClass}`}>
-                        <h4 className="text-body-l font-semibold">{doctorName}</h4>
-                      </div>
                       <div className="bg-carte px-4 py-3">
+                        <h4 className="mb-2 text-body-l font-semibold text-ink">{doctorName}</h4>
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                           <div className="flex items-center gap-2">
                             <MapPin className="h-4 w-4 flex-shrink-0 text-muted" />
@@ -221,6 +228,13 @@ export default function DailyScheduleView() {
                       </div>
                     </div>
                   </div>
+                  {/* Lisere en L (bordure bas + droite), pose sur la carte
+                      entiere, avatar compris : c'est ce qui lui fait epouser
+                      l'arrondi du coin bas-droit. Meme pattern que "Mes
+                      gardes". */}
+                  <div
+                    className={`pointer-events-none absolute inset-0 rounded-card border-b-[3px] border-r-[3px] ${style.borderClass}`}
+                  />
                 </div>
               );
             })}
