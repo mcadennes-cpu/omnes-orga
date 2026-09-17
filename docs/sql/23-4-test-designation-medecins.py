@@ -67,7 +67,11 @@ noms = [p["full_name"] for p in (liste or [])]
 # Historique : 36 en 23-3 (26/08/2026) ; 37 le 17/09/2026, avec Dr Vincent
 # D'ALESIO, remplacant cree dans Bolt le 03/09 et integre par 23-9. Le fil
 # avait bien casse ce jour-la, sur ces deux controles et eux seuls.
-NB_MEDECINS = 37
+# 30 le meme jour, apres 23-11 : six remplacants qui ne travaillent plus au
+# cabinet et le compte fictif Essai DUPONT sont bloques et retires de la
+# liste. Le fil a casse sur ces deux controles et sur « hors liste », qui
+# nommait exactement les cinq anciens ayant des gardes passees.
+NB_MEDECINS = 30
 t.verifier(f"{NB_MEDECINS} medecins", len(noms) == NB_MEDECINS, str(len(noms)))
 
 # Le cas qui a motive la correction.
@@ -84,16 +88,32 @@ t.verifier("la coordinatrice qui n'exerce pas n'y est pas (Charlotte)",
 # Le controle qui compte vraiment : quiconque tient une garde ou une regle
 # de roulement DOIT etre dans la liste, sinon on ne peut plus lui en
 # attribuer.
+#
+# Exception depuis 23-11 (17/09/2026) : un compte BLOQUE est un ancien du
+# cabinet, sorti de la liste par decision. Le blocage est le marqueur, pas
+# l'absence de garde recente -- un medecin non bloque qui tient des gardes
+# et sort de la liste reste un oubli, et fait toujours tomber ce controle.
 print("\n--- 3. Aucun medecin oublie ---")
 oublies = t.sql("""select trim(coalesce(prenom,'')||' '||coalesce(nom,'')) nom
                      from public.profiles p
+                     join auth.users u on u.id = p.id
                     where not p.is_agenda_doctor
+                      and (u.banned_until is null or u.banned_until <= now())
                       and (exists (select 1 from agenda.shifts s
                                     where s.assigned_doctor_id = p.id)
                         or exists (select 1 from agenda.rotation_plan_rules r
                                     where r.doctor_id = p.id))""")
 t.verifier("personne qui tient des gardes n'est hors liste",
            len(oublies) == 0, str([o["nom"] for o in oublies]))
+
+# Le pendant : un compte bloque ne doit jamais etre propose a l'attribution.
+bloques_dans_liste = t.sql("""select trim(coalesce(prenom,'')||' '||coalesce(nom,'')) nom
+                                from public.profiles p
+                                join auth.users u on u.id = p.id
+                               where p.is_agenda_doctor
+                                 and u.banned_until > now()""")
+t.verifier("aucun compte bloque dans la liste",
+           len(bloques_dans_liste) == 0, str([b["nom"] for b in bloques_dans_liste]))
 
 # L'inverse : personne dans la liste qui ne soit un compte de medecin.
 intrus = t.sql("""select trim(coalesce(prenom,'')||' '||coalesce(nom,'')) nom, role
