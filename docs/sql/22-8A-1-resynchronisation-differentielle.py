@@ -52,6 +52,11 @@ CE QU'IL NE TOUCHE PAS, ET POURQUOI
                                 directement contre Bolt (script 23-6).
     deleted_at                  Colonne propre a Orga (MOD2-B). Jamais
                                 ecrasee, jamais effacee.
+    shifts.shift_type (texte)   Sur une garde deja presente dans Orga, le
+                                libelle d'Orga fait foi ; une garde nouvelle
+                                prend l'horaire declare de son creneau.
+                                Corrige le 17/09/2026 : le script avait
+                                defait 6A-1 sur J2 Beaune (etape 4 bis).
 
 Usage identique a 7F : simulation par defaut, --go pour executer.
 """
@@ -252,6 +257,45 @@ if manquants:
          "avant de resynchroniser -- ce script ne cree ni site, ni salle, "
          "ni creneau, ni serie.")
 print("  cles etrangeres : toutes resolues cote Orga")
+
+# ------------------------------------------------ 4 bis. le libelle d'horaire
+# shifts.shift_type est une COPIE TEXTE de l'horaire du creneau, posee a la
+# creation de la garde. Orga fait autorite sur les creneaux depuis 6A (voir
+# l'en-tete) -- mais ce script recopiait quand meme ce texte depuis Bolt.
+#
+# Constate le 17/09/2026 dans agenda.activity_log : la repetition generale
+# du 26/08 a remis 107 gardes J2 Beaune de 14:00-22:00 a 10:00-22:00, Bolt
+# n'ayant jamais change ce creneau. La correction de 6A-1 a ete defaite en
+# silence. Reparee par 23-8, elle l'aurait ete une seconde fois le soir de
+# la bascule -- noyee dans 107 lignes « a modifier » de plus.
+#
+# Regle, calquee sur l'appli : le texte est pose quand une garde ENTRE dans
+# un creneau, puis n'est plus reecrit.
+#   . deja dans Orga, meme creneau    -> le texte d'Orga fait foi
+#   . deja dans Orga, creneau change  -> horaire declare du nouveau creneau
+#   . garde nouvelle                  -> horaire declare de son creneau
+# Meme expression que ouvrir_semaines : coalesce(nullif(time_range, ''), name).
+# L'historique voulu est donc preserve : les gardes J2 Beaune d'avant le
+# 01/08/2026 gardent 10:00-22:00 (arbitrage de 6A-1, maintenu le 17/09).
+# Et une garde close ne remonte plus en faux conflit pour son seul libelle.
+def aligne_libelles_horaire(gardes_bolt, gardes_orga, plages):
+    for ligne in gardes_bolt:
+        actuel = gardes_orga.get(ligne["id"])
+        if actuel is not None and ligne.get("shift_type_id") == actuel.get("shift_type_id"):
+            ligne["shift_type"] = actuel["shift_type"]
+        elif ligne.get("shift_type_id") in plages:
+            ligne["shift_type"] = plages[ligne["shift_type_id"]]
+        # sinon : creneau inconnu d'Orga, texte de Bolt laisse tel quel --
+        # le garde-fou de l'etape 4 a deja arrete le script pour une garde
+        # nouvelle dans ce cas.
+
+
+d, err = sql(ORGA, "select id, name, time_range from agenda.shift_types;")
+if err:
+    stop(f"lecture des creneaux : {err}")
+plages = {r["id"]: (r["time_range"] or r["name"]) for r in (d or [])}
+aligne_libelles_horaire(bolt["shifts"], orga["shifts"], plages)
+print("  libelles d'horaire : ceux d'Orga font foi")
 
 # ------------------------------------------------ 5. le differentiel
 plan = {}
