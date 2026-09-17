@@ -1,0 +1,254 @@
+{
+  "script": "23-12",
+  "ecrit_le": "2026-09-17T14:00:11",
+  "comptes": [
+    {
+      "id": "b43659df-fcd8-4d32-a915-efa2e580fbbd",
+      "prenom": "Matthieu",
+      "nom": "CADENNES",
+      "role": "super_admin",
+      "actif": true,
+      "drapeau": true
+    },
+    {
+      "id": "74e304ec-aeef-45f8-80d4-4a2dde9ca8e6",
+      "prenom": "Charlotte",
+      "nom": "FRANZINO",
+      "role": "super_admin",
+      "actif": true,
+      "drapeau": true
+    },
+    {
+      "id": "e099d757-7097-4642-8dc7-4cb4b9606b99",
+      "prenom": "Xavier",
+      "nom": "BAUDRILLART",
+      "role": "associe_gerant",
+      "actif": true,
+      "drapeau": false
+    },
+    {
+      "id": "f00302cd-e01e-4991-b70f-944f9a4d5070",
+      "prenom": "Caroline",
+      "nom": "Chauvet",
+      "role": "associe_gerant",
+      "actif": true,
+      "drapeau": false
+    },
+    {
+      "id": "03ad0440-76ae-4ca7-96d1-b0e3a9557227",
+      "prenom": "Thomas",
+      "nom": "ETIENNE",
+      "role": "associe_gerant",
+      "actif": true,
+      "drapeau": false
+    },
+    {
+      "id": "1e6a73c0-df26-46c8-9c16-710238fd9d2f",
+      "prenom": "Christophe",
+      "nom": "BERTRAND",
+      "role": "associe",
+      "actif": true,
+      "drapeau": false
+    },
+    {
+      "id": "3d062ad8-76bc-41da-a075-9ef1a128535f",
+      "prenom": "Laurène",
+      "nom": "DAUDIN",
+      "role": "associe",
+      "actif": true,
+      "drapeau": false
+    },
+    {
+      "id": "5eef5c5f-fd92-4fe0-be40-b0e61ee8482a",
+      "prenom": "Imane",
+      "nom": "EL GARI",
+      "role": "associe",
+      "actif": true,
+      "drapeau": false
+    },
+    {
+      "id": "fad62100-0e6e-46b9-bf13-f69bc0c4a584",
+      "prenom": "Airelle",
+      "nom": "SAUVAGE",
+      "role": "associe",
+      "actif": true,
+      "drapeau": true
+    },
+    {
+      "id": "64700032-1529-4d80-8bd2-ce34a62a52e0",
+      "prenom": "Mireille",
+      "nom": "YUAN",
+      "role": "associe",
+      "actif": true,
+      "drapeau": false
+    },
+    {
+      "id": "cf74a6c0-7d8a-4944-b170-76c41aeece6b",
+      "prenom": "Laurie-Anne",
+      "nom": "BATISSE",
+      "role": "remplacant",
+      "actif": false,
+      "drapeau": false
+    },
+    {
+      "id": "0951f601-1c13-43df-98eb-94a71b9c000d",
+      "prenom": "Louis",
+      "nom": "BERTRAND",
+      "role": "remplacant",
+      "actif": false,
+      "drapeau": false
+    },
+    {
+      "id": "f7d56668-ce90-43a6-a4da-be8aba200f7f",
+      "prenom": "Charly",
+      "nom": "BILOTTA",
+      "role": "remplacant",
+      "actif": false,
+      "drapeau": false
+    },
+    {
+      "id": "77d24efd-9c78-4428-9359-61faec1d3780",
+      "prenom": "Vincent",
+      "nom": "D'ALESIO",
+      "role": "remplacant",
+      "actif": false,
+      "drapeau": false
+    },
+    {
+      "id": "1f8ec99a-d85a-4cae-8351-6b9b9db526bb",
+      "prenom": "Louis",
+      "nom": "DE MONTAIGNE DE PONCINS",
+      "role": "remplacant",
+      "actif": false,
+      "drapeau": false
+    },
+    {
+      "id": "3f19e00e-3a9a-461c-8c72-f92eb86ff406",
+      "prenom": "Anne",
+      "nom": "DEMONGEOT",
+      "role": "remplacant",
+      "actif": false,
+      "drapeau": false
+    },
+    {
+      "id": "d3196983-942a-4b08-981f-c8b6f941a117",
+      "prenom": "Célyne",
+      "nom": "DUPONT",
+      "role": "remplacant",
+      "actif": false,
+      "drapeau": false
+    },
+    {
+      "id": "f8e2d6e0-d6b3-4ed5-82c5-516f26d93124",
+      "prenom": "Fanny",
+      "nom": "ERNOUF",
+      "role": "remplacant",
+      "actif": false,
+      "drapeau": false
+    },
+    {
+      "id": "a65ba2e2-fe74-49d8-9762-0757943f7da7",
+      "prenom": "Mathilde",
+      "nom": "GAIMARD",
+      "role": "remplacant",
+      "actif": false,
+      "drapeau": false
+    },
+    {
+      "id": "70cfe78b-f13d-41b4-81b2-bd37392f2e9e",
+      "prenom": "Marc",
+      "nom": "JARRAUD",
+      "role": "remplacant",
+      "actif": false,
+      "drapeau": false
+    },
+    {
+      "id": "366338bb-bc12-4ba4-bf10-469aa99de696",
+      "prenom": "Céline",
+      "nom": "KRÄTTLI",
+      "role": "remplacant",
+      "actif": false,
+      "drapeau": false
+    },
+    {
+      "id": "c6a951f9-0c54-443e-a4cf-24f6f5aeffd6",
+      "prenom": "Aymeric",
+      "nom": "LE MOUËLLE",
+      "role": "remplacant",
+      "actif": false,
+      "drapeau": false
+    },
+    {
+      "id": "e6373ff8-d945-491d-a690-4917fda9d5d7",
+      "prenom": "Yitian",
+      "nom": "LUCOT",
+      "role": "remplacant",
+      "actif": false,
+      "drapeau": false
+    },
+    {
+      "id": "d5146de5-a31f-46c3-b53b-09bc613a5809",
+      "prenom": "Théo",
+      "nom": "MARSALA",
+      "role": "remplacant",
+      "actif": false,
+      "drapeau": false
+    },
+    {
+      "id": "a08b7f39-b43f-4fe9-a8a0-82e7a47af3bb",
+      "prenom": "Hortense",
+      "nom": "NAUDION",
+      "role": "remplacant",
+      "actif": false,
+      "drapeau": false
+    },
+    {
+      "id": "abce8f87-a96d-4f0a-a36d-1eadd5ef4b4b",
+      "prenom": "Marie-Fleur",
+      "nom": "PLOMINSKA",
+      "role": "remplacant",
+      "actif": false,
+      "drapeau": false
+    },
+    {
+      "id": "e8ed08cf-677d-4870-b6a1-705b14577612",
+      "prenom": "Elise",
+      "nom": "RENAUDINEAU",
+      "role": "remplacant",
+      "actif": false,
+      "drapeau": false
+    },
+    {
+      "id": "66cda85d-5d52-4e53-9ac2-620f50a8cbc4",
+      "prenom": "Florence",
+      "nom": "STEINKAMP",
+      "role": "remplacant",
+      "actif": false,
+      "drapeau": false
+    },
+    {
+      "id": "b4066eea-e78d-4b68-b3cc-e8274a7b3784",
+      "prenom": "Dylan",
+      "nom": "THEBAULT",
+      "role": "remplacant",
+      "actif": false,
+      "drapeau": false
+    },
+    {
+      "id": "c2658352-309b-4479-a5b9-cb08f65dc9c2",
+      "prenom": "Claire",
+      "nom": "VIGNE",
+      "role": "remplacant",
+      "actif": false,
+      "drapeau": false
+    },
+    {
+      "id": "443be0bf-e80c-46dc-ad28-916dc124a835",
+      "prenom": "Marie",
+      "nom": "ZEHR",
+      "role": "remplacant",
+      "actif": false,
+      "drapeau": false
+    }
+  ]
+}
