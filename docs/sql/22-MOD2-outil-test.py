@@ -28,6 +28,7 @@ import hashlib
 import hmac
 import importlib.util
 import json
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -46,6 +47,46 @@ _spec.loader.exec_module(outil)
 #: Requete SQL en role postgres (API d'administration). Pour PREPARER et
 #: CONSTATER, jamais pour prouver ce que voit un utilisateur.
 sql = outil.interroger
+
+# ---------------------------------------------------------------------
+# GARDE-FOU DE PRODUCTION (8F-5, 17/09/2026)
+#
+# Tant que le module est en beta, le schema agenda n'est qu'une copie :
+# les suites peuvent y ecrire. Des qu'il est ouvert a tous (23-12), c'est
+# le planning reel du cabinet, et les suites qui ecrivent y deviennent
+# dangereuses -- mesure du 17/09 :
+#   . elles suppriment TOUTES les gardes d'une date de test (fin 2027) ;
+#   . MOD2D restaure « la derniere action du journal », quelle qu'elle soit ;
+#   . elles effacent ou modifient les lignes du journal apparues pendant
+#     le test, y compris celles d'un vrai utilisateur ;
+#   . le controle « modifier le journal est refuse » vise tout le journal.
+# Decision de Matthieu : les bloquer apres l'ouverture, plutot que les
+# reecrire. Le soir J, elles tournent une derniere fois AVANT 23-12.
+#
+# Le blocage est PAR DEFAUT : seule une suite nommee ci-dessous, verifiee
+# en lecture seule, passe encore. Une nouvelle suite qui ecrit est donc
+# bloquee sans qu'on ait a y penser.
+#
+# « Ouvert » = au moins un remplacant actif porte le drapeau beta. C'est
+# exactement ce que fait 23-12, et ce que defait son --annuler.
+# ---------------------------------------------------------------------
+SUITES_LECTURE_SEULE = {
+    # Verifie le 17/09/2026 : select, GET, et rpc journal_activite
+    # (fonction STABLE, sans ecriture).
+    "23-4-test-designation-medecins.py",
+}
+
+_ouvert = sql("""select count(*) as n from public.profiles
+                  where role = 'remplacant' and actif
+                    and agenda_beta_access""")[0]["n"]
+if _ouvert and Path(sys.argv[0]).name not in SUITES_LECTURE_SEULE:
+    raise SystemExit(
+        f"\nARRET : le module Agenda est ouvert a tous ({_ouvert} remplacants "
+        "actifs avec le drapeau).\n"
+        f"{Path(sys.argv[0]).name} ecrit dans le planning reel du cabinet : "
+        "bloquee depuis 8F-5.\n"
+        "Seules tournent encore : " + ", ".join(sorted(SUITES_LECTURE_SEULE))
+        + ".\nRien n'a ete ecrit.")
 
 _cfg = json.load(urllib.request.urlopen(urllib.request.Request(
     f"https://api.supabase.com/v1/projects/{PROJET}/postgrest",
