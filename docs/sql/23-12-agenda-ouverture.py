@@ -21,7 +21,8 @@ Le soir J ne comporte ainsi aucun deploiement : le code en production est
 celui verifie les jours precedents, et l'ouverture est du SQL reversible,
 repete a l'avance. Le retrait du drapeau du code viendra apres J.
 PIEGE jusque-la : un compte medecin cree apres J n'a pas le drapeau (valeur
-par defaut false) -- il faudra le lui poser a la main.
+par defaut false) -- il faudra le lui poser a la main. LEVE le 17/09/2026 par
+23-14 : un declencheur pose le drapeau et la designation selon le role.
 
 QUI EST TOUCHE, ET QUI NE L'EST PAS
   . les remplacants a activer sont designes par une requete, mais ils sont

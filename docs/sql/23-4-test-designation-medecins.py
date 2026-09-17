@@ -62,17 +62,31 @@ ok, liste = t.rest(
 t.verifier("la liste se charge", ok, str(liste)[:200])
 
 noms = [p["full_name"] for p in (liste or [])]
-# Effectif ecrit en dur A DESSEIN : c'est un fil tendu. Un compte designe
-# medecin sans decision doit faire tomber ce controle, pas passer en silence.
-# Historique : 36 en 23-3 (26/08/2026) ; 37 le 17/09/2026, avec Dr Vincent
-# D'ALESIO, remplacant cree dans Bolt le 03/09 et integre par 23-9. Le fil
-# avait bien casse ce jour-la, sur ces deux controles et eux seuls.
-# 30 le meme jour, apres 23-11 : six remplacants qui ne travaillent plus au
-# cabinet et le compte fictif Essai DUPONT sont bloques et retires de la
-# liste. Le fil a casse sur ces deux controles et sur « hors liste », qui
-# nommait exactement les cinq anciens ayant des gardes passees.
-NB_MEDECINS = 30
-t.verifier(f"{NB_MEDECINS} medecins", len(noms) == NB_MEDECINS, str(len(noms)))
+ids_liste = {p["id"] for p in (liste or [])}
+# LA REGLE, ET NON PLUS UN EFFECTIF (8I, 17/09/2026).
+# Jusqu'a la bascule, l'effectif etait ecrit en dur, a dessein : aucun
+# compte ne devait entrer dans la liste sans decision (36 en 23-3, 37 avec
+# D'ALESIO, 30 apres 23-11 -- le fil a casse a chaque fois, comme voulu).
+# Depuis la bascule, l'appli cree des medecins, et 23-14 les designe par
+# leur role : un effectif en dur casserait a chaque creation normale. On
+# verifie donc la regle de 23-14 elle-meme, dans les deux sens.
+regle = {r["id"] for r in t.sql("""
+    select p.id from public.profiles p join auth.users u on u.id = p.id
+     where p.role in ('remplacant', 'associe', 'associe_gerant')
+       and p.actif and (u.banned_until is null or u.banned_until <= now())""")}
+super_admins = {r["id"] for r in t.sql(
+    "select id from public.profiles where role = 'super_admin'")}
+manquants = regle - ids_liste
+t.verifier("tout remplacant / associe actif et non bloque est dans la liste",
+           ok and not manquants, str(len(manquants)) + " manquant(s)")
+intrus_liste = ids_liste - regle - super_admins
+t.verifier("la liste ne contient qu'eux, plus des super_admin designes",
+           ok and not intrus_liste, str(len(intrus_liste)) + " de trop")
+sans_drapeau = t.sql("""select count(*) n from public.profiles
+                         where is_agenda_doctor and not agenda_beta_access""")[0]["n"]
+t.verifier("chaque medecin de la liste peut ouvrir le Planning (drapeau)",
+           sans_drapeau == 0, f"{sans_drapeau} sans drapeau")
+NB_MEDECINS = len(ids_liste)
 
 # Le cas qui a motive la correction.
 t.verifier("le coordinateur qui exerce y est (Matthieu CADENNES)",
