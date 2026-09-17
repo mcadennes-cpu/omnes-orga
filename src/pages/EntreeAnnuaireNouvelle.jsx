@@ -6,6 +6,7 @@ import EntreeAnnuaireForm from '../components/annuaire/EntreeAnnuaireForm'
 import { supabase } from '../lib/supabaseClient'
 import { useEntreesAnnuaire } from '../hooks/useEntreesAnnuaire'
 import { useAuth } from '../hooks/useAuth'
+import { collectCategories } from '../lib/annuaireCategories'
 import HeaderWatermark from '../components/common/HeaderWatermark'
 
 export default function EntreeAnnuaireNouvelle() {
@@ -16,14 +17,10 @@ export default function EntreeAnnuaireNouvelle() {
   const [submitError, setSubmitError] = useState(null)
 
   // Categories existantes pour l'auto-complete.
-  const existingCategories = useMemo(() => {
-    const set = new Set(
-      allEntrees
-        .map((e) => e.categorie)
-        .filter((c) => c && c.trim() !== '')
-    )
-    return Array.from(set).sort((a, b) => a.localeCompare(b, 'fr'))
-  }, [allEntrees])
+  const existingCategories = useMemo(
+    () => collectCategories(allEntrees),
+    [allEntrees]
+  )
 
   function handleCancel() {
     navigate('/annuaire')

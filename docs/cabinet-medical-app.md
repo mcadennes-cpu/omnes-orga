@@ -241,7 +241,7 @@ La fiche détail (`/trombinoscope/:id`, mode lecture) affiche une section « Coo
 
 **Contenu d'une entrée :**
 - Nom / structure
-- Catégorie (ex : cardiologue, labo, urgences pédiatriques…)
+- Catégories — une ou plusieurs (ex : urgences, chirurgie, cardiologue…). Une entrée est retrouvée sous **chacune** de ses catégories (filtre et recherche).
 - Téléphone
 - Email (optionnel)
 - Note libre (optionnel)
@@ -275,6 +275,10 @@ Défense en profondeur : la RLS Postgres applique strictement les mêmes règles
 #### Hard delete
 
 Contrairement au Trombinoscope qui utilise un soft delete via `actif`, l'Annuaire fait un hard DELETE en base. Justification : les entrées d'annuaire n'ont pas de lien fort avec auth.users (juste auteur_id en ON DELETE SET NULL), et il n'y a pas de nécessité de garder un historique. Le ConfirmDialog (variant danger) protège contre les suppressions accidentelles.
+
+#### Catégories multiples (ajout juillet 2026)
+
+Une entrée peut porter plusieurs catégories et est retrouvée sous chacune d'elles (filtre de la liste et recherche globale). Stockage : colonne `categories text[]` (NOT NULL DEFAULT `'{}'`), indexée en GIN. L'ancienne colonne `categorie` (singulier) a été migrée puis supprimée (scripts `docs/sql/5A-3-annuaire-multi-categories.sql` et `5A-4-annuaire-drop-categorie.sql`). Les helpers partagés sont dans [src/lib/annuaireCategories.js](../src/lib/annuaireCategories.js) : `cleanCategories`, `entreeCategories`, `collectCategories`. Saisie en chips (ajout via Entrée/virgule/suggestion, retrait via ×) dans EntreeAnnuaireForm ; affichage multi-pastilles dans la liste, la fiche détail et la recherche globale.
 
 ---
 

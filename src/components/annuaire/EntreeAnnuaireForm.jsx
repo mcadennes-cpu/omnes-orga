@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
-import { Sparkles, Trash2, BookOpen } from 'lucide-react'
+import { Sparkles, Trash2, BookOpen, X } from 'lucide-react'
 import { formatPhoneFr } from '../../lib/phoneFormat'
+import { cleanCategories, entreeCategories } from '../../lib/annuaireCategories'
 
 function toStringValue(v) {
   return v === null || v === undefined ? '' : String(v)
@@ -26,7 +27,9 @@ export default function EntreeAnnuaireForm({
   isNew = false,
 }) {
   const [nom, setNom] = useState(toStringValue(initialValues.nom))
-  const [categorie, setCategorie] = useState(toStringValue(initialValues.categorie))
+  // Categories multiples : tableau de chips + champ de saisie en cours.
+  const [categories, setCategories] = useState(() => entreeCategories(initialValues))
+  const [catInput, setCatInput] = useState('')
   const [telephone, setTelephone] = useState(toStringValue(initialValues.telephone))
   const [email, setEmail] = useState(toStringValue(initialValues.email))
   const [note, setNote] = useState(toStringValue(initialValues.note))
@@ -37,16 +40,44 @@ export default function EntreeAnnuaireForm({
   const trimmedEmail = email.trim()
   const isValid = trimmedNom !== '' && isValidEmail(trimmedEmail)
 
-  // Suggestions categorie : filtrees par ce qui est tape, max 8.
+  // Suggestions categorie : filtrees par ce qui est tape, deja-selectionnees
+  // exclues, max 8.
   const catSuggestions = useMemo(() => {
-    const q = categorie.trim().toLowerCase()
-    const list = q
-      ? existingCategories.filter(
-          (c) => c.toLowerCase().includes(q) && c.toLowerCase() !== q
-        )
-      : existingCategories
+    const q = catInput.trim().toLowerCase()
+    const selected = new Set(categories.map((c) => c.toLowerCase()))
+    const list = existingCategories.filter((c) => {
+      const lc = c.toLowerCase()
+      if (selected.has(lc)) return false
+      if (q && !lc.includes(q)) return false
+      return true
+    })
     return list.slice(0, 8)
-  }, [categorie, existingCategories])
+  }, [catInput, categories, existingCategories])
+
+  // Ajoute une categorie (via suggestion, Entree ou virgule), sans doublon.
+  function addCategory(raw) {
+    const c = (raw ?? '').trim()
+    if (!c) return
+    setCategories((prev) =>
+      prev.some((x) => x.toLowerCase() === c.toLowerCase()) ? prev : [...prev, c]
+    )
+    setCatInput('')
+  }
+
+  function removeCategory(target) {
+    setCategories((prev) => prev.filter((c) => c !== target))
+  }
+
+  // Entree / virgule valident la chip ; Backspace sur champ vide retire la
+  // derniere chip (pattern usuel des champs a tags).
+  function handleCatKeyDown(e) {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault()
+      addCategory(catInput)
+    } else if (e.key === 'Backspace' && catInput === '' && categories.length > 0) {
+      removeCategory(categories[categories.length - 1])
+    }
+  }
 
   function handleSubmit(e) {
     e.preventDefault()
@@ -64,7 +95,9 @@ export default function EntreeAnnuaireForm({
 
     const values = {
       nom: trimmedNom,
-      categorie: categorie.trim() || null,
+      // On inclut catInput : une categorie tapee mais pas encore validee par
+      // Entree est quand meme enregistree. cleanCategories trim/dedoublonne.
+      categories: cleanCategories([...categories, catInput]),
       telephone: telephone.trim() || null,
       email: trimmedEmail || null,
       note: note.trim() || null,
@@ -111,17 +144,46 @@ export default function EntreeAnnuaireForm({
         </Field>
 
         <Field
-          label="Catégorie"
-          hint="Tapez librement ou choisissez parmi les suggestions"
+          label="Catégories"
+          hint="Ajoutez-en une ou plusieurs — Entrée ou virgule pour valider. Une entrée est trouvée sous chacune de ses catégories."
         >
+          {/* Chips selectionnees (retirables) */}
+          {categories.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {categories.map((c) => (
+                <span
+                  key={c}
+                  className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full text-[12px] font-semibold text-ocre-fonce border"
+                  style={{
+                    backgroundColor: 'rgba(232,161,53,0.14)',
+                    borderColor: 'rgba(232,161,53,0.28)',
+                  }}
+                >
+                  {c}
+                  <button
+                    type="button"
+                    onClick={() => removeCategory(c)}
+                    disabled={submitting}
+                    aria-label={`Retirer la catégorie ${c}`}
+                    className="h-[18px] w-[18px] rounded-full flex items-center justify-center shrink-0"
+                    style={{ backgroundColor: 'rgba(160,106,14,0.12)' }}
+                  >
+                    <X size={11} strokeWidth={2.4} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
           <Input
             id="entree-categorie"
-            value={categorie}
-            onChange={(e) => setCategorie(e.target.value)}
+            value={catInput}
+            onChange={(e) => setCatInput(e.target.value)}
+            onKeyDown={handleCatKeyDown}
             onFocus={() => setShowCatSuggest(true)}
             onBlur={() => setTimeout(() => setShowCatSuggest(false), 150)}
             disabled={submitting}
-            placeholder="Ex. Cardiologue, Pharmacie, Hôpital…"
+            placeholder="Ex. Urgences, Chirurgie, Cardiologue…"
           />
           {showCatSuggest && catSuggestions.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1.5">
@@ -131,8 +193,7 @@ export default function EntreeAnnuaireForm({
                   type="button"
                   onMouseDown={(e) => {
                     e.preventDefault()
-                    setCategorie(c)
-                    setShowCatSuggest(false)
+                    addCategory(c)
                   }}
                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-semibold text-ocre-fonce border"
                   style={{
