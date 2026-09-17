@@ -62,7 +62,13 @@ ok, liste = t.rest(
 t.verifier("la liste se charge", ok, str(liste)[:200])
 
 noms = [p["full_name"] for p in (liste or [])]
-t.verifier("36 medecins", len(noms) == 36, str(len(noms)))
+# Effectif ecrit en dur A DESSEIN : c'est un fil tendu. Un compte designe
+# medecin sans decision doit faire tomber ce controle, pas passer en silence.
+# Historique : 36 en 23-3 (26/08/2026) ; 37 le 17/09/2026, avec Dr Vincent
+# D'ALESIO, remplacant cree dans Bolt le 03/09 et integre par 23-9. Le fil
+# avait bien casse ce jour-la, sur ces deux controles et eux seuls.
+NB_MEDECINS = 37
+t.verifier(f"{NB_MEDECINS} medecins", len(noms) == NB_MEDECINS, str(len(noms)))
 
 # Le cas qui a motive la correction.
 t.verifier("le coordinateur qui exerce y est (Matthieu CADENNES)",
@@ -119,7 +125,7 @@ t.verifier("ni la table directement", ok and r == [], str(r)[:150])
 print("\n--- 5. Lecture par un medecin ---")
 ok, liste_m = t.rest(
     "GET", "profiles?select=id,full_name&is_agenda_doctor=eq.true", t.MEDECIN)
-t.verifier("un medecin lit aussi la liste", ok and len(liste_m or []) == 36,
+t.verifier("un medecin lit aussi la liste", ok and len(liste_m or []) == NB_MEDECINS,
            str(len(liste_m or [])))
 
 t.bilan()
