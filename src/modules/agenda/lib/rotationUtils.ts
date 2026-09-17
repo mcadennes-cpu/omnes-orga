@@ -1,6 +1,9 @@
 import { supabase } from './supabase';
 import { isDebugEnabled, enableDebug, logRotationCalculation } from './rotationDebug';
 
+// Les deux seuls champs que lit le calcul de la semaine de roulement. Un
+// RotationPlan les porte : c'est lui qu'on passe a getRotationWeek. (Le nom
+// vient de l'ancienne table rotation_settings, que 6C-4 supprime.)
 type RotationSettings = {
   start_date: string;
   cycle_length_weeks: number;
@@ -19,9 +22,10 @@ type RotationSettings = {
 // n'etant plus un modulo depuis UNE date globale, changer la duree du cycle ne
 // decale plus retroactivement les plannings deja publies.
 //
-// TRANSITION (etape 6C) : ces fonctions coexistent volontairement avec
-// getRotationSettings / l'ancien getRotationWeek le temps de 6C-1. Les
-// consommateurs basculent en 6C-2, l'ancien systeme disparait en 6C-4.
+// TRANSITION (etape 6C) : ces fonctions ont coexiste avec getRotationSettings
+// (table rotation_settings) le temps de 6C-1, les consommateurs ont bascule en
+// 6C-2. 6C-4 retire l'ancien systeme : le code en 8E-1, les deux tables le
+// soir de la bascule.
 // ---------------------------------------------------------------------------
 
 export type RotationPlan = {
@@ -33,8 +37,6 @@ export type RotationPlan = {
   effective_to: string | null;
 };
 
-let cachedSettings: RotationSettings | null = null;
-let lastFetchTime = 0;
 let cachedPlans: RotationPlan[] | null = null;
 let lastPlansFetchTime = 0;
 const CACHE_DURATION = 60000;
@@ -87,8 +89,7 @@ function toIsoDay(date: Date): string {
 // toujours d'un seul plan, meme si une date d'entree en vigueur tombait en
 // milieu de semaine.
 //
-// Renvoie null si aucun plan ne couvre la date — meme comportement que
-// l'ancien getRotationSettings() sans ligne en base : l'appelant s'abstient.
+// Renvoie null si aucun plan ne couvre la date : l'appelant s'abstient.
 export function getPlanForDate(date: Date, plans: RotationPlan[]): RotationPlan | null {
   const target = new Date(date);
   target.setHours(12, 0, 0, 0);
@@ -127,42 +128,9 @@ if (isDebugEnabled()) {
   console.log('  • Show help via: window.__rotationDebug.help()');
 }
 
-export async function getRotationSettings(): Promise<RotationSettings | null> {
-  const now = Date.now();
-
-  if (cachedSettings && (now - lastFetchTime) < CACHE_DURATION) {
-    return cachedSettings;
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from('rotation_settings')
-      .select('start_date, cycle_length_weeks')
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      console.error('Error fetching rotation settings:', error);
-      return null;
-    }
-
-    cachedSettings = data;
-    lastFetchTime = now;
-    return data;
-  } catch (err) {
-    console.error('Error fetching rotation settings:', err);
-    return null;
-  }
-}
-
-export function clearRotationCache() {
-  cachedSettings = null;
-  lastFetchTime = 0;
-}
-
-// Accepte indifféremment un RotationSettings (ancien systeme) ou un
-// RotationPlan : les deux portent start_date et cycle_length_weeks, et
-// l'arithmetique est la meme. C'est volontaire — reutiliser cette fonction
-// telle quelle est ce qui garantit l'iso-comportement de la bascule 6C.
+// Recoit un RotationPlan (qui porte start_date et cycle_length_weeks). La
+// fonction est celle de l'ancien systeme, reprise telle quelle : c'est ce qui a
+// garanti l'iso-comportement de la bascule 6C.
 export function getRotationWeek(date: Date, settings: RotationSettings, debugContext?: { componentName?: string; inputOrigin?: string }): number {
   const startDate = new Date(settings.start_date + 'T12:00:00');
   startDate.setHours(12, 0, 0, 0);
