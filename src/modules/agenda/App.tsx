@@ -126,7 +126,7 @@ function App({ orgaProfile }: AppProps) {
           <ActivityLogView />
         )}
         {currentView === 'settings' && currentUser.role === 'coordinator' && (
-          <SettingsView />
+          <SettingsView currentUser={currentUser} />
         )}
       </main>
 

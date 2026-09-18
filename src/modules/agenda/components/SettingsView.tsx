@@ -4,17 +4,24 @@ import SitesManagement from './settings/SitesManagement';
 import RoomsManagement from './settings/RoomsManagement';
 import ShiftTypesManagement from './settings/ShiftTypesManagement';
 import RotationManagement from './settings/RotationManagement';
+import SauvegardePlanning from './settings/SauvegardePlanning';
+import { Profile } from '../lib/supabase';
 
-type SettingsTab = 'sites' | 'rooms' | 'shift_types' | 'rotation';
+type SettingsTab = 'sites' | 'rooms' | 'shift_types' | 'rotation' | 'sauvegarde';
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'sites', label: 'Sites' },
   { id: 'rooms', label: 'Salles' },
   { id: 'shift_types', label: 'Horaires' },
   { id: 'rotation', label: 'Roulement' },
+  { id: 'sauvegarde', label: 'Sauvegarde' },
 ];
 
-export default function SettingsView() {
+type SettingsViewProps = {
+  currentUser: Profile;
+};
+
+export default function SettingsView({ currentUser }: SettingsViewProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>('sites');
 
   return (
@@ -52,6 +59,7 @@ export default function SettingsView() {
         {activeTab === 'rooms' && <RoomsManagement />}
         {activeTab === 'shift_types' && <ShiftTypesManagement />}
         {activeTab === 'rotation' && <RotationManagement />}
+        {activeTab === 'sauvegarde' && <SauvegardePlanning currentUser={currentUser} />}
       </div>
     </div>
   );

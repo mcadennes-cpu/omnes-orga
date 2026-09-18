@@ -1,4 +1,5 @@
 import { Profile } from '../lib/supabase';
+import RappelSauvegarde from './RappelSauvegarde';
 import RequestsCalendarView from './RequestsCalendarView';
 
 type RequestsViewProps = {
@@ -6,5 +7,10 @@ type RequestsViewProps = {
 };
 
 export default function RequestsView({ currentUser }: RequestsViewProps) {
-  return <RequestsCalendarView currentUser={currentUser} />;
+  return (
+    <div>
+      <RappelSauvegarde currentUser={currentUser} />
+      <RequestsCalendarView currentUser={currentUser} />
+    </div>
+  );
 }
