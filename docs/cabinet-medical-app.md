@@ -1429,10 +1429,90 @@ Le module a sa **propre doc de référence** : `docs/integration-agenda.md` (con
 
 ---
 
+## Chantier D — sécurité des policies RLS (21/09/2026)
+
+**Le constat.** Le schéma `agenda` vérifie bien `actif` : ses 51 policies
+passent toutes par `agenda.peut_acceder()` ou `agenda.est_coordinateur()`,
+qui testent `and actif`. Le schéma `public`, lui, l'ignorait totalement :
+**aucune** de ses 99 policies ne testait `actif` en mot entier, et les 9
+fonctions qui lisent `profiles` (`can_read_codes`, `can_write_codes`,
+`can_read_compta`, `is_super_admin`, `current_user_role`, `is_sim_member`,
+`is_immobilier_member`, `can_create_discussion_board`,
+`can_create_immobilier_board`) filtrent sur `role` et jamais sur `actif`.
+Le schéma `storage` non plus : 0 de ses 20 policies.
+
+Mesuré sur l'environnement de test : une fiche désactivée dont le compte
+auth n'est pas bloqué voyait **284 lignes**, pouvait insérer dans
+l'annuaire, modifier sa propre fiche, et lire 4 buckets de fichiers.
+L'exposition est restée **latente** en production — les 7 fiches inactives
+ont toutes leur compte bloqué — mais le trou s'ouvre dès qu'un
+coordinateur désactive quelqu'un sans le bloquer, ce qui est le geste
+naturel.
+
+**Le choix d'architecture : une couche `restrictive`.** Les policies
+existantes sont toutes `PERMISSIVE` : elles se combinent avec un **OU**, il
+suffit qu'une seule autorise. Une policy `RESTRICTIVE` se combine avec un
+**ET** : elle doit être satisfaite *en plus* de tout le reste. On pose donc
+un verrou par-dessus, sans toucher à une seule serrure existante.
+Corriger les 9 fonctions n'aurait couvert que 30 policies sur 99 ; réécrire
+les 69 autres, c'était 69 occasions de casser l'appli en silence. Ici :
+**0 policy modifiée**, et le retour arrière est un `DROP POLICY`.
+`postgres` et `service_role` ont `rolbypassrls = true` : la couche ne peut
+pas enfermer l'administration.
+
+**L'exception sur `profiles`.** La lecture de sa **propre** fiche reste
+passante (`id = auth.uid()`). Sans elle, `useRole()` ne recevrait aucune
+donnée et resterait bloqué en `loading` : la personne désactivée tomberait
+sur un écran blanc. C'est cette ligne qui permet à `ProtectedRoute`
+d'afficher l'écran `CompteDesactive`.
+
+**Le trou storage, en plus de `actif`.** `immobilier_storage_select`
+n'exigeait que le bucket (`using (bucket_id = 'immobilier-attachments')`) :
+tout compte connecté listait et lisait les fichiers du module immobilier,
+alors que la table `immobilier_attachments` exige d'être membre du tableau
+et que l'écriture dans ce même bucket exige `is_immobilier_member()`. La
+porte de derrière était plus ouverte que la porte d'entrée.
+Le bucket `avatars` est volontairement laissé tel quel : il est `public`,
+ses photos sont servies hors RLS, restreindre la policy ne changerait rien
+à leur exposition réelle.
+
+**Les scripts.**
+
+| Script | Rôle | Écrit ? |
+|---|---|---|
+| `23-20-mesurer-policies.py` | Mesure l'état des policies, empreinte comparable (`--enregistrer` / `--comparer`) | jamais |
+| `23-21-exiger-compte-actif.py` | `public.est_actif()` + 29 policies restrictives sur les 27 tables de `public` | `--go` |
+| `23-22-test-compte-actif.py` | Les 5 contrôles A→E, transactions annulées | jamais |
+| `23-23-cloner-storage-env-test.py` | Clone buckets + policies storage vers le test | test seul |
+| `23-24-storage-compte-actif.py` | 2 policies restrictives sur `storage.objects` | `--go` |
+
+Tous : simulation par défaut, `--retour-arriere`, sauvegarde `23-16` de
+moins de 6 h exigée mécaniquement avant toute écriture en production.
+
+**Preuves obtenues sur l'environnement de test.** Les 5 rôles actifs voient
+exactement le même nombre de lignes qu'avant, table par table (zéro écart).
+Les inactifs tombent de 284 à 1 ligne — leur propre fiche —, insertion
+refusée, mise à jour sans effet. Côté fichiers : inactifs à zéro, et
+`remplacant` / `poste_bureau` perdent le seul bucket immobilier. Le retour
+arrière a été joué pour de vrai : état identique à l'empreinte d'origine,
+policy par policy et fonction par fonction.
+
+**État au 21/09/2026 : non basculé en production.** Le contrôle de
+permissions de Claude Code refuse l'écriture ; `23-21 --go` puis
+`23-24 --go` restent à lancer à la main, dans cet ordre (`23-24` dépend de
+`est_actif()`). L'environnement de test, lui, porte les deux couches.
+
+**Reste ouvert.** `anon` dispose des droits DML sur les 27 tables de
+`public` — seule la RLS l'arrête, et les 31 policies `to public` ne le
+filtrent que par `auth.uid()`. Aucune fuite mesurée, mais la marge est
+mince. À traiter en durcissement séparé.
+
+---
+
 ## Limitations connues
 
 - **Création d'un médecin sans UI dédiée** — RÉSOLU à l'étape 14. Le super_admin peut désormais créer un médecin directement depuis `/trombinoscope` via le bouton "+ Nouveau médecin". La voie dashboard Supabase reste disponible mais n'est plus le chemin nominal.
-- **Filtrage des champs sensibles côté frontend** — la RLS `profiles_select_all_authenticated` autorise la lecture de toute la table `profiles` à tout utilisateur authentifié. Le masquage de `jours_disponibles` et `notes_internes` pour les remplaçants se fait côté React. Si on a besoin d'une sécurité forte (les remplaçants ne doivent jamais voir ces données via une requête manuelle), migrer vers une vue PostgreSQL filtrée par rôle.
+- **Filtrage des champs sensibles côté frontend** — la RLS `profiles_select_all_authenticated` autorise la lecture de toute la table `profiles` à tout utilisateur authentifié **et actif** (depuis le chantier D, une policy restrictive exige `public.est_actif()` ; la règle `using true`, elle, est inchangée). Le masquage de `jours_disponibles` et `notes_internes` pour les remplaçants se fait côté React. Si on a besoin d'une sécurité forte (les remplaçants ne doivent jamais voir ces données via une requête manuelle), migrer vers une vue PostgreSQL filtrée par rôle.
 - **Gestion des RIB centralisée sur le super_admin** — depuis l'étape 11, les RIB (`profiles_compta`) sont saisis et modifiés uniquement par le super_admin, depuis la fiche Trombinoscope de chaque médecin. Les médecins associés (associe / associe_gerant) les consultent en lecture pour payer les remplaçants. Les remplaçants n'ont aucun accès (ni lecture ni écriture). Pas de validation BIC (seul l'IBAN est validé par checksum mod-97). Pas d'historique des modifications de RIB (hard delete, dernière valeur écrase).
 - **Cohérence du nommage Discussion** — le module Discussion utilise des noms anglais (`title`, `status`, `archived`, `created_by`) en BDD, hooks et composants, alors qu'Immobilier utilise le français (`titre`, `statut`, `archive`, `auteur_id`). Cette dette de nommage transverse rend la lecture du code plus pénible (helpers de normalisation en transit dans `Recherche.jsx`) mais n'a pas d'impact utilisateur. Renommage prévu en étape 12 ter ou après le déploiement Vercel : impacte les colonnes Postgres, les RLS, les fonctions SECURITY DEFINER (`is_board_member`, `is_board_owner`, `mark_board_read`), les hooks (`useDiscussion`, `useBoard`, `useCard`), les composants et la doc. Sous-chantiers prévus : (a) SQL + RLS + fonctions, (b) hooks JS, (c) composants et UI, (d) doc et limitations.
 - **Breadcrumb des Drives à 2 segments** — les modules Cabinet pratique et SIM affichent un breadcrumb réduit à `Module > NomDossierActuel` quel que soit le niveau d'imbrication. Au-delà du 2e niveau, le contexte intermédiaire n'est pas visible dans le fil ; le retour racine se fait en un clic. Un breadcrumb complet (remontée des `parent_id`) sera ajouté en transverse sur les deux modules si le besoin se confirme avec l'usage.
