@@ -8,7 +8,7 @@ import {
 } from '../lib/rotationUtils';
 import { useToast } from '../components/ui/ActionToast';
 import { checkDoctorDailyConflict } from '../lib/shiftValidation';
-import { aujourdhuiCabinet } from '../lib/dates';
+import { aujourdhuiCabinet, depuisJour } from '../lib/dates';
 
 // Boite regroupant toute la "mecanique" de la fenetre de detail d'une garde
 // (etat, chargements a l'ouverture, actions du coordinateur). Le composant
@@ -79,13 +79,13 @@ async function findRotationSlotShifts(shift: Shift): Promise<{
   shiftIds: string[];
 }> {
   const plans = await getRotationPlans();
-  const plan = getPlanForDate(new Date(shift.date), plans);
+  const plan = getPlanForDate(depuisJour(shift.date), plans);
   if (!plan) {
     throw new Error('Aucun plan de roulement ne couvre cette date');
   }
 
   const { rotationWeek, weekday } = getRotationSlot(
-    new Date(shift.date),
+    depuisJour(shift.date),
     plan,
     { componentName: 'useShiftDetail.findRotationSlotShifts', inputOrigin: `shift.date: "${shift.date}"` }
   );
@@ -106,11 +106,11 @@ async function findRotationSlotShifts(shift: Shift): Promise<{
       // Une garde regie par un AUTRE plan n'est pas dans la meme case : le
       // roulement a change entre-temps. Sans ce test, une action passee sur
       // decembre 2026 toucherait des gardes de 2027 relevant du V2.
-      const candidatePlan = getPlanForDate(new Date(candidate.date), plans);
+      const candidatePlan = getPlanForDate(depuisJour(candidate.date), plans);
       if (!candidatePlan || candidatePlan.id !== plan.id) return false;
 
       const slot = getRotationSlot(
-        new Date(candidate.date),
+        depuisJour(candidate.date),
         candidatePlan,
         { componentName: 'useShiftDetail.findRotationSlotShifts(filter)', inputOrigin: `candidate.date: "${candidate.date}"` }
       );
@@ -211,12 +211,12 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
     };
 
     const loadRotationInfo = async () => {
-      const plan = getPlanForDate(new Date(shift.date), await getRotationPlans());
+      const plan = getPlanForDate(depuisJour(shift.date), await getRotationPlans());
       if (cancelled) return;
 
       if (plan) {
         const week = getRotationWeek(
-          new Date(shift.date),
+          depuisJour(shift.date),
           plan,
           { componentName: 'ShiftDetailModal.loadRotationInfo', inputOrigin: `shift.date: "${shift.date}"` }
         );
@@ -232,7 +232,7 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
         return;
       }
 
-      const plan = getPlanForDate(new Date(shift.date), await getRotationPlans());
+      const plan = getPlanForDate(depuisJour(shift.date), await getRotationPlans());
       if (cancelled) return;
 
       if (!plan) {
@@ -240,7 +240,7 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
         return;
       }
 
-      const shiftDate = new Date(shift.date);
+      const shiftDate = depuisJour(shift.date);
       const rotationWeek = getRotationWeek(
         shiftDate,
         plan,
@@ -596,7 +596,7 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
       // C'est precisement cette ecriture qui avait fait diverger la base du
       // fichier -- 41 regles modifiees et 24 ajoutees en sept mois.
       const plans = await getRotationPlans();
-      const plan = getPlanForDate(new Date(shift.date), plans);
+      const plan = getPlanForDate(depuisJour(shift.date), plans);
       if (!plan) {
         setError('Aucun plan de roulement ne couvre cette date');
         setLoading(false);
@@ -604,7 +604,7 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
       }
 
       const { rotationWeek: currentRotationWeek, weekday: currentWeekday } = getRotationSlot(
-        new Date(shift.date),
+        depuisJour(shift.date),
         plan,
         { componentName: 'ShiftDetailModal.handleApplyToRotationWeek', inputOrigin: `shift.date: "${shift.date}"` }
       );
@@ -633,11 +633,11 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
         const matchingShifts = allShifts.filter(s => {
           // Meme precaution que dans findRotationSlotShifts : une garde regie
           // par un autre plan n'est pas dans la meme case.
-          const sPlan = getPlanForDate(new Date(s.date), plans);
+          const sPlan = getPlanForDate(depuisJour(s.date), plans);
           if (!sPlan || sPlan.id !== plan.id) return false;
 
           const { rotationWeek: shiftRotationWeek, weekday: shiftWeekday } = getRotationSlot(
-            new Date(s.date),
+            depuisJour(s.date),
             sPlan,
             { componentName: 'ShiftDetailModal.handleApplyToRotationWeek(filter)', inputOrigin: `s.date: "${s.date}"` }
           );

@@ -10,7 +10,7 @@ import {
 import { checkDoctorDailyConflict } from '../lib/shiftValidation';
 import ConflictErrorModal from './ConflictErrorModal';
 import BottomSheet from './ui/BottomSheet';
-import { aujourdhuiCabinet, libelleJourCourt } from '../lib/dates';
+import { aujourdhuiCabinet, depuisJour, libelleJourCourt } from '../lib/dates';
 
 type Doctor = {
   id: string;
@@ -50,9 +50,9 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
 
   const loadRotationInfo = async () => {
     try {
-      const plan = getPlanForDate(new Date(shift.date), await getRotationPlans());
+      const plan = getPlanForDate(depuisJour(shift.date), await getRotationPlans());
       if (plan) {
-        const shiftDate = new Date(shift.date);
+        const shiftDate = depuisJour(shift.date);
         const week = getRotationWeek(
           shiftDate,
           plan,
@@ -182,7 +182,7 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
       // Depuis 6C-3, ne cree plus de regle : le plan vient du fichier valide
       // et l'application ne l'ecrit jamais (source unique, MOD-1).
       const plans = await getRotationPlans();
-      const plan = getPlanForDate(new Date(shift.date), plans);
+      const plan = getPlanForDate(depuisJour(shift.date), plans);
       if (!plan) {
         setError('Aucun plan de roulement ne couvre cette date');
         setLoading(false);
@@ -190,7 +190,7 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
       }
 
       const { rotationWeek: currentRotationWeek, weekday: currentWeekday } = getRotationSlot(
-        new Date(shift.date),
+        depuisJour(shift.date),
         plan,
         { componentName: 'AssignDoctorModal.handleApplyToRotation', inputOrigin: `shift.date: "${shift.date}"` }
       );
@@ -227,11 +227,11 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
       {
         const matchingShifts = allShifts.filter(s => {
           // Une garde regie par un autre plan n'est pas dans la meme case.
-          const sPlan = getPlanForDate(new Date(s.date), plans);
+          const sPlan = getPlanForDate(depuisJour(s.date), plans);
           if (!sPlan || sPlan.id !== plan.id) return false;
 
           const { rotationWeek: shiftRotationWeek, weekday: shiftWeekday } = getRotationSlot(
-            new Date(s.date),
+            depuisJour(s.date),
             sPlan,
             { componentName: 'AssignDoctorModal.handleApplyToRotation(filter)', inputOrigin: `s.date: "${s.date}"` }
           );
