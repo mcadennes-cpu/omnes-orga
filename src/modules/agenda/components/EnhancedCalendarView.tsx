@@ -14,6 +14,7 @@ import StatusBadge from './ui/StatusBadge';
 import { AgendaStatusKey } from '../lib/statusStyles';
 import { saveWeekAsTemplate } from '../lib/weekTemplateUtils';
 import { useToast } from './ui/ActionToast';
+import { depuisJour, jourLocal } from '../lib/dates';
 
 type EnhancedCalendarViewProps = {
   currentUser: Profile;
@@ -84,15 +85,8 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
     }
   };
 
-  const formatDateLocal = (d: Date): string => {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
   const getDateRange = () => {
-    const date = new Date(selectedDate);
+    const date = depuisJour(selectedDate);
 
     if (viewMode === 'week') {
       const startOfWeek = new Date(date);
@@ -101,8 +95,8 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
       endOfWeek.setDate(startOfWeek.getDate() + 6);
 
       return {
-        start: formatDateLocal(startOfWeek),
-        end: formatDateLocal(endOfWeek)
+        start: jourLocal(startOfWeek),
+        end: jourLocal(endOfWeek)
       };
     } else {
       const year = date.getFullYear();
@@ -117,8 +111,8 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
       gridEnd.setDate(gridStart.getDate() + 41);
 
       return {
-        start: formatDateLocal(gridStart),
-        end: formatDateLocal(gridEnd)
+        start: jourLocal(gridStart),
+        end: jourLocal(gridEnd)
       };
     }
   };
@@ -185,22 +179,22 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
   };
 
   const handleDayClick = (date: Date) => {
-    setSelectedDate(date.toISOString().split('T')[0]);
+    setSelectedDate(jourLocal(date));
     setViewMode('week');
   };
 
   const handleWeekChange = (direction: 'prev' | 'next') => {
-    const currentDate = new Date(selectedDate);
+    const currentDate = depuisJour(selectedDate);
     const newDate = new Date(currentDate);
     newDate.setDate(currentDate.getDate() + (direction === 'next' ? 7 : -7));
-    setSelectedDate(newDate.toISOString().split('T')[0]);
+    setSelectedDate(jourLocal(newDate));
   };
 
   const handleMonthChange = (direction: 'prev' | 'next') => {
-    const currentDate = new Date(selectedDate);
+    const currentDate = depuisJour(selectedDate);
     const newDate = new Date(currentDate);
     newDate.setMonth(currentDate.getMonth() + (direction === 'next' ? 1 : -1));
-    setSelectedDate(newDate.toISOString().split('T')[0]);
+    setSelectedDate(jourLocal(newDate));
   };
 
   // Mappe l'ancienne logique de statut vers la cle statusStyles : comportement
@@ -216,7 +210,7 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
   };
 
   const handleSaveAsTemplate = async (templateName: string) => {
-    const date = new Date(selectedDate);
+    const date = depuisJour(selectedDate);
     const startOfWeek = new Date(date);
     startOfWeek.setDate(date.getDate() - date.getDay() + 1);
 
@@ -313,7 +307,7 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
                       </button>
                       <h3 className="text-body-l font-semibold capitalize text-ink">
                         {(() => {
-                          const date = new Date(selectedDate);
+                          const date = depuisJour(selectedDate);
                           const startOfWeek = new Date(date);
                           startOfWeek.setDate(date.getDate() - date.getDay() + 1);
                           const endOfWeek = new Date(startOfWeek);
@@ -335,7 +329,7 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
                     </div>
                     <DoctorWeekSummaryView
                       weekStart={(() => {
-                        const date = new Date(selectedDate);
+                        const date = depuisJour(selectedDate);
                         const startOfWeek = new Date(date);
                         startOfWeek.setDate(date.getDate() - date.getDay() + 1);
                         return startOfWeek;
@@ -352,7 +346,7 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
                 ) : (
                   <WeekView
                     shifts={shifts}
-                    currentWeek={new Date(selectedDate)}
+                    currentWeek={depuisJour(selectedDate)}
                     onWeekChange={handleWeekChange}
                     onShiftClick={handleShiftClick}
                     getStatusBadge={getStatusBadge}
@@ -368,7 +362,7 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
             {viewMode === 'month' && (
               <MonthView
                 shifts={shifts}
-                currentMonth={new Date(selectedDate)}
+                currentMonth={depuisJour(selectedDate)}
                 onMonthChange={handleMonthChange}
                 onDayClick={handleDayClick}
                 getStatusBadge={getStatusBadge}

@@ -3,7 +3,7 @@ import { supabase, supabaseOrga, Shift, Profile } from '../lib/supabase';
 import { Calendar, MapPin, Clock, Users, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import Avatar from '../../../components/common/Avatar';
 import { getHoraireStyle } from '../lib/horaireStyles';
-import { libelleJour } from '../lib/dates';
+import { depuisJour, jourLocal, libelleJour } from '../lib/dates';
 
 type ShiftWithDoctor = Shift & {
   assigned_doctor: Profile | null;
@@ -84,9 +84,9 @@ export default function DailyScheduleView() {
   const formatDate = (dateStr: string) => libelleJour(dateStr);
 
   const changeDate = (days: number) => {
-    const date = new Date(selectedDate);
+    const date = depuisJour(selectedDate);
     date.setDate(date.getDate() + days);
-    setSelectedDate(date.toISOString().split('T')[0]);
+    setSelectedDate(jourLocal(date));
   };
 
   const filteredShifts = selectedSite === 'all'

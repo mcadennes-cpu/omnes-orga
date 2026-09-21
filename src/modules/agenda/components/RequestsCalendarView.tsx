@@ -10,6 +10,7 @@ import BulkAssignPrevalidatedModal from './BulkAssignPrevalidatedModal';
 import ExportPlanningModal from './ExportPlanningModal';
 import StatusBadge from './ui/StatusBadge';
 import { AgendaStatusKey } from '../lib/statusStyles';
+import { depuisJour, jourLocal } from '../lib/dates';
 
 type RequestsCalendarViewProps = {
   currentUser: Profile;
@@ -74,7 +75,7 @@ export default function RequestsCalendarView({ currentUser }: RequestsCalendarVi
   };
 
   const getDateRange = () => {
-    const date = new Date(selectedDate);
+    const date = depuisJour(selectedDate);
 
     if (viewMode === 'week') {
       const startOfWeek = new Date(date);
@@ -83,8 +84,8 @@ export default function RequestsCalendarView({ currentUser }: RequestsCalendarVi
       endOfWeek.setDate(startOfWeek.getDate() + 6);
 
       return {
-        start: startOfWeek.toISOString().split('T')[0],
-        end: endOfWeek.toISOString().split('T')[0]
+        start: jourLocal(startOfWeek),
+        end: jourLocal(endOfWeek)
       };
     } else {
       const year = date.getFullYear();
@@ -92,9 +93,13 @@ export default function RequestsCalendarView({ currentUser }: RequestsCalendarVi
       const startOfMonth = new Date(year, month, 1);
       const endOfMonth = new Date(year, month + 1, 0);
 
+      // jourLocal et non toISOString : new Date(annee, mois, 1) est minuit
+      // LOCAL, que toISOString reculait au jour precedent en France. La borne
+      // de fin perdait ainsi le dernier jour de chaque mois -- 91 gardes
+      // jamais chargees sur 13 mois (8M-4).
       return {
-        start: startOfMonth.toISOString().split('T')[0],
-        end: endOfMonth.toISOString().split('T')[0]
+        start: jourLocal(startOfMonth),
+        end: jourLocal(endOfMonth)
       };
     }
   };
@@ -173,22 +178,22 @@ export default function RequestsCalendarView({ currentUser }: RequestsCalendarVi
   };
 
   const handleDayClick = (date: Date) => {
-    setSelectedDate(date.toISOString().split('T')[0]);
+    setSelectedDate(jourLocal(date));
     setViewMode('week');
   };
 
   const handleWeekChange = (direction: 'prev' | 'next') => {
-    const currentDate = new Date(selectedDate);
+    const currentDate = depuisJour(selectedDate);
     const newDate = new Date(currentDate);
     newDate.setDate(currentDate.getDate() + (direction === 'next' ? 7 : -7));
-    setSelectedDate(newDate.toISOString().split('T')[0]);
+    setSelectedDate(jourLocal(newDate));
   };
 
   const handleMonthChange = (direction: 'prev' | 'next') => {
-    const currentDate = new Date(selectedDate);
+    const currentDate = depuisJour(selectedDate);
     const newDate = new Date(currentDate);
     newDate.setMonth(currentDate.getMonth() + (direction === 'next' ? 1 : -1));
-    setSelectedDate(newDate.toISOString().split('T')[0]);
+    setSelectedDate(jourLocal(newDate));
   };
 
   // Badge de statut cote coordinateur : memes cas et libelles qu'avant, en
@@ -293,7 +298,7 @@ export default function RequestsCalendarView({ currentUser }: RequestsCalendarVi
             {viewMode === 'week' && (
               <WeekView
                 shifts={shifts}
-                currentWeek={new Date(selectedDate)}
+                currentWeek={depuisJour(selectedDate)}
                 onWeekChange={handleWeekChange}
                 onShiftClick={handleShiftClick}
                 getStatusBadge={(status, shift) => getStatusBadge(status, shift)}
@@ -304,7 +309,7 @@ export default function RequestsCalendarView({ currentUser }: RequestsCalendarVi
             {viewMode === 'month' && (
               <MonthView
                 shifts={shifts}
-                currentMonth={new Date(selectedDate)}
+                currentMonth={depuisJour(selectedDate)}
                 onMonthChange={handleMonthChange}
                 onDayClick={handleDayClick}
                 getStatusBadge={(status, shift) => getStatusBadge(status, shift)}

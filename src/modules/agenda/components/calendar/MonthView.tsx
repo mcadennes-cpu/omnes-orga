@@ -9,6 +9,7 @@ import {
   RotationPlan,
 } from '../../lib/rotationUtils';
 import { STATUS_STYLES, resolveShiftStatus } from '../../lib/statusStyles';
+import { jourLocal } from '../../lib/dates';
 
 type MonthViewProps = {
   shifts: Shift[];
@@ -82,15 +83,8 @@ export default function MonthView({
 
   const monthDays = getMonthDays(currentMonth);
 
-  const formatDateLocal = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
   const getShiftsForDay = (date: Date) => {
-    const dateStr = formatDateLocal(date);
+    const dateStr = jourLocal(date);
     return shifts.filter(shift => shift.date === dateStr);
   };
 
