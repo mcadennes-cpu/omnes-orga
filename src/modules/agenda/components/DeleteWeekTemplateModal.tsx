@@ -83,8 +83,11 @@ export default function DeleteWeekTemplateModal({ onClose, onSuccess }: DeleteWe
 
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('fr-FR', {
+  // horodatage et non « date » : c'est le created_at de la semaine type, un
+  // vrai INSTANT. new Date() est ici la bonne fonction -- la regle de
+  // lib/dates.ts ne vise que les dates de garde (8M-8).
+  const formatDate = (horodatage: string) => {
+    return new Date(horodatage).toLocaleDateString('fr-FR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric'
