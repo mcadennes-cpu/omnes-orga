@@ -15,10 +15,13 @@ import ApplyToRotationWeekModal from './shiftDetail/ApplyToRotationWeekModal';
 import DeletionBlockedModal from './shiftDetail/DeletionBlockedModal';
 import RotationChangeModal from './shiftDetail/RotationChangeModal';
 import { useShiftDetail } from '../hooks/useShiftDetail';
+import { libelleJour } from '../lib/dates';
 
-// Meme idiome que ShiftInfoRows : chaque composant formate sa date localement.
+// Meme idiome que ShiftInfoRows : chaque composant formate sa date localement,
+// mais en passant par libelleJour -- new Date('2026-12-19') affichait « vendredi
+// 18 decembre » a l'ouest de Greenwich (8M).
 function formatDateFr(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString('fr-FR', {
+  return libelleJour(dateStr, {
     weekday: 'long',
     day: 'numeric',
     month: 'long',

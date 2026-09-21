@@ -1,4 +1,5 @@
 import BottomSheet from './ui/BottomSheet';
+import { libelleJour } from '../lib/dates';
 
 type CancelRequestModalProps = {
   isOpen: boolean;
@@ -15,15 +16,8 @@ export default function CancelRequestModal({
   shiftDate,
   shiftType
 }: CancelRequestModalProps) {
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return new Intl.DateTimeFormat('fr-FR', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    }).format(date);
-  };
+  // libelleJour et non new Date(dateStr) : voir lib/dates.ts (8M).
+  const formatDate = (dateStr: string) => libelleJour(dateStr);
 
   return (
     <BottomSheet

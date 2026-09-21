@@ -10,6 +10,7 @@ import {
 import { checkDoctorDailyConflict } from '../lib/shiftValidation';
 import ConflictErrorModal from './ConflictErrorModal';
 import BottomSheet from './ui/BottomSheet';
+import { libelleJourCourt } from '../lib/dates';
 
 type Doctor = {
   id: string;
@@ -257,7 +258,7 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
             if (validation.isValid) {
               validShiftIds.push(matchingShift.id);
             } else {
-              conflictDates.push(new Date(matchingShift.date).toLocaleDateString('fr-FR'));
+              conflictDates.push(libelleJourCourt(matchingShift.date));
             }
           }
 
@@ -375,7 +376,7 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
           <div className="mb-4 rounded-input border border-marine/20 bg-marine/5 p-3">
             <p className="text-body-m text-ink">{info}</p>
             <p className="mt-1 text-caption">
-              La garde du {new Date(shift.date).toLocaleDateString('fr-FR')} est bien
+              La garde du {libelleJourCourt(shift.date)} est bien
               assignée.
             </p>
           </div>

@@ -4,6 +4,7 @@ import { CalendarCheck, Calendar, MapPin, Clock, AlertCircle, X, FileText } from
 import CancelRequestModal from './CancelRequestModal';
 import Segmented from './ui/Segmented';
 import { getHoraireStyle } from '../lib/horaireStyles';
+import { libelleJour } from '../lib/dates';
 
 type PendingRequest = Request & {
   shift: Shift;
@@ -125,15 +126,8 @@ export default function MyScheduleView({ currentUser }: MyScheduleViewProps) {
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return new Intl.DateTimeFormat('fr-FR', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    }).format(date);
-  };
+  // libelleJour et non new Date(dateStr) : voir lib/dates.ts (8M).
+  const formatDate = (dateStr: string) => libelleJour(dateStr);
 
   // Demandes en attente reellement affichables (garde encore existante).
   const visiblePending = pendingRequests.filter(

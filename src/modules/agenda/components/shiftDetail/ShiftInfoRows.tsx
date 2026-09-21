@@ -3,6 +3,7 @@ import { Calendar, Clock, MapPin, User, Repeat, Edit2 } from 'lucide-react';
 import { Shift } from '../../lib/supabase';
 import StatusBadge from '../ui/StatusBadge';
 import { AgendaStatusKey } from '../../lib/statusStyles';
+import { libelleJour } from '../../lib/dates';
 
 type ShiftInfoRowsProps = {
   shift: Shift;
@@ -14,13 +15,9 @@ type ShiftInfoRowsProps = {
   onEditSeries: () => void;
 };
 
+// libelleJour et non new Date(dateStr) : voir lib/dates.ts (8M).
 function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString('fr-FR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  });
+  return libelleJour(dateStr);
 }
 
 // Statut de la garde -> cle statusStyles + libelle (wording d'origine conserve).

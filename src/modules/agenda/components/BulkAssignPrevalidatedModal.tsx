@@ -3,6 +3,7 @@ import { AlertCircle, CheckCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { checkDoctorDailyConflict } from '../lib/shiftValidation';
 import BottomSheet from './ui/BottomSheet';
+import { libelleJourCourt } from '../lib/dates';
 
 type BulkAssignPrevalidatedModalProps = {
   onClose: () => void;
@@ -71,7 +72,7 @@ export default function BulkAssignPrevalidatedModal({
           );
 
           if (!validation.isValid) {
-            conflictWarnings.push(`${doctorName} - conflit détecté pour le ${new Date(shiftDate).toLocaleDateString('fr-FR')}`);
+            conflictWarnings.push(`${doctorName} - conflit détecté pour le ${libelleJourCourt(shiftDate)}`);
             errorCount++;
             continue;
           }
