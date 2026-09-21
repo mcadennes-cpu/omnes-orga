@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { jourLocal } from './dates';
 
 // ---------------------------------------------------------------------------
 // Une semaine type dit QUELLES CASES sont ouvertes -- l'offre. Le plan de
@@ -23,7 +24,9 @@ export async function saveWeekAsTemplate(
   for (let i = 0; i < 7; i++) {
     const date = new Date(weekStart);
     date.setDate(weekStart.getDate() + i);
-    weekDates.push(date.toISOString().split('T')[0]);
+    // weekStart est construit en heure locale par l'appelant : la relire en
+    // UTC enregistrait la semaine decalee d'un jour (8M).
+    weekDates.push(jourLocal(date));
   }
 
   const { data: shifts, error: shiftsError } = await supabase

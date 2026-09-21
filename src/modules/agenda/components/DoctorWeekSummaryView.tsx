@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Calendar, ChevronDown, ChevronUp, CheckSquare, Square, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { jourLocal } from '../lib/dates';
 import { useToast } from './ui/ActionToast';
 
 interface Shift {
@@ -55,7 +56,10 @@ export default function DoctorWeekSummaryView({
     for (let i = 0; i < 7; i++) {
       const date = new Date(weekStart);
       date.setDate(date.getDate() + i);
-      const dateString = date.toISOString().split('T')[0];
+      // jourLocal et non toISOString : l'en-tete de la carte est lu en heure
+      // locale (formatDayHeader). Avec une cle en UTC, les deux se separaient
+      // d'un jour des que le navigateur etait a l'ouest de Greenwich -- 8M.
+      const dateString = jourLocal(date);
 
       if (date < today) {
         continue;
