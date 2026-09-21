@@ -35,3 +35,4 @@ dev-dist
 supabase/.branches
 supabase/.temp
 reference-agenda/
+.env.test

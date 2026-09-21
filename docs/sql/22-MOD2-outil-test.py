@@ -28,16 +28,37 @@ import hashlib
 import hmac
 import importlib.util
 import json
+import os
 import sys
 import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 
-PROJET = "ydihrgnixthrraprclox"
+# ---------------------------------------------------------------------
+# CIBLE : production, ou environnement de test (C-4, 21/09/2026)
+#
+#     python3 docs/sql/22-MOD2A-2-test-journal-activite.py        # production
+#     OMNES_CIBLE=test python3 docs/sql/22-MOD2A-2-...            # base de test
+#
+# La production reste la cible par defaut : une suite lancee sans y penser
+# retombe sur le garde-fou de 8F-5, qui la bloque. La base de test, elle,
+# doit porter la table temoin posee par 23-18 -- sans quoi on refuse
+# d'ecrire, au cas ou la variable designerait un vrai projet.
+# ---------------------------------------------------------------------
+PROJET_PROD = "ydihrgnixthrraprclox"          # OMNES ORGA
+PROJET_TEST = "yjttfdwjbyufpavwxcpy"          # environnement de test (23-18)
 
-if not Path("docs/sql").is_dir() or not Path(".env").is_file():
-    raise SystemExit("A lancer depuis la racine du depot omnes-orga.")
+CIBLE = os.environ.get("OMNES_CIBLE", "prod").strip().lower()
+if CIBLE not in ("prod", "test"):
+    raise SystemExit("OMNES_CIBLE vaut 'prod' (defaut) ou 'test'.")
+SUR_TEST = CIBLE == "test"
+PROJET = PROJET_TEST if SUR_TEST else PROJET_PROD
+FICHIER_ENV = Path(".env.test") if SUR_TEST else Path(".env")
+
+if not Path("docs/sql").is_dir() or not FICHIER_ENV.is_file():
+    raise SystemExit(f"A lancer depuis la racine du depot omnes-orga, "
+                     f"avec {FICHIER_ENV}.")
 
 _spec = importlib.util.spec_from_file_location(
     "outil", "docs/sql/22-6-outil-comparer-roulement-fichiers.py")
@@ -46,6 +67,7 @@ _spec.loader.exec_module(outil)
 
 #: Requete SQL en role postgres (API d'administration). Pour PREPARER et
 #: CONSTATER, jamais pour prouver ce que voit un utilisateur.
+outil.PROJET_SUPABASE = PROJET       # l'outil interroge la meme base que nous
 sql = outil.interroger
 
 # ---------------------------------------------------------------------
@@ -76,23 +98,39 @@ SUITES_LECTURE_SEULE = {
     "23-4-test-designation-medecins.py",
 }
 
-_ouvert = sql("""select count(*) as n from public.profiles
-                  where role = 'remplacant' and actif
-                    and agenda_beta_access""")[0]["n"]
-if _ouvert and Path(sys.argv[0]).name not in SUITES_LECTURE_SEULE:
-    raise SystemExit(
-        f"\nARRET : le module Agenda est ouvert a tous ({_ouvert} remplacants "
-        "actifs avec le drapeau).\n"
-        f"{Path(sys.argv[0]).name} ecrit dans le planning reel du cabinet : "
-        "bloquee depuis 8F-5.\n"
-        "Seules tournent encore : " + ", ".join(sorted(SUITES_LECTURE_SEULE))
-        + ".\nRien n'a ete ecrit.")
+if SUR_TEST:
+    # Sur la base de test, les suites ecrivent librement -- mais on verifie
+    # d'abord que c'est bien elle : la table temoin de 23-18 en est la preuve.
+    _temoin = sql("""select count(*) as n from pg_class c
+                       join pg_namespace n on n.oid = c.relnamespace
+                      where c.relname = '_environnement_de_test'
+                        and n.nspname = 'public'""")[0]["n"]
+    if not _temoin:
+        raise SystemExit(
+            f"\nARRET : le projet {PROJET} n'a pas la table temoin "
+            "`public._environnement_de_test`.\n"
+            "Ce n'est pas l'environnement de test construit par 23-18 : "
+            "on n'y ecrit pas.\nRien n'a ete ecrit.")
+    print(f"[cible : ENVIRONNEMENT DE TEST -- projet {PROJET}]")
+else:
+    _ouvert = sql("""select count(*) as n from public.profiles
+                      where role = 'remplacant' and actif
+                        and agenda_beta_access""")[0]["n"]
+    if _ouvert and Path(sys.argv[0]).name not in SUITES_LECTURE_SEULE:
+        raise SystemExit(
+            f"\nARRET : le module Agenda est ouvert a tous ({_ouvert} remplacants "
+            "actifs avec le drapeau).\n"
+            f"{Path(sys.argv[0]).name} ecrit dans le planning reel du cabinet : "
+            "bloquee depuis 8F-5.\n"
+            "Seules tournent encore : " + ", ".join(sorted(SUITES_LECTURE_SEULE))
+            + ".\nPour les rejouer : OMNES_CIBLE=test (environnement de test, C-4)."
+            + "\nRien n'a ete ecrit.")
 
 _cfg = json.load(urllib.request.urlopen(urllib.request.Request(
     f"https://api.supabase.com/v1/projects/{PROJET}/postgrest",
     headers={"Authorization": f"Bearer {outil.jeton_supabase()}",
              "User-Agent": "omnes-orga-script/1.0"})))
-_env = dict(l.split("=", 1) for l in Path(".env").read_text().splitlines()
+_env = dict(l.split("=", 1) for l in FICHIER_ENV.read_text().splitlines()
             if "=" in l and not l.startswith("#"))
 URL = _env["VITE_SUPABASE_URL"].strip()
 ANON = _env["VITE_SUPABASE_ANON_KEY"].strip()
