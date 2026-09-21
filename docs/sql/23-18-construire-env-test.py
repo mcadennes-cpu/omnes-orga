@@ -404,7 +404,10 @@ def main():
     debut = time.time()
     if RECOMMENCER and etat["tables"]:
         print("\n--- Effacement du projet de TEST ---")
-        ecrire_test(["drop schema if exists agenda cascade",
+        # Les comptes aussi : sans cela, 23-19 ne pourrait pas repartir d'une
+        # base vide (les fiches sont creees par le declencheur de Supabase).
+        ecrire_test(["delete from auth.users",
+                     "drop schema if exists agenda cascade",
                      "drop schema public cascade",
                      "create schema public",
                      "grant usage on schema public to anon, authenticated, service_role",
