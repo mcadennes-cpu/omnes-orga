@@ -1497,10 +1497,32 @@ refusée, mise à jour sans effet. Côté fichiers : inactifs à zéro, et
 arrière a été joué pour de vrai : état identique à l'empreinte d'origine,
 policy par policy et fonction par fonction.
 
-**État au 21/09/2026 : non basculé en production.** Le contrôle de
-permissions de Claude Code refuse l'écriture ; `23-21 --go` puis
-`23-24 --go` restent à lancer à la main, dans cet ordre (`23-24` dépend de
-`est_actif()`). L'environnement de test, lui, porte les deux couches.
+**BASCULÉ EN PRODUCTION le 21/09/2026.** `23-21 --go` puis `23-24 --go`
+(dans cet ordre, `23-24` dépend de `est_actif()`), lancés à la main par
+Matthieu — le contrôle de permissions de Claude Code refuse ces écritures.
+Sauvegarde `23-16` de 17h17 prise juste avant.
+
+Vérifié en base après bascule : **31 policies ajoutées** (29 `public`,
+2 `storage`), **0 retirée, 0 modifiée**, les 99 permissives de `public` et
+les 20 de `storage` intactes, 27 tables couvertes sur 27. Les 5 rôles
+actifs voient exactement le même nombre de lignes qu'avant (336 / 443 /
+300 / 307 / 437, inchangés) ; les comptes inactifs passent de 331 et 307
+lignes à **1** — leur propre fiche — insertion refusée, mise à jour sans
+effet, zéro fichier dans les six buckets.
+
+**Effet de bord voulu** : `remplacant` et `poste_bureau` perdent l'accès
+aux fichiers du bucket immobilier. La table `immobilier_attachments` le
+leur refusait déjà ; c'est la porte de derrière qui se referme.
+
+**Retour arrière**, dans l'ordre inverse de la pose :
+```
+python3 docs/sql/23-24-storage-compte-actif.py --retour-arriere --go
+python3 docs/sql/23-21-exiger-compte-actif.py --retour-arriere --go
+```
+Joué pour de vrai sur l'environnement de test avant la bascule : état
+identique à l'empreinte d'origine, policy par policy et fonction par
+fonction. Empreintes d'avant conservées dans
+`~/Documents/claude-projets/archives/orga-mesures/`.
 
 **Reste ouvert.** `anon` dispose des droits DML sur les 27 tables de
 `public` — seule la RLS l'arrête, et les 31 policies `to public` ne le
