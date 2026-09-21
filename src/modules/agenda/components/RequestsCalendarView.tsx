@@ -10,7 +10,7 @@ import BulkAssignPrevalidatedModal from './BulkAssignPrevalidatedModal';
 import ExportPlanningModal from './ExportPlanningModal';
 import StatusBadge from './ui/StatusBadge';
 import { AgendaStatusKey } from '../lib/statusStyles';
-import { depuisJour, jourLocal } from '../lib/dates';
+import { aujourdhuiCabinet, depuisJour, jourLocal } from '../lib/dates';
 
 type RequestsCalendarViewProps = {
   currentUser: Profile;
@@ -20,7 +20,7 @@ export default function RequestsCalendarView({ currentUser }: RequestsCalendarVi
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(aujourdhuiCabinet());
   const [locationFilter, setLocationFilter] = useState<'all' | 'Dijon' | 'Beaune'>('all');
   const [roomFilter, setRoomFilter] = useState('all');
   const [doctorFilter, setDoctorFilter] = useState('all');

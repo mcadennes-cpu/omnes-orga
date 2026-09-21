@@ -3,6 +3,7 @@ import { supabase, Site, Room, ShiftType } from '../lib/supabase';
 import { Calendar, MapPin, Clock, Home, Repeat } from 'lucide-react';
 import { applyRotationRulesToShifts } from '../lib/rotationUtils';
 import BottomSheet from './ui/BottomSheet';
+import { aujourdhuiCabinet } from '../lib/dates';
 
 type CreateShiftModalProps = {
   coordinatorId: string;
@@ -427,7 +428,7 @@ export default function CreateShiftModal({ coordinatorId, onClose, onSuccess }: 
             value={date}
             onChange={(e) => setDate(e.target.value)}
             required
-            min={new Date().toISOString().split('T')[0]}
+            min={aujourdhuiCabinet()}
             className={fieldClass}
           />
         </div>
@@ -494,7 +495,7 @@ export default function CreateShiftModal({ coordinatorId, onClose, onSuccess }: 
                 value={seriesEndDate}
                 onChange={(e) => setSeriesEndDate(e.target.value)}
                 required={isSeries}
-                min={date || new Date().toISOString().split('T')[0]}
+                min={date || aujourdhuiCabinet()}
                 className={fieldClass}
               />
             </div>

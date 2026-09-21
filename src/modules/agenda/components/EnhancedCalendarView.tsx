@@ -14,7 +14,7 @@ import StatusBadge from './ui/StatusBadge';
 import { AgendaStatusKey } from '../lib/statusStyles';
 import { saveWeekAsTemplate } from '../lib/weekTemplateUtils';
 import { useToast } from './ui/ActionToast';
-import { depuisJour, jourLocal } from '../lib/dates';
+import { aujourdhuiCabinet, depuisJour, jourLocal } from '../lib/dates';
 
 type EnhancedCalendarViewProps = {
   currentUser: Profile;
@@ -24,7 +24,7 @@ export default function EnhancedCalendarView({ currentUser }: EnhancedCalendarVi
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(aujourdhuiCabinet());
   const [locationFilter, setLocationFilter] = useState<'all' | 'Dijon' | 'Beaune'>('all');
   const [roomFilter, setRoomFilter] = useState('all');
   const [doctorFilter, setDoctorFilter] = useState('all');

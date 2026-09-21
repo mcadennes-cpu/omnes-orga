@@ -4,7 +4,7 @@ import { CalendarCheck, Calendar, MapPin, Clock, AlertCircle, X, FileText } from
 import CancelRequestModal from './CancelRequestModal';
 import Segmented from './ui/Segmented';
 import { getHoraireStyle } from '../lib/horaireStyles';
-import { libelleJour } from '../lib/dates';
+import { aujourdhuiCabinet, libelleJour } from '../lib/dates';
 
 type PendingRequest = Request & {
   shift: Shift;
@@ -56,7 +56,10 @@ export default function MyScheduleView({ currentUser }: MyScheduleViewProps) {
       .select('*')
       .eq('assigned_doctor_id', currentUser.id)
       .eq('status', 'assigned')
-      .gte('date', new Date().toISOString().split('T')[0])
+            // Le jour du cabinet et non celui du navigateur : depuis Tahiti,
+      // « aujourd'hui » en UTC avait un jour d'avance des 14h locales, et la
+      // garde du jour disparaissait de « Mes gardes » (8M-5).
+      .gte('date', aujourdhuiCabinet())
       .order('date', { ascending: true });
 
     if (!error && data) {
@@ -74,7 +77,7 @@ export default function MyScheduleView({ currentUser }: MyScheduleViewProps) {
       `)
       .eq('doctor_id', currentUser.id)
       .eq('status', 'pending')
-      .gte('shift.date', new Date().toISOString().split('T')[0])
+      .gte('shift.date', aujourdhuiCabinet())
       .order('shift(date)', { ascending: true });
 
     if (!error && data) {

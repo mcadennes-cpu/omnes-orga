@@ -3,7 +3,7 @@ import { supabase, supabaseOrga, Shift, Profile } from '../lib/supabase';
 import { Calendar, MapPin, Clock, Users, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import Avatar from '../../../components/common/Avatar';
 import { getHoraireStyle } from '../lib/horaireStyles';
-import { depuisJour, jourLocal, libelleJour } from '../lib/dates';
+import { aujourdhuiCabinet, depuisJour, jourLocal, libelleJour } from '../lib/dates';
 
 type ShiftWithDoctor = Shift & {
   assigned_doctor: Profile | null;
@@ -24,7 +24,7 @@ const fieldClass =
 // affiche sa vraie photo quand il en a une, ses initiales sinon.
 
 export default function DailyScheduleView() {
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(aujourdhuiCabinet());
   const [shifts, setShifts] = useState<ShiftWithDoctor[]>([]);
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedSite, setSelectedSite] = useState<string>('all');

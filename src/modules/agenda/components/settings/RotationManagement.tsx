@@ -6,6 +6,7 @@ import RotationPlanImport from './RotationPlanImport';
 import RotationPlanDiff from './RotationPlanDiff';
 import ConfirmDialog from '../../../../components/common/ConfirmDialog';
 import RotationChangesList from './RotationChangesList';
+import { aujourdhuiCabinet } from '../../lib/dates';
 
 // ---------------------------------------------------------------------------
 // Consultation des plans de roulement (MOD-1, etape 6C-3).
@@ -119,7 +120,7 @@ export default function RotationManagement() {
     }
   };
 
-  const aujourdhui = new Date().toISOString().split('T')[0];
+  const aujourdhui = aujourdhuiCabinet();
   const estEnVigueur = (p: RotationPlanRow) =>
     p.status === 'active' &&
     !!p.effective_from &&

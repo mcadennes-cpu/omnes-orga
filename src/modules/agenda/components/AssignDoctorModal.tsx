@@ -10,7 +10,7 @@ import {
 import { checkDoctorDailyConflict } from '../lib/shiftValidation';
 import ConflictErrorModal from './ConflictErrorModal';
 import BottomSheet from './ui/BottomSheet';
-import { libelleJourCourt } from '../lib/dates';
+import { aujourdhuiCabinet, libelleJourCourt } from '../lib/dates';
 
 type Doctor = {
   id: string;
@@ -201,7 +201,7 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
       // `free` ou `pending` en base (du 29/12/2025 au 31/07/2026). Signale par
       // Matthieu, qui voyait un conflit annonce sur le 30/12/2025 en assignant
       // une garde de 2027.
-      const aujourdhui = new Date().toISOString().split('T')[0];
+      const aujourdhui = aujourdhuiCabinet();
 
       const { data: allShifts, error: fetchError } = await supabase
         .from('shifts')

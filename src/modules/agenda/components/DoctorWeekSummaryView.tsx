@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Calendar, ChevronDown, ChevronUp, CheckSquare, Square, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { jourLocal } from '../lib/dates';
+import { aujourdhuiCabinet, jourLocal } from '../lib/dates';
 import { useToast } from './ui/ActionToast';
 
 interface Shift {
@@ -50,8 +50,11 @@ export default function DoctorWeekSummaryView({
 
   const getDayData = (): DayData[] => {
     const days: DayData[] = [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Le jour du cabinet et non celui du navigateur : depuis Papeete il est
+    // encore la veille de Dijon pendant dix heures, et une journee deja
+    // ouverte au cabinet restait masquee (8M-5). Les chaines 'AAAA-MM-JJ' se
+    // comparent dans l'ordre chronologique.
+    const aujourdhui = aujourdhuiCabinet();
 
     for (let i = 0; i < 7; i++) {
       const date = new Date(weekStart);
@@ -61,7 +64,7 @@ export default function DoctorWeekSummaryView({
       // d'un jour des que le navigateur etait a l'ouest de Greenwich -- 8M.
       const dateString = jourLocal(date);
 
-      if (date < today) {
+      if (dateString < aujourdhui) {
         continue;
       }
 
