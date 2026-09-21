@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Calendar } from 'lucide-react';
 import { applyRotationRulesToShifts } from '../lib/rotationUtils';
 import BottomSheet from './ui/BottomSheet';
+import { depuisJour, jourLocal } from '../lib/dates';
 
 type EditSeriesModalProps = {
   seriesId: string;
@@ -69,7 +70,9 @@ export default function EditSeriesModal({ seriesId, onClose, onSuccess }: EditSe
 
         const weekdaysSet = new Set<number>();
         shiftsData.forEach(shift => {
-          const date = new Date(shift.date);
+          // depuisJour : le jour de la semaine se lit sur la date de la
+          // garde, pas sur celle de la veille (8M-7).
+          const date = depuisJour(shift.date);
           const dayOfWeek = (date.getDay() + 6) % 7;
           weekdaysSet.add(dayOfWeek);
         });
@@ -103,8 +106,8 @@ export default function EditSeriesModal({ seriesId, onClose, onSuccess }: EditSe
         throw new Error('Veuillez sélectionner une date de fin');
       }
 
-      const start = new Date(startDate);
-      const end = new Date(endDate);
+      const start = depuisJour(startDate);
+      const end = depuisJour(endDate);
 
       if (end <= start) {
         throw new Error('La date de fin doit être après la date de début');
@@ -130,7 +133,7 @@ export default function EditSeriesModal({ seriesId, onClose, onSuccess }: EditSe
 
       while (currentDate <= end) {
         const dayOfWeek = (currentDate.getDay() + 6) % 7;
-        const dateStr = currentDate.toISOString().split('T')[0];
+        const dateStr = jourLocal(currentDate);
 
         if (selectedWeekdays.includes(dayOfWeek)) {
           const existingShift = existingShifts.find(s => s.date === dateStr);

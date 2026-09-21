@@ -35,7 +35,10 @@ export default function ExportPlanningModal({ onClose }: ExportPlanningModalProp
       return;
     }
 
-    if (new Date(endDate) < new Date(startDate)) {
+    // Les chaines 'AAAA-MM-JJ' se comparent dans l'ordre chronologique :
+    // inutile d'en faire des Date, et le module n'a plus aucun new Date()
+    // pose sur une date de garde (8M-7).
+    if (endDate < startDate) {
       setError('La date de fin doit être postérieure à la date de début.');
       return;
     }

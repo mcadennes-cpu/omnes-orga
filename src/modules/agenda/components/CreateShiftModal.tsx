@@ -3,7 +3,7 @@ import { supabase, Site, Room, ShiftType } from '../lib/supabase';
 import { Calendar, MapPin, Clock, Home, Repeat } from 'lucide-react';
 import { applyRotationRulesToShifts } from '../lib/rotationUtils';
 import BottomSheet from './ui/BottomSheet';
-import { aujourdhuiCabinet } from '../lib/dates';
+import { aujourdhuiCabinet, depuisJour, jourLocal } from '../lib/dates';
 
 type CreateShiftModalProps = {
   coordinatorId: string;
@@ -234,8 +234,11 @@ export default function CreateShiftModal({ coordinatorId, onClose, onSuccess }: 
           throw new Error('Veuillez sélectionner une date de fin pour la série');
         }
 
-        const startDate = new Date(date);
-        const endDate = new Date(seriesEndDate);
+        // depuisJour et non new Date(chaine) : le jour de la semaine etait
+        // lu a l'ouest de Greenwich sur la date de la VEILLE, et la serie
+        // « tous les vendredis » ouvrait des samedis (8M-7).
+        const startDate = depuisJour(date);
+        const endDate = depuisJour(seriesEndDate);
 
         if (endDate <= startDate) {
           throw new Error('La date de fin doit être après la date de début');
@@ -251,7 +254,7 @@ export default function CreateShiftModal({ coordinatorId, onClose, onSuccess }: 
         while (currentDate <= endDate) {
           const dayOfWeek = (currentDate.getDay() + 6) % 7;
           if (selectedWeekdays.includes(dayOfWeek)) {
-            joursVises.push(currentDate.toISOString().split('T')[0]);
+            joursVises.push(jourLocal(currentDate));
           }
           currentDate.setDate(currentDate.getDate() + 1);
         }
