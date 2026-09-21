@@ -27,6 +27,14 @@ CE QU'IL FAIT -- la structure seulement, jamais les donnees (C-3)
   9. la RLS activee table par table, puis les 170 policies ;
  10. les droits accordes a anon, authenticated et service_role.
 
+CE QU'IL NE CLONE PAS : LE SCHEMA storage
+Les tables de `storage` appartiennent a Supabase et existent deja sur tout
+projet : les ajouter ici ferait tenter de les RECREER. Les buckets et les
+policies storage se clonent donc a part, avec 23-23 -- a relancer apres
+chaque --recommencer, sans quoi le test repart avec 0 policy storage contre
+20 en production (le cas rencontre le 21/09/2026, qui a rendu D-8
+irrepetable jusqu'a ce qu'on s'en apercoive).
+
 RIEN N'EST REECRIT DE MEMOIRE : chaque definition est celle que Postgres
 lui-meme rend (`pg_get_constraintdef`, `pg_get_functiondef`,
 `pg_get_triggerdef`, `pg_get_viewdef`, `pg_indexes`, `pg_policies`). Les
@@ -448,6 +456,9 @@ def main():
         print(f"\n{len(ecarts)} ecart(s) : structure NON conforme.")
         return 1
     print("  Aucun ecart : la structure de test est identique a la production.")
+    print("\n  A FAIRE ENSUITE -- ce script ne clone pas storage :")
+    print("    python3 docs/sql/23-23-cloner-storage-env-test.py --go")
+    print("    python3 docs/sql/23-19-charger-donnees-env-test.py --go")
     print(f"\nConstruit le {datetime.now().strftime('%d/%m/%Y a %Hh%M')}.")
     return 0
 

@@ -33,7 +33,19 @@ LES QUATRE CONTROLES
   B. un compte inactif ne voit plus rien, sauf sa propre fiche (1 ligne) ;
   C. un compte inactif ne peut plus ecrire (insertion refusee, mise a jour
      sans effet), alors qu'un compte actif le peut ;
-  D. le schema agenda est inchange -- il gardait deja `actif`.
+  D. le schema agenda est inchange -- il gardait deja `actif` ;
+  E. les FICHIERS (storage) : un inactif n'y accede plus, et le bucket
+     immobilier n'est plus lisible par un non-membre (chantier D-8).
+
+LES FICHIERS TEMOINS DU CONTROLE E
+Le storage de l'environnement de test est vide (23-23 clone les buckets et
+les policies, jamais le contenu). La suite pose donc elle-meme un objet par
+bucket, DANS LA TRANSACTION QU'ELLE ANNULE : les lignes existent le temps
+du controle et disparaissent au rollback. En production, les vrais fichiers
+sont comptes tels quels, sans qu'on en ajoute.
+Un objet du bucket `discussion-attachments` n'est visible que s'il a sa
+ligne dans `public.discussion_attachments` : le temoin n'en a pas, donc
+personne ne le voit. C'est attendu, et non une regression.
 """
 import base64
 import json
@@ -200,7 +212,7 @@ for c in actifs + inactifs:
     print(f"  {marque} {c['role']:16} {total:6} lignes visibles au total")
 
 etat = {"projet": PROJET, "mesure_le": datetime.now().isoformat(timespec="seconds"),
-        "couche_posee": bool(couche), "releve": releve,
+        "couche_posee": bool(couche), "releve": releve, "storage": {},
         "comptes": {c["id"]: {"role": c["role"], "actif": c["actif"],
                               "nom": c["nom"]} for c in comptes}}
 
@@ -262,6 +274,65 @@ controle("public : policies PERMISSIVE d'origine intactes",
                    where schemaname='public' and permissive='PERMISSIVE'""")[0]["n"], 99)
 
 # ---------------------------------------------------------------------
+titre("E. LES FICHIERS (storage)")
+BUCKETS = [r["id"] for r in admin("select id from storage.buckets order by id")]
+couche_storage = admin("""
+    select count(*) as n from pg_policies
+     where schemaname='storage'
+       and policyname in ('exiger_compte_actif',
+                          'restreindre_immobilier_aux_membres')""")[0]["n"]
+print(f"  buckets : {len(BUCKETS)} -- " + ", ".join(BUCKETS))
+print(f"  couche D-8 : {couche_storage} policies "
+      f"({'POSEE' if couche_storage else 'ABSENTE'})")
+
+storage_releve = {}
+if not BUCKETS:
+    print("\n  aucun bucket sur cette base : controle E ignore.")
+    print("  (sur le test : python3 docs/sql/23-23-cloner-storage-env-test.py --go)")
+else:
+    #: Un objet temoin par bucket, pose puis annule avec la transaction.
+    #:
+    #: L'ORDRE COMPTE : les temoins sont poses en role `postgres`, AVANT la
+    #: bascule vers `authenticated`. Pose apres, l'insertion tomberait sous
+    #: la RLS qu'on cherche justement a mesurer, et la suite s'arreterait sur
+    #: « new row violates row-level security policy ». On ne passe donc pas
+    #: par comme(), qui bascule le role des la premiere ligne.
+    sondes = ", ".join(f"('{b}', 'SONDE-23-22/{b}.bin')" for b in BUCKETS)
+    for c in actifs + inactifs:
+        claims = json.dumps({"sub": c["id"], "role": "authenticated"})
+        lignes, err = _appel(
+            "begin;\n"
+            f"insert into storage.objects (bucket_id, name) values {sondes};\n"
+            "set local role authenticated;\n"
+            f"set local request.jwt.claims = '{claims}';\n"
+            "select bucket_id, count(*)::int as n from storage.objects "
+            "group by 1 order by 1;\n"
+            "rollback;\n")
+        if err:
+            stop(f"controle E impossible pour {c['nom']} -- {err}")
+        vu = {r["bucket_id"]: r["n"] for r in (lignes or [])}
+        storage_releve[c["id"]] = {b: vu.get(b, 0) for b in BUCKETS}
+        lisibles = [b for b in BUCKETS if vu.get(b)]
+        marque = "ACTIF  " if c["actif"] else "INACTIF"
+        print(f"  {marque} {c['role']:16} "
+              + (", ".join(lisibles) if lisibles else "aucun fichier"))
+
+    if couche_storage:
+        for c in inactifs:
+            controle(f"inactif {c['role']} : aucun fichier",
+                     [b for b in BUCKETS if storage_releve[c["id"]][b]], [])
+        #: Le bucket immobilier n'est lisible que par is_immobilier_member()
+        #: -- super_admin, associe_gerant, associe. Un remplacant ou le poste
+        #: bureau ne doit plus y acceder.
+        for c in actifs:
+            attendu = c["role"] in ("super_admin", "associe_gerant", "associe")
+            controle(f"ACTIF {c['role']:16} : immobilier lisible",
+                     bool(storage_releve[c["id"]].get("immobilier-attachments")),
+                     attendu)
+
+# ---------------------------------------------------------------------
+etat["storage"] = storage_releve
+
 if ENREGISTRER:
     Path(ENREGISTRER).parent.mkdir(parents=True, exist_ok=True)
     Path(ENREGISTRER).write_text(json.dumps(etat, indent=1, ensure_ascii=False))
@@ -271,9 +342,13 @@ if ENREGISTRER:
 if COMPARER:
     titre("A-bis. AUCUNE REGRESSION POUR LES COMPTES ACTIFS")
     avant = json.loads(Path(COMPARER).read_text())
+    #: L'avertissement ne vaut que pour la couche de `public` (23-21). Les
+    #: fichiers ont leur propre couche (23-24) : comparer deux releves ou
+    #: celle de public est posee dans les deux cas reste utile pour storage.
     if avant["couche_posee"] and couche:
-        print("  ATTENTION : les deux releves ont la couche posee -- "
-              "la comparaison ne prouve rien.")
+        print("  NOTE : la couche de `public` est posee dans les deux releves "
+              "-- la\n        comparaison des tables ne prouve donc rien ; "
+              "celle des fichiers,\n        si (couche storage distincte).")
     print(f"  releve de reference du {avant['mesure_le']} "
           f"(couche {'posee' if avant['couche_posee'] else 'absente'})\n")
     for c in actifs:
@@ -286,6 +361,24 @@ if COMPARER:
         controle(f"ACTIF {c['role']:16} voit autant qu'avant", ecarts, {})
         for t, (a, b) in ecarts.items():
             print(f"         {t:30} avant {a} -> apres {b}")
+    for c in actifs:
+        ref_s = (avant.get("storage") or {}).get(c["id"])
+        if ref_s is None or not storage_releve:
+            continue
+        ecarts_s = {b: (ref_s.get(b), storage_releve[c["id"]].get(b))
+                    for b in storage_releve[c["id"]]
+                    if ref_s.get(b) != storage_releve[c["id"]].get(b)}
+        #: Le bucket immobilier DOIT changer pour un non-membre : c'est la
+        #: correction elle-meme, pas une regression. On l'ecarte du verdict
+        #: et on l'affiche a part.
+        attendu_immo = c["role"] in ("super_admin", "associe_gerant", "associe")
+        volontaire = {b: v for b, v in ecarts_s.items()
+                      if b == "immobilier-attachments" and not attendu_immo}
+        regression = {b: v for b, v in ecarts_s.items() if b not in volontaire}
+        controle(f"ACTIF {c['role']:16} fichiers inchanges", regression, {})
+        for b, (a, x) in volontaire.items():
+            print(f"         {b:30} {a} -> {x}  (fermeture voulue, non-membre)")
+
     for c in inactifs:
         ref = avant["releve"].get(c["id"])
         if ref is None:
