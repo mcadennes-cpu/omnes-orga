@@ -94,22 +94,18 @@ export const MODULES = [
     icon: CalendarClock,
     color: 'canard',
     // poste_bureau exclu : le planning de gardes ne concerne que les medecins.
+    // Meme liste que canAccessAgenda() dans permissions.js et que la liste
+    // blanche de agenda.peut_acceder() en base (23-25) : les trois doivent
+    // rester alignees. Le drapeau agenda_beta_access qui pilotait cette tuile
+    // pendant la phase beta a ete retire le 22/09/2026.
     allowedRoles: ['super_admin', 'associe_gerant', 'associe', 'remplacant'],
-    // Phase beta (etapes 2-6 integration agenda) : visible uniquement si
-    // profiles.agenda_beta_access = true. A la sortie de beta, supprimer
-    // simplement cette ligne pour ouvrir le module a tous les allowedRoles.
-    betaFlag: 'agenda_beta_access',
   },
 ]
 
-// role : filtre principal (comme les RLS cote base). profile : le profil
-// complet (useRole), utilise pour les modules en beta — si un module porte
-// betaFlag, il n'est visible que si profile[betaFlag] est vrai.
-export function getVisibleModules(role, profile = null) {
+// role : seul filtre, comme les RLS cote base. Le mecanisme betaFlag, qui
+// masquait en plus un module aux profils sans drapeau, a ete retire avec la
+// sortie de beta du Planning (22/09/2026) : plus aucun module n'en portait.
+export function getVisibleModules(role) {
   if (!role) return []
-  return MODULES.filter((m) => {
-    if (!m.allowedRoles.includes(role)) return false
-    if (m.betaFlag && !profile?.[m.betaFlag]) return false
-    return true
-  })
+  return MODULES.filter((m) => m.allowedRoles.includes(role))
 }

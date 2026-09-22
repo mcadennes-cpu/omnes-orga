@@ -420,3 +420,28 @@ export function canWriteCodes(role) {
 export function canCreateMedecin(role) {
   return role === ROLES.SUPER_ADMIN
 }
+
+// =============================================================================
+// Permissions du module Planning (identifiant interne : agenda, étape 22)
+// =============================================================================
+
+/**
+ * true si le rôle a accès au module Planning. Le poste de bureau en est exclu :
+ * le planning de gardes ne concerne que les médecins.
+ *
+ * Miroir de `agenda.peut_acceder()` côté base (script 23-25), qui porte la
+ * même liste blanche et y ajoute la condition `actif`. Trois endroits doivent
+ * rester alignés : cette fonction, les `allowedRoles` de l'entrée `agenda`
+ * dans modules.js, et la liste blanche de la fonction SQL — sans quoi la
+ * tuile, la garde de page et la base ne diraient pas la même chose.
+ *
+ * A remplacé le drapeau `agenda_beta_access` de la phase bêta le 22/09/2026.
+ * La colonne existe toujours en base mais plus personne ne la lit pour
+ * décider ; elle reste remplie selon le rôle par le déclencheur de 23-14.
+ */
+export function canAccessAgenda(role) {
+  return role === ROLES.SUPER_ADMIN
+      || role === ROLES.ASSOCIE_GERANT
+      || role === ROLES.ASSOCIE
+      || role === ROLES.REMPLACANT
+}
