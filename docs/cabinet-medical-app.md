@@ -493,6 +493,7 @@ Dossier `src/features/evenements/` : hooks `useEvenements`, `useEvenement`, `use
 
 #### Limitations connues
 
+- **La liste des rôles du Planning vit à trois endroits** — depuis la sortie de bêta (22/09/2026), l'accès au module tient à une liste blanche de rôles écrite trois fois : dans `agenda.peut_acceder()` côté base (qui y ajoute `actif`), dans les `allowedRoles` de l'entrée `agenda` de `modules.js` (qui pilote la tuile), et dans `canAccessAgenda()` de `permissions.js` (qui pilote la garde de page). Les trois doivent rester alignées ; leurs commentaires se citent mutuellement. C'est la duplication que le projet pratique déjà pour SIM (`SIM_ROLES`) et les Codes d'accès, conservée par cohérence plutôt que de créer un couplage différent pour un seul module. Si elles divergeaient, le symptôme serait une tuile visible menant à un écran vide, ou l'inverse.
 - Suppression d'un événement : nettoyage best-effort des blobs Storage des documents ; un échec laisse des fichiers orphelins (sans fuite de données).
 - Pas de Realtime sur les documents ni le sondage : rafraîchis au chargement de la page détail.
 
@@ -1425,7 +1426,7 @@ Le module a sa **propre doc de référence** : `docs/integration-agenda.md` (con
 
    - **Étape 1/8 du plan agenda — FAITE (23/07/2026)** : squelette `src/modules/agenda/` (50 fichiers TypeScript copiés tels quels, non routés donc invisibles) + second client Supabase `supabaseAgenda` pointant vers le projet Planning (`VITE_AGENDA_SUPABASE_URL` / `VITE_AGENDA_SUPABASE_ANON_KEY`). Détail dans la section « Suivi d'avancement » d'`integration-agenda.md`.
 
-   - **Étape 2/8 du plan agenda — FAITE (23/07/2026)** : colonne `profiles.agenda_beta_access` (script `docs/sql/22-2A`, activée pour les 2 super_admin = le duo de bêta-testeurs), tuile « Planning » sur la grille d'accueil (canard, `CalendarClock`, mécanisme générique `betaFlag` dans `modules.js`), route `/planning` chargée en `React.lazy` (chunk séparé ~42 kB gzip). Correction au passage de la collision du token Tailwind `fuchsia` (marque vs gamme standard). Détail dans « Suivi d'avancement » d'`integration-agenda.md`.
+   - **Étape 2/8 du plan agenda — FAITE (23/07/2026)** : colonne `profiles.agenda_beta_access` (script `docs/sql/22-2A`, activée pour les 2 super_admin = le duo de bêta-testeurs), tuile « Planning » sur la grille d'accueil (canard, `CalendarClock`, mécanisme générique `betaFlag` dans `modules.js` — drapeau et mécanisme retirés le 22/09/2026, cf. « Sortie de bêta du Planning »), route `/planning` chargée en `React.lazy` (chunk séparé ~42 kB gzip). Correction au passage de la collision du token Tailwind `fuchsia` (marque vs gamme standard). Détail dans « Suivi d'avancement » d'`integration-agenda.md`.
 
 ---
 
@@ -1528,6 +1529,94 @@ fonction. Empreintes d'avant conservées dans
 `public` — seule la RLS l'arrête, et les 31 policies `to public` ne le
 filtrent que par `auth.uid()`. Aucune fuite mesurée, mais la marge est
 mince. À traiter en durcissement séparé.
+
+---
+
+## Sortie de bêta du Planning — le rôle à la place du drapeau (22/09/2026)
+
+**Le constat.** Le module Planning est ouvert à tout le cabinet depuis le
+17/09, mais l'accès passait toujours par `profiles.agenda_beta_access`, le
+drapeau de la phase bêta de juillet. Le script `22-2A` le présentait alors
+comme un simple masquage d'icône — « aucune policy RLS ne dépend de cette
+colonne ». Ce n'était plus vrai depuis `22-7C-3` : mesuré le 21/09, les
+**51** policies du schéma `agenda` passent **toutes** par
+`agenda.peut_acceder()` (11) ou `agenda.est_coordinateur()` (41), **zéro**
+n'échappe aux deux — et les deux fonctions testaient le drapeau. C'était
+donc la vraie barrière de données du module.
+
+**Ce n'était plus une règle, mais un doublon.** Depuis `23-14` (étape 8I,
+17/09), le déclencheur `designer_agenda_selon_role` remplit lui-même le
+drapeau **à partir du rôle**, à la création d'un compte et à chaque
+changement de rôle. La règle « le rôle décide » était déjà écrite, mais en
+amont, dans une colonne recopiée, au lieu d'être lue au moment de décider.
+
+**L'équivalence a été mesurée, pas supposée.** Sur les 41 fiches, le drapeau
+valait exactement « rôle médecin » : **zéro divergence**. `23-25` refait ce
+contrôle en base avant chaque écriture et s'arrête s'il trouve le moindre
+écart — il ne prend pas à la place de l'humain une décision qui changerait
+l'accès de quelqu'un.
+
+**Le piège : remplacer la ligne, jamais la supprimer.** `peut_acceder()`
+portait le commentaire « retirer la ligne ci-dessous pour ouvrir à tous ».
+Au pied de la lettre, cela donnait l'accès complet au planning au compte
+`poste_bureau` — la borne partagée du cabinet, active, que seul le drapeau
+tenait à l'écart. La condition a donc été remplacée par une **liste
+blanche** de rôles (`super_admin`, `associe_gerant`, `associe`,
+`remplacant`), alignée sur les `allowedRoles` de la tuile : un rôle ajouté
+plus tard n'aura rien par défaut. C'est l'oubli qui ferme, pas celui qui
+ouvre.
+
+**Ce que la contre-épreuve a montré.** Avant la bascule, poser
+`agenda_beta_access = true` sur le compte du poste de bureau lui ouvrait
+**les 2511 gardes** (mesuré en transaction annulée sur la production le
+21/09). Après, le même geste ne donne rien. Le trou était latent — personne
+n'avait de raison de poser ce drapeau — du même genre que celui du chantier
+D : il s'ouvrait au premier geste de quelqu'un voulant bien faire.
+
+**Les scripts.**
+
+| Script | Rôle | Écrit ? |
+|---|---|---|
+| `23-25-agenda-sortie-de-beta.py` | Remplace le corps des 2 fonctions par la liste blanche | `--go` |
+| `23-26-agenda-preuve-sortie-de-beta.py` | Les 3 volets de preuve, transactions annulées | jamais |
+
+`23-25` : simulation par défaut, `--retour-arriere`, sauvegarde `23-16` de
+moins de 6 h exigée mécaniquement en production, et **refus d'écrire si le
+corps trouvé en base ne correspond pas à l'empreinte md5 attendue** — sans
+quoi le retour arrière restaurerait une version périmée.
+
+**Preuves obtenues.** Volet **A** : les 41 fiches une par une, chacune sous
+son identité — réponse des deux fonctions identique avant et après. Volet
+**B** : 7 témoins (un par couple rôle/actif) sous `set local role
+authenticated`, comptage sur les 16 tables — **zéro écart sur 112
+comptages**. Volet **C** : la contre-épreuve force le drapeau à diverger du
+rôle pour établir lequel décide ; ses réponses s'**inversent** entre avant
+et après, ce qu'un simple « rien n'a changé » ne prouverait pas. Le retour
+arrière a été joué pour de vrai deux fois sur l'environnement de test :
+corps d'origine restitué au caractère près.
+
+**BASCULÉ EN PRODUCTION le 22/09/2026 à 11h31**, sauvegarde `23-16` prise
+deux minutes avant. Vérifié après : les deux fonctions décident selon le
+rôle, les 51 policies intactes, `poste_bureau` et les 7 comptes inactifs à
+zéro ligne, les 33 comptes médecins voient leurs 2511 gardes. Code en
+production : `canAccessAgenda(role)` dans `permissions.js`, `Agenda.jsx` sur
+ce rôle, `modules.js` sans `betaFlag` ni son mécanisme générique.
+
+**Retour arrière** (les deux fonctions, en une transaction) :
+```
+python3 docs/sql/23-25-agenda-sortie-de-beta.py --retour-arriere --go
+```
+
+**Reste ouvert.** La colonne `profiles.agenda_beta_access` **n'est pas
+supprimée** : plus personne ne la lit pour décider, mais elle reste en base
+et le déclencheur de `23-14` continue de la remplir. Six scripts de
+`docs/sql` la lisent (dont les suites de test et `23-12`), et un
+`DROP COLUMN` serait irréversible. Sa suppression, avec la reprise de ces
+six scripts, est un chantier à part. À noter aussi : la liste des rôles vit
+désormais à **trois endroits** (la fonction SQL, `allowedRoles` dans
+`modules.js`, `canAccessAgenda` dans `permissions.js`) — duplication que le
+projet pratique déjà pour SIM et les Codes d'accès ; les trois commentaires
+se citent mutuellement.
 
 ---
 

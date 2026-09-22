@@ -536,9 +536,17 @@ agenda.peut_acceder()      -- compte actif + agenda_beta_access
 agenda.est_coordinateur()  -- + is_agenda_coordinator
 ```
 
+> **Depuis le 22/09/2026, le drapeau ne décide plus** (script `23-25`) :
+> `peut_acceder()` teste « compte actif + rôle médecin », via une liste
+> blanche de rôles, et `est_coordinateur()` reprend la même liste. Voir
+> « Sortie de bêta du Planning » dans `cabinet-medical-app.md`. La suite de
+> ce paragraphe décrit le raisonnement de juillet.
+
 Les policies deviennent lisibles (`using (agenda.peut_acceder())`), et surtout
-**la sortie de bêta devient une seule ligne à retirer dans une fonction**, au
-lieu de reprendre 57 policies. Les fonctions sont `stable` (évaluées une fois par
+**la sortie de bêta devient une seule ligne à changer dans une fonction**, au
+lieu de reprendre 57 policies — ce qui s'est vérifié : deux corps de fonction
+remplacés, zéro policy touchée. (Une ligne à *changer*, et non à retirer : la
+retirer aurait ouvert le module au compte `poste_bureau`.) Les fonctions sont `stable` (évaluées une fois par
 requête et non par ligne) et `security definer` (elles lisent `public.profiles`
 sans dépendre des policies de cette table, ce qui écarte tout risque de
 récursion entre policies).
