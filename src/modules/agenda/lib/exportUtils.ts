@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { lireToutesLesLignes } from './pagination';
 
 type ExportOptions = {
   startDate: string;
@@ -16,6 +17,9 @@ type MatrixExportOptions = {
 type ExportResult = {
   success: boolean;
   error?: string;
+  /** Nombre de gardes reellement ecrites dans le fichier. Affiche a
+   *  l'utilisateur : c'est la confirmation visible que rien n'a ete tronque. */
+  gardes?: number;
 };
 
 const DAYS_OF_WEEK = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
@@ -46,30 +50,39 @@ function escapeCSVField(field: string | null | undefined): string {
 
 export async function exportPlanningToCSV(options: ExportOptions): Promise<ExportResult> {
   try {
-    let query = supabase
-      .from('shifts')
-      .select(`
-        id,
-        date,
-        location,
-        room,
-        shift_type,
-        status,
-        shift_type_data:shift_types!shift_type_id(time_range),
-        assigned_doctor:profiles!assigned_doctor_id(full_name),
-        requests(id, status, doctor_id)
-      `)
-      .gte('date', options.startDate)
-      .lte('date', options.endDate)
-      .order('date', { ascending: true })
-      .order('location', { ascending: true })
-      .order('room', { ascending: true });
+    // Lecture par tranches : au-dela de 1 000 gardes, une requete unique
+    // renvoyait 1 000 lignes sans le signaler, et le fichier partait tronque
+    // (2 691 gardes sur l'annee 2026 -> 37 % du planning). Le tri se termine
+    // par `id` pour etre TOTAL : sans cela, les gardes d'une meme journee
+    // pourraient changer d'ordre entre deux tranches, et se dupliquer ou
+    // disparaitre. Voir lib/pagination.ts.
+    const { data: shifts, error } = await lireToutesLesLignes<any>((debut, fin) => {
+      let query = supabase
+        .from('shifts')
+        .select(`
+          id,
+          date,
+          location,
+          room,
+          shift_type,
+          status,
+          shift_type_data:shift_types!shift_type_id(time_range),
+          assigned_doctor:profiles!assigned_doctor_id(full_name),
+          requests(id, status, doctor_id)
+        `)
+        .gte('date', options.startDate)
+        .lte('date', options.endDate)
+        .order('date', { ascending: true })
+        .order('location', { ascending: true })
+        .order('room', { ascending: true })
+        .order('id', { ascending: true });
 
-    if (options.siteFilter !== 'all') {
-      query = query.eq('location', options.siteFilter);
-    }
+      if (options.siteFilter !== 'all') {
+        query = query.eq('location', options.siteFilter);
+      }
 
-    const { data: shifts, error } = await query;
+      return query.range(debut, fin);
+    });
 
     if (error) {
       console.error('Error fetching shifts for export:', error);
@@ -151,7 +164,7 @@ export async function exportPlanningToCSV(options: ExportOptions): Promise<Expor
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    return { success: true };
+    return { success: true, gardes: sortedShifts.length };
   } catch (err) {
     console.error('Unexpected error during export:', err);
     return { success: false, error: 'Une erreur inattendue est survenue.' };

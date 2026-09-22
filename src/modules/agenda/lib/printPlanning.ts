@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { getRotationPlans, getPlanForDate, getRotationWeek } from './rotationUtils';
+import { lireToutesLesLignes } from './pagination';
 
 // ---------------------------------------------------------------------------
 // Planning a imprimer (8B-3).
@@ -152,21 +153,31 @@ const STYLES = `
  */
 export async function construirePlanningImprimable(options: PrintOptions): Promise<PrintResult> {
   try {
-    const { data, error } = await supabase
-      .from('shifts')
-      .select(`
-        date,
-        location,
-        room,
-        status,
-        coordinator_note,
-        shift_type_data:shift_types!shift_type_id(name),
-        assigned_doctor:profiles!assigned_doctor_id(full_name),
-        requests(id, status)
-      `)
-      .gte('date', options.startDate)
-      .lte('date', options.endDate)
-      .order('date', { ascending: true });
+    // Lecture par tranches, meme raison que pour l'export CSV : au-dela de
+    // 1 000 gardes, une requete unique en renvoyait 1 000 sans rien signaler,
+    // et le planning s'imprimait incomplet. Le tri se termine par `id` pour
+    // etre TOTAL — `date` seule laisse les gardes d'une meme journee a
+    // egalite, et leur ordre pourrait changer d'une tranche a l'autre.
+    // Voir lib/pagination.ts.
+    const { data, error } = await lireToutesLesLignes<any>((debut, fin) =>
+      supabase
+        .from('shifts')
+        .select(`
+          id,
+          date,
+          location,
+          room,
+          status,
+          coordinator_note,
+          shift_type_data:shift_types!shift_type_id(name),
+          assigned_doctor:profiles!assigned_doctor_id(full_name),
+          requests(id, status)
+        `)
+        .gte('date', options.startDate)
+        .lte('date', options.endDate)
+        .order('date', { ascending: true })
+        .order('id', { ascending: true })
+        .range(debut, fin));
 
     if (error) {
       console.error('[Impression] Erreur de chargement :', error);

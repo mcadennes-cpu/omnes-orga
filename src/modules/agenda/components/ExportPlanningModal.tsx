@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, Printer } from 'lucide-react';
+import { CheckCircle2, Download, Printer } from 'lucide-react';
 import { exportPlanningToCSV } from '../lib/exportUtils';
 import { construirePlanningImprimable } from '../lib/printPlanning';
 import BottomSheet from './ui/BottomSheet';
@@ -26,6 +26,10 @@ export default function ExportPlanningModal({ onClose }: ExportPlanningModalProp
   const [includeAssignedShifts, setIncludeAssignedShifts] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState('');
+  // Nombre de gardes ecrites dans le fichier, une fois l'export fait.
+  // Affiche plutot que de fermer la modale aussitot : c'est la
+  // confirmation visible qu'aucune garde n'a ete laissee de cote.
+  const [gardesExportees, setGardesExportees] = useState<number | null>(null);
 
   const handleExport = async () => {
     setError('');
@@ -95,7 +99,7 @@ export default function ExportPlanningModal({ onClose }: ExportPlanningModalProp
       if (!result.success) {
         setError(result.error || 'Une erreur est survenue lors de l\'exportation.');
       } else {
-        onClose();
+        setGardesExportees(result.gardes ?? 0);
       }
     } catch (err) {
       console.error('Export error:', err);
@@ -112,6 +116,14 @@ export default function ExportPlanningModal({ onClose }: ExportPlanningModalProp
       onClose={onClose}
       busy={isExporting}
       footer={
+        gardesExportees !== null ? (
+          <button
+            onClick={onClose}
+            className="h-12 flex-1 rounded-input bg-marine text-button text-white shadow-button transition-colors hover:bg-marine/90"
+          >
+            Fermer
+          </button>
+        ) : (
         <>
           <button
             onClick={onClose}
@@ -143,8 +155,22 @@ export default function ExportPlanningModal({ onClose }: ExportPlanningModalProp
             )}
           </button>
         </>
+        )
       }
     >
+      {gardesExportees !== null ? (
+        <div className="py-4 text-center">
+          <CheckCircle2 className="mx-auto mb-3 h-10 w-10 text-canard" strokeWidth={1.5} />
+          <p className="text-body-l text-ink">
+            <span className="font-semibold">{gardesExportees}</span>
+            {gardesExportees > 1 ? ' gardes exportées' : ' garde exportée'}
+          </p>
+          <p className="mt-1 text-caption">
+            Le fichier est complet : il contient toutes les gardes de la période
+            choisie, quel que soit leur nombre.
+          </p>
+        </div>
+      ) : (
       <div className="space-y-4">
         <div>
           <label className="mb-1 block text-field-label">Format d'export</label>
@@ -232,6 +258,7 @@ export default function ExportPlanningModal({ onClose }: ExportPlanningModalProp
           </div>
         )}
       </div>
+      )}
     </BottomSheet>
   );
 }
