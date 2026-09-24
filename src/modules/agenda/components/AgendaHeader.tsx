@@ -145,9 +145,12 @@ export default function AgendaHeader({
             key={view}
             onClick={() => onViewChange(view)}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-pill text-button whitespace-nowrap transition-colors ${
+              // Onglet actif en marine depuis le 24/09/2026 (demande de
+              // Matthieu) : plus sobre que le canard, qui reste la couleur
+              // d'accent du module (filtres, Segmented, filigrane).
               currentView === view
-                ? 'bg-canard text-white'
-                : 'text-muted hover:bg-canard/10 hover:text-canard'
+                ? 'bg-marine text-white'
+                : 'text-muted hover:bg-marine/10 hover:text-marine'
             }`}
           >
             <Icon size={17} strokeWidth={2} />
