@@ -88,3 +88,21 @@ export function resolveHoraire(shiftType: string, dateStr: string): HoraireKey {
 export function getHoraireStyle(shiftType: string, dateStr: string): HoraireStyle {
   return HORAIRE_STYLES[resolveHoraire(shiftType, dateStr)];
 }
+
+// Nom court du creneau pour le badge des cartes de garde (24/09/2026). Les noms
+// en base portent le site et parfois l'horaire, saisis de facon irreguliere :
+// "J3 Dijon", "WE1 beaune 08h-20h", "pre - J2 Dijon". Le site etant deja ecrit
+// sur la carte, on le retire ici, a l'affichage seulement : la base n'est pas
+// touchee. Resultat : "J3", "WE1", "pre-J2", "J5 bis" (verifie sur les 19
+// creneaux en base).
+export function nomCourtCreneau(nom: string, nomsSites: string[]): string {
+  let court = nom;
+  for (const site of nomsSites) {
+    court = court.replace(new RegExp(`\\b${site}\\b`, 'gi'), '');
+  }
+  return court
+    .replace(/\d{1,2}h\d{0,2}\s*[-–]\s*\d{1,2}h\d{0,2}/gi, '')
+    .replace(/\s*-\s*/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
+}

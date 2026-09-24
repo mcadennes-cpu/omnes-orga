@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase, supabaseOrga, Shift, Profile } from '../lib/supabase';
 import { CalendarDays, MapPin, Users, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import Avatar from '../../../components/common/Avatar';
-import { getHoraireStyle, isWeekend } from '../lib/horaireStyles';
+import { getHoraireStyle, isWeekend, nomCourtCreneau } from '../lib/horaireStyles';
 import { aujourdhuiCabinet, depuisJour, jourLocal, libelleJour } from '../lib/dates';
 
 type ShiftWithDoctor = Shift & {
@@ -14,23 +14,6 @@ type Site = {
   id: number;
   name: string;
 };
-
-// Nom court du creneau pour le badge de la carte (24/09/2026). Les noms en base
-// portent le site et parfois l'horaire, saisis de facon irreguliere :
-// "J3 Dijon", "WE1 beaune 08h-20h", "pre - J2 Dijon". Le site etant deja ecrit
-// sur la carte, on le retire ici, a l'affichage seulement : la base n'est pas
-// touchee. Resultat : "J3", "WE1", "pre-J2", "J5 bis".
-function nomCourtCreneau(nom: string, sites: Site[]): string {
-  let court = nom;
-  for (const site of sites) {
-    court = court.replace(new RegExp(`\\b${site.name}\\b`, 'gi'), '');
-  }
-  return court
-    .replace(/\d{1,2}h\d{0,2}\s*[-–]\s*\d{1,2}h\d{0,2}/gi, '')
-    .replace(/\s*-\s*/g, '-')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
 
 function libelleNombre(n: number): string {
   if (n === 0) return 'Aucun médecin';
@@ -196,7 +179,7 @@ export default function DailyScheduleView() {
             {sortedShifts.map((shift) => {
               const doctorName = shift.assigned_doctor.full_name;
               const style = getHoraireStyle(shift.shift_type, shift.date);
-              const creneau = shift.shift_type_data ? nomCourtCreneau(shift.shift_type_data.name, sites) : '';
+              const creneau = shift.shift_type_data ? nomCourtCreneau(shift.shift_type_data.name, sites.map((site) => site.name)) : '';
               return (
                 // Carte entiere teintee a la couleur du creneau (24/09/2026,
                 // remplace le lisere en L sur cet ecran). Avatar 72 px, taille

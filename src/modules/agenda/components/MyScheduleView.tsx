@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react';
 import { supabase, supabaseOrga, Shift, Profile, Request } from '../lib/supabase';
-import { CalendarCheck, Calendar, MapPin, Clock, AlertCircle, X, FileText } from 'lucide-react';
+import { CalendarCheck, Calendar, MapPin, AlertCircle, X, FileText } from 'lucide-react';
 import CancelRequestModal from './CancelRequestModal';
 import Segmented from './ui/Segmented';
-import { getHoraireStyle } from '../lib/horaireStyles';
+import { getHoraireStyle, isWeekend, nomCourtCreneau } from '../lib/horaireStyles';
 import { aujourdhuiCabinet, libelleJour } from '../lib/dates';
 
+// Nom du creneau (J3, WE1...) lu par jointure, pour le badge de la carte.
+type ShiftAvecCreneau = Shift & {
+  shift_type_data?: { name: string } | null;
+};
+
 type PendingRequest = Request & {
-  shift: Shift;
+  shift: ShiftAvecCreneau;
 };
 
 type MyScheduleViewProps = {
@@ -17,7 +22,7 @@ type MyScheduleViewProps = {
 type ViewMode = 'confirmed' | 'pending';
 
 export default function MyScheduleView({ currentUser }: MyScheduleViewProps) {
-  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [shifts, setShifts] = useState<ShiftAvecCreneau[]>([]);
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
@@ -53,7 +58,7 @@ export default function MyScheduleView({ currentUser }: MyScheduleViewProps) {
     setLoading(true);
     const { data, error } = await supabase
       .from('shifts')
-      .select('*')
+      .select('*, shift_type_data:shift_types!shift_type_id(name)')
       .eq('assigned_doctor_id', currentUser.id)
       .eq('status', 'assigned')
             // Le jour du cabinet et non celui du navigateur : depuis Tahiti,
@@ -73,7 +78,7 @@ export default function MyScheduleView({ currentUser }: MyScheduleViewProps) {
       .from('requests')
       .select(`
         *,
-        shift:shifts(*)
+        shift:shifts(*, shift_type_data:shift_types!shift_type_id(name))
       `)
       .eq('doctor_id', currentUser.id)
       .eq('status', 'pending')
@@ -101,13 +106,13 @@ export default function MyScheduleView({ currentUser }: MyScheduleViewProps) {
       .single();
 
     if (shiftError || !shiftData) {
-      setError("Impossible de retirer cette garde car elle est en attente de validation. En cas d'indisponibilite de votre part, veuillez contacter directement le coordinateur.");
+      setError("Impossible de retirer cette garde car elle est en attente de validation. En cas d'indisponibilité de votre part, veuillez contacter directement le coordinateur.");
       setCancelModalOpen(false);
       return;
     }
 
     if (shiftData.status === 'assigned') {
-      setError("Impossible de retirer cette garde car elle est deja assignee. En cas d'indisponibilite de votre part, veuillez contacter directement le coordinateur.");
+      setError("Impossible de retirer cette garde car elle est déjà assignée. En cas d'indisponibilité de votre part, veuillez contacter directement le coordinateur.");
       setCancelModalOpen(false);
       return;
     }
@@ -129,39 +134,9 @@ export default function MyScheduleView({ currentUser }: MyScheduleViewProps) {
     }
   };
 
-  // libelleJour et non new Date(dateStr) : voir lib/dates.ts (8M).
-  const formatDate = (dateStr: string) => libelleJour(dateStr);
-
   // Demandes en attente reellement affichables (garde encore existante).
   const visiblePending = pendingRequests.filter(
     (req) => req.shift !== null && req.status === 'pending'
-  );
-
-  // Lieu, salle et horaire d'une garde, communs aux deux bascules (confirmees /
-  // en attente). L'horaire est ici : la couleur du creneau est reduite a un
-  // lisere en pied de carte, qui ne porte aucun texte.
-  const shiftInfoGrid = (shift: Shift) => (
-    <div className="grid grid-cols-3 gap-4">
-      <div className="flex items-center gap-2">
-        <MapPin className="h-4 w-4 flex-shrink-0 text-muted" />
-        <span className="text-body-m font-medium text-ink">{shift.location}</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <Calendar className="h-4 w-4 flex-shrink-0 text-muted" />
-        <span className="text-body-m font-medium text-ink">{shift.room}</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <Clock className="h-4 w-4 flex-shrink-0 text-muted" />
-        <span className="text-body-m font-medium text-ink">{shift.shift_type}</span>
-      </div>
-    </div>
-  );
-
-  const coordinatorNote = (note: string) => (
-    <div className="mt-3 flex items-start gap-2 border-t border-border pt-3">
-      <FileText className="mt-0.5 h-4 w-4 flex-shrink-0 text-canard" />
-      <p className="text-body-m text-ink">{note}</p>
-    </div>
   );
 
   // Bouton destructif "Retirer cette garde" (vue en attente).
@@ -176,7 +151,7 @@ export default function MyScheduleView({ currentUser }: MyScheduleViewProps) {
 
   const emptyState = (icon: JSX.Element, title: string, subtitle: string) => (
     <div className="py-12 text-center">
-      <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-fond">
+      <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-carte">
         {icon}
       </div>
       <p className="mb-2 text-muted">{title}</p>
@@ -184,41 +159,53 @@ export default function MyScheduleView({ currentUser }: MyScheduleViewProps) {
     </div>
   );
 
-  // Carte de garde : tout en noir sur blanc, et la couleur du creneau reduite a
-  // un lisere de 3 px en L — bord bas + bord droit (essai du 03/09/2026, a
-  // comparer avec le bandeau plein reste en place dans "Planning du jour").
+  // Carte de garde alignee sur "Planning du jour" (24/09/2026) : la carte
+  // entiere est teintee a la couleur du creneau (remplace le lisere en L).
+  // A la place de l'avatar, inutile ici puisque c'est le medecin lui-meme, la
+  // colonne blanche porte la date facon page de calendrier ; le nom du jour
+  // passe en brique le week-end, comme l'en-tete de "Planning du jour".
   // Une carte par garde (le cas normal etant une garde par jour ; d'eventuels
   // doublons apparaissent en deux cartes).
-  const shiftCard = (shift: Shift, extra?: JSX.Element | null) => {
+  // libelleJour et non new Date(dateStr) : voir lib/dates.ts (8M).
+  const shiftCard = (shift: ShiftAvecCreneau, extra?: JSX.Element | null) => {
     const style = getHoraireStyle(shift.shift_type, shift.date);
+    const creneau = shift.shift_type_data ? nomCourtCreneau(shift.shift_type_data.name, [shift.location]) : '';
     return (
-      <div
-        key={shift.id}
-        className="relative overflow-hidden rounded-card border border-border bg-carte shadow-card"
-      >
-        <div className="bg-carte px-4 py-3">
-          <p className="mb-3 text-body-l font-semibold capitalize text-ink">
-            {formatDate(shift.date)}
+      <li key={shift.id} className={`flex items-stretch overflow-hidden rounded-card ${style.bgClass}`}>
+        <div className="flex w-[88px] flex-shrink-0 flex-col items-center justify-center bg-carte py-3">
+          <p className={`text-eyebrow ${isWeekend(shift.date) ? 'text-brique' : ''}`}>
+            {libelleJour(shift.date, { weekday: 'short' }).replace('.', '')}
           </p>
-          {shiftInfoGrid(shift)}
-          {shift.coordinator_note && coordinatorNote(shift.coordinator_note)}
-          {extra && <div className="mt-3">{extra}</div>}
+          <p className="text-h1 tabular-nums text-ink">{libelleJour(shift.date, { day: 'numeric' })}</p>
+          <p className="text-caption">{libelleJour(shift.date, { month: 'short' })}</p>
         </div>
-        {/* Lisere en L : une BORDURE bas + droite, pas deux rectangles poses.
-            Un rectangle ne peut pas suivre un arrondi — les deux se croisaient
-            en angle droit dans le coin bas-droit. La bordure, elle, epouse le
-            rayon a epaisseur constante, et s'estompe en biseau la ou elle
-            rencontre les cotes sans bordure (coins bas-gauche et haut-droit).
-            Posee en surimpression pour ne rien deplacer dans la carte. */}
-        <div
-          className={`pointer-events-none absolute inset-0 rounded-card border-b-[3px] border-r-[3px] ${style.borderClass}`}
-        />
-      </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5 p-3.5">
+          <div className="flex items-baseline justify-between gap-2">
+            <p className={`text-h2 tabular-nums ${style.textClass}`}>{shift.shift_type}</p>
+            {creneau && (
+              <span className={`flex-shrink-0 rounded-full bg-carte px-2.5 py-0.5 text-body-m font-semibold ${style.textClass}`}>
+                {creneau}
+              </span>
+            )}
+          </div>
+          <p className="flex items-center gap-1.5 text-body-m font-semibold text-ink">
+            <MapPin size={15} strokeWidth={2} className="flex-shrink-0 text-muted" />
+            {shift.location} · {shift.room}
+          </p>
+          {shift.coordinator_note && (
+            <p className="mt-1 flex items-start gap-1.5 rounded-pill bg-carte px-3 py-2 text-caption text-ink">
+              <FileText size={15} strokeWidth={2} className="mt-0.5 flex-shrink-0" />
+              {shift.coordinator_note}
+            </p>
+          )}
+          {extra && <div className="mt-1">{extra}</div>}
+        </div>
+      </li>
     );
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {error && (
         <div className="flex items-start gap-3 rounded-card border-2 border-brique/20 bg-brique/10 p-4">
           <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-brique" />
@@ -235,18 +222,10 @@ export default function MyScheduleView({ currentUser }: MyScheduleViewProps) {
         </div>
       )}
 
-      <div className="rounded-card border border-border bg-carte p-6 shadow-card">
-        <div className="mb-6 flex items-center gap-3">
-          <div className="rounded-pill bg-canard/10 p-2">
-            <CalendarCheck className="h-6 w-6 text-canard" />
-          </div>
-          <div>
-            <h2 className="text-h2 text-ink">Mes gardes</h2>
-            <p className="text-caption">Consultez vos gardes confirmées et en attente</p>
-          </div>
-        </div>
-
-        <div className="mb-6">
+      {/* Le bloc titre "Mes gardes" et le cadre blanc ont disparu (24/09/2026),
+          comme dans "Planning du jour" : l'onglet actif du header le dit deja. */}
+      <div>
+        <div className="mb-4">
           <Segmented
             ariaLabel="Filtre des gardes"
             value={viewMode}
@@ -268,9 +247,9 @@ export default function MyScheduleView({ currentUser }: MyScheduleViewProps) {
               'Consultez le calendrier pour demander des gardes',
             )
           ) : (
-            <div className="space-y-3">
+            <ul className="flex flex-col gap-2.5">
               {shifts.map((shift) => shiftCard(shift))}
-            </div>
+            </ul>
           )
         ) : (
           visiblePending.length === 0 ? (
@@ -280,9 +259,9 @@ export default function MyScheduleView({ currentUser }: MyScheduleViewProps) {
               'Utilisez le calendrier pour demander des gardes',
             )
           ) : (
-            <div className="space-y-3">
+            <ul className="flex flex-col gap-2.5">
               {visiblePending.map((request) => shiftCard(request.shift, removeButton(request)))}
-            </div>
+            </ul>
           )
         )}
       </div>
