@@ -841,6 +841,8 @@ Les tokens couleurs, typographies, radii et shadows sont centralisés dans `tail
 
 **Shadows** : `shadow-card` (cartes/list items, très subtile), `shadow-button` (CTA primary, plus marquée), `shadow-tile` (tuiles modules colorées). Toutes utilisent une teinte marine plutôt que du noir pur.
 
+**Travailler le design avec Claude Design** (24/09/2026) : `docs/design/prompt-claude-design-planning.md` est un prompt prêt à l'emploi qui décrit à Claude Design les seules briques autorisées (tokens, typo, radii, composants), pour qu'il propose des modifications transposables telles quelles. Écrit pour le module Planning, réutilisable pour les autres modules en changeant la couleur d'accent et la liste des composants. Premier usage : 8P dans `integration-agenda.md`.
+
 ### Helpers de permissions
 
 `src/lib/permissions.js` centralise les règles d'accès du Trombinoscope (cf. section "Permissions fines" du module 1). Les pages et composants importent ces helpers plutôt que de tester `role` directement, ce qui rend les règles modifiables d'un seul endroit.
