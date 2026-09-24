@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Le Planning a déménagé — Omnès Médecins</title>
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#F5F7F9" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@800&family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+    <!--
+      Page de redirection de l'ancienne appli Bolt (OMNES PLANNING), remplacee
+      le 17/09/2026 par le module Planning d'Omnes Medecins.
+      Page 100 % statique : aucun script, aucun appel a Supabase (le projet
+      Bolt est en pause). Couleurs et typo du design system Omnes, recopiees
+      en dur faute de Tailwind ici. Source versionnee dans
+      docs/bolt-redirection/index.html du depot omnes-orga.
+    -->
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px 16px;
+        background: #F5F7F9;
+        color: #1C3D52;
+        font-family: Inter, system-ui, -apple-system, sans-serif;
+      }
+      .carte {
+        width: 100%;
+        max-width: 420px;
+        background: #FFFFFF;
+        border-radius: 16px;
+        padding: 32px 24px;
+        text-align: center;
+        box-shadow: 0 1px 3px 0 rgba(28,61,82,0.08), 0 1px 2px -1px rgba(28,61,82,0.06);
+      }
+      .logo { width: 88px; height: auto; margin-bottom: 20px; }
+      .eyebrow {
+        font-size: 11px; font-weight: 600; letter-spacing: 0.16em;
+        text-transform: uppercase; color: rgba(28,61,82,0.35); margin-bottom: 8px;
+      }
+      h1 {
+        font-family: Archivo, Inter, system-ui, sans-serif;
+        font-size: 24px; font-weight: 800; letter-spacing: -0.01em; margin-bottom: 12px;
+      }
+      p { font-size: 15px; line-height: 1.5; }
+      .intro { margin-bottom: 24px; }
+      .bouton {
+        display: block; width: 100%; padding: 14px 16px;
+        background: #1C3D52; color: #FFFFFF; text-decoration: none;
+        font-size: 15px; font-weight: 600; letter-spacing: 0.01em;
+        border-radius: 14px;
+        box-shadow: 0 4px 12px -2px rgba(28,61,82,0.20), 0 2px 4px -2px rgba(28,61,82,0.12);
+      }
+      .aide {
+        margin-top: 24px; padding-top: 20px;
+        border-top: 1px solid rgba(28,61,82,0.08);
+        text-align: left; font-size: 13px; color: rgba(28,61,82,0.55);
+      }
+      .aide p { font-size: 13px; }
+      .aide p + p { margin-top: 10px; }
+      .aide strong { color: #1C3D52; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <main class="carte">
+      <img class="logo" src="/logo-omnes.svg" alt="Omnès Médecins" />
+      <p class="eyebrow">Omnès Planning</p>
+      <h1>Le Planning a déménagé</h1>
+      <p class="intro">
+        Depuis le 17 septembre 2026, le planning des gardes fait partie de
+        l'application <strong>Omnès Médecins</strong>. Cette ancienne adresse
+        n'est plus utilisée.
+      </p>
+      <a class="bouton" href="https://omnes-orga.vercel.app/planning">Ouvrir le Planning</a>
+      <div class="aide">
+        <p>
+          <strong>Pour vous connecter :</strong> utilisez votre adresse e&#8209;mail
+          habituelle. En cas de doute sur le mot de passe, touchez
+          « Mot de passe oublié ? » sur la page de connexion.
+        </p>
+        <p>
+          <strong>Pensez à mettre à jour votre favori</strong>, ou à ajouter
+          l'application à votre écran d'accueil depuis la nouvelle adresse.
+        </p>
+      </div>
+    </main>
+  </body>
+</html>
