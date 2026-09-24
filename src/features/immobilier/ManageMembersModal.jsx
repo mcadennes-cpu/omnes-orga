@@ -2,14 +2,15 @@
 // Modale bottom-sheet pour gerer les participants d'un tableau.
 // - Liste des membres actuels avec actions (desinviter, quitter)
 // - Section pour inviter de nouveaux participants
-// Garde-fou (option β) : empeche de retirer le dernier owner.
+// Garde-fou (option β) : empeche de retirer le createur du tableau.
 
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, UserMinus, UserPlus, Crown } from 'lucide-react';
+import { X, UserMinus, UserPlus } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../hooks/useAuth';
 import { initials, formatName } from '../../lib/profileFormat';
+import Pill from '../../components/common/Pill';
 import MemberPicker from './MemberPicker';
 
 export default function ManageMembersModal({
@@ -95,7 +96,7 @@ export default function ManageMembersModal({
       // Garde-fou cote UI (en plus de la RLS qui ne le bloque pas).
       // eslint-disable-next-line no-alert
       alert(
-        "Impossible : c'est le seul owner du tableau. Demandez au super_admin de designer un autre gestionnaire."
+        "Impossible : cette personne a créé le tableau et ne peut pas en être retirée. Demandez au super administrateur si besoin."
       );
       return;
     }
@@ -193,11 +194,10 @@ export default function ManageMembersModal({
                           )}
                         </p>
                         {isOwner && (
-                          <span className="inline-flex items-center gap-1
-                                           px-2 py-0.5 rounded-pill
-                                           bg-ocre/10 text-ocre text-caption">
-                            <Crown size={12} aria-hidden="true" />
-                            Owner
+                          <span className="shrink-0">
+                            <Pill color="canard" size="sm">
+                              Créateur
+                            </Pill>
                           </span>
                         )}
                       </div>
@@ -215,15 +215,15 @@ export default function ManageMembersModal({
                         className="p-2 text-muted hover:text-brique
                                    rounded-pill hover:bg-brique/10
                                    disabled:opacity-50"
-                        aria-label={isSelf ? 'Quitter le tableau' : 'Desinviter'}
-                        title={isSelf ? 'Quitter le tableau' : 'Desinviter'}
+                        aria-label={isSelf ? 'Quitter le tableau' : 'Désinviter'}
+                        title={isSelf ? 'Quitter le tableau' : 'Désinviter'}
                       >
                         <UserMinus size={18} />
                       </button>
                     )}
                     {blocked && isSelf && (
                       <span className="text-caption text-faint italic">
-                        seul owner
+                        créateur
                       </span>
                     )}
                   </div>
@@ -233,8 +233,8 @@ export default function ManageMembersModal({
 
             {isCurrentUserMember && isCurrentUserOwner && ownerCount === 1 && (
               <p className="text-caption text-muted mt-2 italic">
-                Vous etes l'unique owner — vous ne pouvez pas quitter le tableau.
-                Demandez au super_admin de designer un autre gestionnaire.
+                Vous avez créé ce tableau — vous ne pouvez pas le quitter.
+                Demandez au super administrateur si besoin.
               </p>
             )}
           </section>

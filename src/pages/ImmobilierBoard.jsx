@@ -31,6 +31,7 @@ import CreateCardModal from '../features/immobilier/CreateCardModal';
 import BoardActionsMenu from '../features/immobilier/BoardActionsMenu';
 import EditBoardModal from '../features/immobilier/EditBoardModal';
 import ManageMembersModal from '../features/immobilier/ManageMembersModal';
+import MembersSheet from '../components/common/MembersSheet';
 import BoardSkeleton from '../features/immobilier/BoardSkeleton';
 import EmptyBoard from '../features/immobilier/EmptyBoard';
 import HeaderWatermark from '../components/common/HeaderWatermark';
@@ -59,6 +60,7 @@ export default function ImmobilierBoard() {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false);
   const [manageMembersOpen, setManageMembersOpen] = useState(false);
+  const [membersSheetOpen, setMembersSheetOpen] = useState(false);
 
   const counts = useMemo(
     () => ({
@@ -200,7 +202,12 @@ export default function ImmobilierBoard() {
             {/* Ligne 2 : avatars + CTA nouvelle carte */}
             <div className="flex items-center justify-between gap-3
                             px-4 pb-3 min-h-[36px] relative z-10">
-              <MemberAvatars members={members} max={4} />
+              <MemberAvatars
+                members={members}
+                max={4}
+                onClick={() => setMembersSheetOpen(true)}
+                ariaLabel={`Voir les ${members.length} participants`}
+              />
               {canCreate && (
                 <button
                   type="button"
@@ -360,6 +367,15 @@ export default function ImmobilierBoard() {
         confirmLabel="Quitter le tableau"
         danger
         onConfirm={handleLeaveBoard}
+      />
+
+      <MembersSheet
+        open={membersSheetOpen}
+        onClose={() => setMembersSheetOpen(false)}
+        profiles={members.map((m) => m.profile).filter(Boolean)}
+        ownerIds={ownerIds}
+        currentUserId={user?.id}
+        accentColor="canard"
       />
 
       <ManageMembersModal

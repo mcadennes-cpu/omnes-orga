@@ -6,6 +6,7 @@ import BoardPage from '../features/discussion/BoardPage'
 import BoardActionsMenu from '../features/discussion/BoardActionsMenu'
 import CreateCardModal from '../features/discussion/CreateCardModal'
 import RenameBoardModal from '../features/discussion/RenameBoardModal'
+import MembersSheet from '../components/common/MembersSheet'
 import { useBoard } from '../features/discussion/useBoard'
 import { useMedecins } from '../hooks/useMedecins'
 import { useRole } from '../hooks/useRole'
@@ -45,10 +46,14 @@ export default function DiscussionBoard() {
   const [createCardOpen, setCreateCardOpen] = useState(false)
   const [renameOpen, setRenameOpen] = useState(false)
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [membersOpen, setMembersOpen] = useState(false)
 
   const memberProfiles = members
     .map((m) => medecins.find((med) => med.id === m.userId))
     .filter(Boolean)
+
+  // discussion_board_members.role vaut 'owner' ou 'member' (cf. 7A-1).
+  const ownerIds = members.filter((m) => m.role === 'owner').map((m) => m.userId)
 
   // --- Etats introuvable / erreur -----------------------------------------
   if (notFound) {
@@ -148,6 +153,7 @@ export default function DiscussionBoard() {
         board={board}
         cards={cards}
         memberProfiles={memberProfiles}
+        onShowMembers={() => setMembersOpen(true)}
         isLoading={isLoading}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
@@ -157,6 +163,15 @@ export default function DiscussionBoard() {
         onBack={() => navigate('/discussion')}
         onUnarchive={userCanArchiveBoard ? handleToggleArchive : undefined}
         headerActions={headerActions}
+      />
+
+      <MembersSheet
+        open={membersOpen}
+        onClose={() => setMembersOpen(false)}
+        profiles={memberProfiles}
+        ownerIds={ownerIds}
+        currentUserId={userId}
+        accentColor="brique"
       />
 
       <CreateCardModal

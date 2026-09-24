@@ -27,6 +27,7 @@ export default function BoardPage({
   board,
   cards,
   memberProfiles = [],
+  onShowMembers,
   isLoading,
   statusFilter,
   onStatusFilterChange,
@@ -75,7 +76,12 @@ export default function BoardPage({
 
         {/* Ligne 2 : membres + CTA nouvelle carte */}
         <div className="flex items-center justify-between gap-3 px-4 pb-3 min-h-[36px] relative z-10">
-          <MemberAvatars profiles={memberProfiles} max={4} />
+          <MemberAvatars
+            profiles={memberProfiles}
+            max={4}
+            onClick={onShowMembers}
+            ariaLabel={`Voir les ${memberProfiles.length} participants`}
+          />
           {canCreateCard && (
             <button
               type="button"
