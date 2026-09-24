@@ -16,6 +16,8 @@
 // 3 px — sur la carte de garde, dans "Mes gardes" et "Planning du jour"
 // (03/09/2026). Auparavant c'etait un bandeau plein ; le champ `bandClass` qui
 // le servait a ete retire avec lui, faute d'usage.
+// Depuis le 24/09/2026, "Planning du jour" teinte la carte entiere
+// (`bgClass` + `textClass`) ; "Mes gardes" garde le lisere en L pour l'instant.
 //
 // Pourquoi une BORDURE et non un rectangle pose : seule une bordure epouse
 // l'arrondi des coins a epaisseur constante. Deux rectangles se croisent
@@ -30,19 +32,25 @@ export interface HoraireStyle {
   key: HoraireKey;
   /** Couleur de bordure, pour le lisere en L de la carte de garde. */
   borderClass: string;
+  /** Teinte pastel de la carte entiere ("Planning du jour", 24/09/2026). */
+  bgClass: string;
+  /** Couleur du texte pose sur cette teinte (horaire, badge du creneau). */
+  textClass: string;
 }
 
 export const HORAIRE_STYLES: Record<HoraireKey, HoraireStyle> = {
-  matinCourt: { key: 'matinCourt', borderClass: 'border-ocre' },
-  matin:      { key: 'matin',      borderClass: 'border-olive' },
-  journee:    { key: 'journee',    borderClass: 'border-canard' },
-  apresMidi:  { key: 'apresMidi',  borderClass: 'border-marine' },
-  weekend:    { key: 'weekend',    borderClass: 'border-brique' },
-  autre:      { key: 'autre',      borderClass: 'border-border' },
+  // Ocre : texte en ocre-fonce, l'ocre natif manquant de contraste sur fond pale.
+  matinCourt: { key: 'matinCourt', borderClass: 'border-ocre',   bgClass: 'bg-ocre/20',   textClass: 'text-ocre-fonce' },
+  matin:      { key: 'matin',      borderClass: 'border-olive',  bgClass: 'bg-olive/15',  textClass: 'text-olive' },
+  journee:    { key: 'journee',    borderClass: 'border-canard', bgClass: 'bg-canard/15', textClass: 'text-canard' },
+  apresMidi:  { key: 'apresMidi',  borderClass: 'border-marine', bgClass: 'bg-marine/10', textClass: 'text-marine' },
+  weekend:    { key: 'weekend',    borderClass: 'border-brique', bgClass: 'bg-brique/15', textClass: 'text-brique' },
+  autre:      { key: 'autre',      borderClass: 'border-border', bgClass: 'bg-carte',     textClass: 'text-ink' },
 };
 
 // Jour de la semaine sans decalage de fuseau (dateStr = 'YYYY-MM-DD').
-function isWeekend(dateStr: string): boolean {
+// Exportee pour l'en-tete de "Planning du jour" (nom du jour en brique).
+export function isWeekend(dateStr: string): boolean {
   const [y, m, d] = dateStr.split('-').map(Number);
   if (!y || !m || !d) return false;
   const day = new Date(y, m - 1, d).getDay();

@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { supabase, supabaseOrga, Shift, Profile } from '../lib/supabase';
-import { Calendar, MapPin, Clock, Users, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import { CalendarDays, MapPin, Users, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import Avatar from '../../../components/common/Avatar';
-import { getHoraireStyle } from '../lib/horaireStyles';
+import { getHoraireStyle, isWeekend } from '../lib/horaireStyles';
 import { aujourdhuiCabinet, depuisJour, jourLocal, libelleJour } from '../lib/dates';
 
 type ShiftWithDoctor = Shift & {
   assigned_doctor: Profile | null;
+  shift_type_data: { name: string } | null;
 };
 
 type Site = {
@@ -14,10 +15,31 @@ type Site = {
   name: string;
 };
 
-// Champ date / select a la charte Omnes (focus canard).
-const fieldClass =
-  'rounded-input border border-border bg-carte px-4 py-2 text-body-m text-ink ' +
-  'focus:border-canard focus:outline-none focus:ring-2 focus:ring-canard/30';
+// Nom court du creneau pour le badge de la carte (24/09/2026). Les noms en base
+// portent le site et parfois l'horaire, saisis de facon irreguliere :
+// "J3 Dijon", "WE1 beaune 08h-20h", "pre - J2 Dijon". Le site etant deja ecrit
+// sur la carte, on le retire ici, a l'affichage seulement : la base n'est pas
+// touchee. Resultat : "J3", "WE1", "pre-J2", "J5 bis".
+function nomCourtCreneau(nom: string, sites: Site[]): string {
+  let court = nom;
+  for (const site of sites) {
+    court = court.replace(new RegExp(`\\b${site.name}\\b`, 'gi'), '');
+  }
+  return court
+    .replace(/\d{1,2}h\d{0,2}\s*[-–]\s*\d{1,2}h\d{0,2}/gi, '')
+    .replace(/\s*-\s*/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function libelleNombre(n: number): string {
+  if (n === 0) return 'Aucun médecin';
+  return n === 1 ? '1 médecin' : `${n} médecins`;
+}
+
+// Bouton icone carre de 44 px (zone tactile minimale), blanc sur fond de page.
+const boutonIcone =
+  'relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-pill bg-carte text-marine shadow-card';
 
 // Depuis l'etape 7E, le module lit les profils d'Omnes-Orga via la vue
 // agenda.profiles : <Avatar> recoit directement le profil du medecin et
@@ -66,7 +88,8 @@ export default function DailyScheduleView() {
       .from('shifts')
       .select(`
         *,
-        assigned_doctor:profiles!assigned_doctor_id(*)
+        assigned_doctor:profiles!assigned_doctor_id(*),
+        shift_type_data:shift_types!shift_type_id(name)
       `)
       .eq('date', selectedDate)
       .eq('status', 'assigned')
@@ -80,9 +103,6 @@ export default function DailyScheduleView() {
     setLoading(false);
   };
 
-  // libelleJour et non new Date(dateStr) : voir lib/dates.ts (8M).
-  const formatDate = (dateStr: string) => libelleJour(dateStr);
-
   const changeDate = (days: number) => {
     const date = depuisJour(selectedDate);
     date.setDate(date.getDate() + days);
@@ -93,148 +113,125 @@ export default function DailyScheduleView() {
     ? shifts
     : shifts.filter(shift => shift.location === selectedSite);
 
-  // Une pastille par garde (le cas normal etant une seule garde par medecin ;
-  // en cas d'erreur de saisie, le medecin apparait sur deux pastilles). Tri par
-  // nom de medecin pour regrouper visuellement d'eventuels doublons.
+  // Une carte par garde (le cas normal etant une seule garde par medecin ; en
+  // cas d'erreur de saisie, le medecin apparait sur deux cartes). Tri par
+  // horaire depuis le 24/09/2026 — on lit la journee dans l'ordre, matins
+  // d'abord — puis par nom. `shift_type` est la plage "HH:MM-HH:MM", sur deux
+  // chiffres : l'ordre alphabetique est l'ordre chronologique.
   const sortedShifts = filteredShifts
     .filter((s): s is ShiftWithDoctor & { assigned_doctor: Profile } => s.assigned_doctor !== null)
-    .sort((a, b) => a.assigned_doctor.full_name.localeCompare(b.assigned_doctor.full_name, 'fr'));
+    .sort((a, b) =>
+      a.shift_type.localeCompare(b.shift_type) ||
+      a.assigned_doctor.full_name.localeCompare(b.assigned_doctor.full_name, 'fr'));
+
+  // libelleJour et non new Date(dateStr) : voir lib/dates.ts (8M).
+  const nomDuJour = libelleJour(selectedDate, { weekday: 'long' });
+  const dateDuJour = libelleJour(selectedDate, { day: 'numeric', month: 'long' });
+  const weekend = isWeekend(selectedDate);
+
+  const choixSite = [{ value: 'all', label: 'Tous les sites' }, ...sites.map((s) => ({ value: s.name, label: s.name }))];
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-card border border-border bg-carte p-6 shadow-card">
-        <div className="mb-6 flex items-center gap-3">
-          <div className="rounded-pill bg-canard/10 p-2">
-            <Users className="h-6 w-6 text-canard" />
-          </div>
-          <div>
-            <h2 className="text-h2 text-ink">Planning du jour</h2>
-            <p className="text-caption">Consultez les médecins assignés pour une journée</p>
-          </div>
+    <div className="flex flex-col gap-3">
+      {/* Date du jour a gauche, commandes regroupees a droite. Le bloc titre
+          "Planning du jour" a disparu : l'onglet actif du header le dit deja. */}
+      <div className="flex items-end gap-2">
+        <div className="min-w-0 flex-1">
+          <p className={`text-eyebrow ${weekend ? 'text-brique' : ''}`}>{nomDuJour}</p>
+          <h2 className="text-h1 truncate text-ink">{dateDuJour}</h2>
         </div>
+        <button onClick={() => changeDate(-1)} aria-label="Jour précédent" className={boutonIcone}>
+          <ChevronLeft size={20} strokeWidth={2} />
+        </button>
+        {/* Le vrai champ date, invisible, recouvre l'icone : le doigt tape
+            directement dessus et le selecteur natif s'ouvre. Plus fiable sur
+            iPhone qu'un bouton qui ouvrirait le champ par programme. */}
+        <label className={boutonIcone}>
+          <CalendarDays size={20} strokeWidth={2} />
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
+            aria-label="Choisir une date"
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          />
+        </label>
+        <button onClick={() => changeDate(1)} aria-label="Jour suivant" className={boutonIcone}>
+          <ChevronRight size={20} strokeWidth={2} />
+        </button>
+      </div>
 
-        <div className="mb-6 flex items-center justify-between gap-4">
+      {/* Choix du site : chips en defilement horizontal (hide-scrollbar),
+          au lieu de la liste deroulante. Actif en canard, comme Segmented. */}
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 hide-scrollbar md:mx-0 md:px-0">
+        {choixSite.map((choix) => (
           <button
-            onClick={() => changeDate(-1)}
-            className="rounded-pill p-2 transition-colors hover:bg-fond"
+            key={choix.value}
+            onClick={() => setSelectedSite(choix.value)}
+            aria-pressed={selectedSite === choix.value}
+            className={`flex h-11 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-pill px-4 text-body-m font-semibold transition-colors ${
+              selectedSite === choix.value ? 'bg-canard text-white' : 'bg-carte text-muted shadow-card'
+            }`}
           >
-            <ChevronLeft className="h-5 w-5 text-marine" />
+            {choix.value !== 'all' && <MapPin size={15} strokeWidth={2} />}
+            {choix.label}
           </button>
+        ))}
+      </div>
 
-          <div className="flex flex-1 items-center gap-3">
-            <Calendar className="h-5 w-5 flex-shrink-0 text-canard" />
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className={`flex-1 ${fieldClass}`}
-            />
+      {loading ? (
+        <div className="py-12 text-center text-muted">Chargement…</div>
+      ) : sortedShifts.length === 0 ? (
+        <div className="py-12 text-center">
+          <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-carte">
+            <Users className="h-8 w-8 text-faint" />
           </div>
-
-          <button
-            onClick={() => changeDate(1)}
-            className="rounded-pill p-2 transition-colors hover:bg-fond"
-          >
-            <ChevronRight className="h-5 w-5 text-marine" />
-          </button>
+          <p className="mb-2 text-muted">Aucun médecin assigné</p>
+          <p className="text-caption">Il n'y a pas de gardes assignées pour cette date</p>
         </div>
-
-        <div className="mb-6">
-          <div className="flex items-center gap-3">
-            <MapPin className="h-5 w-5 flex-shrink-0 text-canard" />
-            <select
-              value={selectedSite}
-              onChange={(e) => setSelectedSite(e.target.value)}
-              className={`flex-1 ${fieldClass}`}
-            >
-              <option value="all">Tous les sites</option>
-              {sites.map((site) => (
-                <option key={site.id} value={site.name}>
-                  {site.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="mb-6 text-center">
-          <h3 className="text-h2 capitalize text-ink">{formatDate(selectedDate)}</h3>
-        </div>
-
-        {loading ? (
-          <div className="py-12 text-center text-muted">Chargement…</div>
-        ) : sortedShifts.length === 0 ? (
-          <div className="py-12 text-center">
-            <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-fond">
-              <Users className="h-8 w-8 text-faint" />
-            </div>
-            <p className="mb-2 text-muted">Aucun médecin assigné</p>
-            <p className="text-caption">Il n'y a pas de gardes assignées pour cette date</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
+      ) : (
+        <>
+          <p className="text-caption">{libelleNombre(sortedShifts.length)}</p>
+          <ul className="flex flex-col gap-2.5">
             {sortedShifts.map((shift) => {
               const doctorName = shift.assigned_doctor.full_name;
               const style = getHoraireStyle(shift.shift_type, shift.date);
+              const creneau = shift.shift_type_data ? nomCourtCreneau(shift.shift_type_data.name, sites) : '';
               return (
-                <div
-                  key={shift.id}
-                  className="relative overflow-hidden rounded-card border border-border bg-carte shadow-card"
-                >
-                  <div className="flex items-stretch">
-                    {/* Avatar seul a gauche, taille 72 comme MedecinCard dont
-                        cette carte reprend le pattern. Le texte ne perd rien :
-                        12 (pl) + 72 + 16 (px de la colonne droite) = 100 px,
-                        exactement l'ancien 16 + 52 + 16 + 16. Le py-3 garantit
-                        de l'air au-dessus et en dessous quand les infos tiennent
-                        sur une seule ligne (ecran large) — sans lui l'avatar
-                        toucherait les bords de la carte. */}
-                    <div className="flex flex-shrink-0 items-center py-3 pl-3">
-                      <Avatar profile={shift.assigned_doctor} size={72} alt={doctorName} />
-                    </div>
-                    {/* Colonne droite : nom, puis lieu / salle / horaire, tout
-                        en noir sur blanc. La couleur du creneau est portee par
-                        le lisere en L de la carte (03/09/2026 — un bandeau
-                        plein coiffait le nom auparavant). */}
-                    <div className="min-w-0 flex-1">
-                      <div className="bg-carte px-4 py-3">
-                        <h4 className="mb-2 text-body-l font-semibold text-ink">{doctorName}</h4>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                          <div className="flex items-center gap-2">
-                            <MapPin className="h-4 w-4 flex-shrink-0 text-muted" />
-                            <span className="text-body-m font-medium text-ink">{shift.location}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 flex-shrink-0 text-muted" />
-                            <span className="text-body-m text-ink">{shift.room}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4 flex-shrink-0 text-muted" />
-                            <span className="text-body-m text-ink">{shift.shift_type}</span>
-                          </div>
-                        </div>
-                        {shift.coordinator_note && (
-                          <div className="mt-2 flex items-start gap-2 border-t border-border pt-2">
-                            <FileText className="mt-0.5 h-4 w-4 flex-shrink-0 text-canard" />
-                            <p className="text-body-m text-ink">{shift.coordinator_note}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                // Carte entiere teintee a la couleur du creneau (24/09/2026,
+                // remplace le lisere en L sur cet ecran). Avatar 72 px, taille
+                // de MedecinCard, sur une colonne blanche pleine hauteur.
+                <li key={shift.id} className={`flex items-stretch overflow-hidden rounded-card ${style.bgClass}`}>
+                  <div className="flex w-[88px] flex-shrink-0 items-center justify-center bg-carte py-3">
+                    <Avatar profile={shift.assigned_doctor} size={72} alt={doctorName} />
                   </div>
-                  {/* Lisere en L (bordure bas + droite), pose sur la carte
-                      entiere, avatar compris : c'est ce qui lui fait epouser
-                      l'arrondi du coin bas-droit. Meme pattern que "Mes
-                      gardes". */}
-                  <div
-                    className={`pointer-events-none absolute inset-0 rounded-card border-b-[3px] border-r-[3px] ${style.borderClass}`}
-                  />
-                </div>
+                  <div className="flex min-w-0 flex-1 flex-col gap-1.5 p-3.5">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className={`text-h2 tabular-nums ${style.textClass}`}>{shift.shift_type}</p>
+                      {creneau && (
+                        <span className={`flex-shrink-0 rounded-full bg-carte px-2.5 py-0.5 text-body-m font-semibold ${style.textClass}`}>
+                          {creneau}
+                        </span>
+                      )}
+                    </div>
+                    <p className="truncate text-body-m font-semibold text-ink">{doctorName}</p>
+                    <p className="flex items-center gap-1.5 text-caption">
+                      <MapPin size={15} strokeWidth={2} className="flex-shrink-0" />
+                      {shift.location} · {shift.room}
+                    </p>
+                    {shift.coordinator_note && (
+                      <p className="mt-1 flex items-start gap-1.5 rounded-pill bg-carte px-3 py-2 text-caption text-ink">
+                        <FileText size={15} strokeWidth={2} className="mt-0.5 flex-shrink-0" />
+                        {shift.coordinator_note}
+                      </p>
+                    )}
+                  </div>
+                </li>
               );
             })}
-          </div>
-        )}
-      </div>
+          </ul>
+        </>
+      )}
     </div>
   );
 }
