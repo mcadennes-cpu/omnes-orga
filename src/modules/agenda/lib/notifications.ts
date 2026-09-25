@@ -14,7 +14,7 @@
 import { notifyUsers } from '../../../lib/notify';
 import { libelleJour } from './dates';
 import { nomCourtCreneau } from './horaireStyles';
-import { supabaseOrga } from './supabase';
+import { supabase, supabaseOrga } from './supabase';
 
 // Pages ouvertes au clic. Le parametre ?vue= est lu a partir de 8R-4 ;
 // avant, il est simplement ignore et le Planning s'ouvre sur l'onglet
@@ -188,4 +188,67 @@ export function notifierParMedecin(
   for (const [doctorId, liste] of parMedecin) {
     notifier([doctorId], fabrique(liste));
   }
+}
+
+// ---- Destinataires lus en base (8R-3) ----
+//
+// Lus dans la vue agenda.profiles, avec les MEMES regles que le reste du
+// module : `role = 'coordinator'` vient de is_agenda_coordinator (les droits
+// de coordination), `is_agenda_doctor` designe qui prend des gardes. Pas de
+// liste en dur : un changement de coordinatrice suit tout seul.
+
+// Coordinateurs qui NE recoivent PAS les nouvelles demandes (D), a leur
+// demande. Matthieu (25/09/2026) : coordinateur pour les droits, mais ce
+// n'est pas lui qui attribue les gardes -- c'est Charlotte. On exclut plutot
+// que de nommer la destinataire : une future coordinatrice recevra les
+// demandes d'office, sans que personne ait a penser a l'ajouter ici.
+const SANS_PUSH_DEMANDES = new Set<string>([
+  'b43659df-fcd8-4d32-a915-efa2e580fbbd', // Matthieu CADENNES
+]);
+
+/** D — un medecin vient d'envoyer `nombre` demandes : prevenir la coordination. */
+export function notifierNouvellesDemandes(nombre: number): void {
+  if (nombre < 1) return;
+  void (async () => {
+    try {
+      const auteur = await auteurCourant();
+      if (!auteur) return;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, role')
+        .or(`role.eq.coordinator,id.eq.${auteur}`)
+        .eq('is_active', true);
+      if (error || !data) return;
+      const nom = data.find(p => p.id === auteur)?.full_name ?? '';
+      const coordination = data
+        .filter(p => p.role === 'coordinator' && !SANS_PUSH_DEMANDES.has(p.id))
+        .map(p => p.id);
+      notifier(coordination, texteNouvellesDemandes(nom, nombre));
+    } catch (err) {
+      console.error('[agenda] echec notification', err);
+    }
+  })();
+}
+
+/**
+ * F — des semaines viennent d'etre ouvertes : prevenir tous les medecins
+ * actifs qui prennent des gardes (remplacants et associes), auteur exclu.
+ * Rien si l'ouverture n'a cree aucune garde LIBRE : des gardes deja
+ * attribuees par le roulement n'offrent rien a demander.
+ */
+export function notifierSemainesOuvertes(libres: number, debut: string, fin: string): void {
+  if (libres < 1 || !debut || !fin) return;
+  void (async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('is_agenda_doctor', true)
+        .eq('is_active', true);
+      if (error || !data) return;
+      notifier(data.map(p => p.id), texteSemainesOuvertes(debut, fin));
+    } catch (err) {
+      console.error('[agenda] echec notification', err);
+    }
+  })();
 }

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { CalendarPlus, Loader2, Save, Repeat, PartyPopper } from 'lucide-react';
 import BottomSheet from './ui/BottomSheet';
 import { supabase } from '../lib/supabase';
+import { notifierSemainesOuvertes } from '../lib/notifications';
 
 // ---------------------------------------------------------------------------
 // Ouvrir les N prochaines semaines (MOD-1, etape 6H).
@@ -280,11 +281,14 @@ export default function OpenWeeksModal({ onClose, onOpened }: OpenWeeksModalProp
     setEcriture(true);
     setErreur('');
     try {
-      const { error } = await supabase.rpc('ouvrir_semaines', {
+      const { data, error } = await supabase.rpc('ouvrir_semaines', {
         p_debut: debut, p_semaines: semaines,
         p_ouvertures: ouverturesPayload(), p_verifier_seulement: false,
       });
       if (error) throw error;
+      // 8R -- F : d'apres le rapport de l'ecriture reelle, pas de l'apercu.
+      const ecrit = data as Rapport | null;
+      notifierSemainesOuvertes(ecrit?.libres ?? 0, ecrit?.debut ?? '', ecrit?.fin ?? '');
       onOpened(rapport?.total ?? 0);
       onClose();
     } catch (err: any) {

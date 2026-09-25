@@ -3,6 +3,7 @@ import { Calendar, ChevronDown, ChevronUp, CheckSquare, Square, ChevronLeft, Che
 import { supabase } from '../lib/supabase';
 import { aujourdhuiCabinet, jourLocal } from '../lib/dates';
 import { useToast } from './ui/ActionToast';
+import { notifierNouvellesDemandes } from '../lib/notifications';
 
 interface Shift {
   id: string;
@@ -169,6 +170,8 @@ export default function DoctorWeekSummaryView({
           `Demande envoyée pour ${successCount} garde${successCount > 1 ? 's' : ''}.`,
           'succes'
         );
+        // 8R -- D : un seul push a la coordination pour tout l'envoi.
+        notifierNouvellesDemandes(successCount);
         setSelectedShifts(new Set());
         setExpandedDay(null);
         onRequestsSubmitted();
