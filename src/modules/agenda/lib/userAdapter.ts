@@ -24,6 +24,8 @@ export type OrgaProfile = {
   email: string | null;
   actif?: boolean;
   is_agenda_coordinator?: boolean;
+  // Jeton push (etape 17) : absent = aucune notification recue (8R-5).
+  fcm_token?: string | null;
 };
 
 // Rôles applicatifs Orga qui exercent au cabinet à demeure, par opposition aux

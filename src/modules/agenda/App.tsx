@@ -10,6 +10,7 @@ import DailyScheduleView from './components/DailyScheduleView';
 import RequestsView from './components/RequestsView';
 import ActivityLogView from './components/ActivityLogView';
 import SettingsView from './components/SettingsView';
+import RappelNotifications from './components/RappelNotifications';
 
 type AppProps = {
   orgaProfile?: OrgaProfile | null;
@@ -150,6 +151,9 @@ function App({ orgaProfile }: AppProps) {
       />
 
       <main className="w-full mx-auto px-4 md:px-8 py-8">
+        {/* 8R-5 : tant que le profil n'a aucun jeton, la personne ne recoit
+            aucun push du Planning. Au-dessus de tous les onglets. */}
+        <RappelNotifications aUnJeton={!!orgaProfile?.fcm_token} />
         {currentView === 'calendar' && <EnhancedCalendarView currentUser={currentUser} />}
         {currentView === 'schedule' && currentUser.role === 'doctor' && (
           <MyScheduleView currentUser={currentUser} />
