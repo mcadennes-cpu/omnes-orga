@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { buildAgendaUser, estAssocieOrga, OrgaProfile } from './lib/userAdapter';
 import { UserRole } from './lib/supabase';
-import AgendaHeader, { AgendaView, vueParDefaut } from './components/AgendaHeader';
+import AgendaHeader, { AgendaView, ongletsVisibles, vueParDefaut } from './components/AgendaHeader';
 import { ToastProvider } from './components/ui/ActionToast';
 import EnhancedCalendarView from './components/EnhancedCalendarView';
 import MyScheduleView from './components/MyScheduleView';
@@ -88,6 +89,43 @@ function App({ orgaProfile }: AppProps) {
     // ferait atterrir le coordinateur sur le second onglet à chaque retour.
     setCurrentView(vueParDefaut(role, estAssocie));
   };
+
+  // ---------------------------------------------------------------------
+  // Lien profond des notifications (8R-4) : /planning?vue=schedule
+  //
+  // Le clic sur un push ouvre l'URL qu'il porte (cf. lib/notifications.ts).
+  // On ouvre l'onglet demandé, puis on EFFACE le paramètre : sinon un second
+  // push identique, l'appli restée ouverte sur le Planning, ne changerait pas
+  // l'adresse et n'aurait aucun effet.
+  //
+  // Même règle que la barre d'onglets (ongletsVisibles) : un onglet que le
+  // rôle n'a pas n'est jamais ouvert -- on reste sur l'accueil du rôle plutôt
+  // que d'afficher un écran vide. Seule exception : un vrai coordinateur qui
+  // exerce (Matthieu) reçoit des push médecin ; l'onglet est dans son autre
+  // vue, on bascule donc l'affichage comme le ferait le sélecteur.
+  // ---------------------------------------------------------------------
+  const [searchParams, setSearchParams] = useSearchParams();
+  const vueDemandee = searchParams.get('vue');
+
+  useEffect(() => {
+    if (!vueDemandee || !currentUser) return;
+
+    const sansVue = new URLSearchParams(searchParams);
+    sansVue.delete('vue');
+    setSearchParams(sansVue, { replace: true });
+
+    const aLOnglet = (role: UserRole) =>
+      ongletsVisibles(role, estAssocie).some((tab) => tab.view === vueDemandee);
+
+    if (!aLOnglet(currentUser.role)) {
+      const autreVue: UserRole = currentUser.role === 'coordinator' ? 'doctor' : 'coordinator';
+      if (!isRealCoordinator || !aLOnglet(autreVue)) return;
+      handleViewAsChange(autreVue);
+    }
+    setCurrentView(vueDemandee as AgendaView);
+    // Ne rejoue qu'à l'arrivée d'un nouveau paramètre.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vueDemandee]);
 
   // La page /planning ne rend ce composant qu'une fois le profil chargé ;
   // ce garde-fou ne joue qu'en cas d'usage direct du module.
