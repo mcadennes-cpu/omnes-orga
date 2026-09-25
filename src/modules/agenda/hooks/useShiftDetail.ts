@@ -9,6 +9,14 @@ import {
 import { useToast } from '../components/ui/ActionToast';
 import { checkDoctorDailyConflict } from '../lib/shiftValidation';
 import { aujourdhuiCabinet, depuisJour } from '../lib/dates';
+import {
+  gardeDepuisShift,
+  notifier,
+  notifierParMedecin,
+  texteGardesAttribuees,
+  texteGardesRetirees,
+  texteGardesValidees,
+} from '../lib/notifications';
 
 // Boite regroupant toute la "mecanique" de la fenetre de detail d'une garde
 // (etat, chargements a l'ouverture, actions du coordinateur). Le composant
@@ -151,6 +159,21 @@ async function findSeriesShiftsToFree(shift: Shift): Promise<string[]> {
 
   if (error) throw error;
   return (data ?? []).map((candidate) => candidate.id);
+}
+
+// Push « garde retiree » (8R) : on ne previent que pour des gardes
+// reellement ASSIGNEES. Une garde en attente portant un medecin est une
+// pre-validation -- un brouillon dont il n'a jamais ete prevenu. A lire AVANT
+// la liberation, qui efface le statut.
+async function lireGardesAssignees(shiftIds: string[]) {
+  if (shiftIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from('shifts')
+    .select('date, location, shift_type, assigned_doctor_id')
+    .in('id', shiftIds)
+    .eq('status', 'assigned');
+  if (error) return []; // un push en moins, jamais une action bloquee
+  return data ?? [];
 }
 
 export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () => void) {
@@ -300,6 +323,13 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
 
       if (approveError) throw approveError;
 
+      // 8R -- A : le medecin valide. C : celui qu'il remplace, si la garde
+      // etait deja attribuee (pas s'il n'etait que pre-valide : brouillon).
+      notifier([doctorId], texteGardesValidees([gardeDepuisShift(shift)]));
+      if (shift.status === 'assigned' && shift.assigned_doctor_id !== doctorId) {
+        notifier([shift.assigned_doctor_id], texteGardesRetirees([gardeDepuisShift(shift)]));
+      }
+
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -351,6 +381,13 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
         .eq('id', requestId);
 
       if (updateError) throw updateError;
+
+      // 8R -- la pre-validation est un brouillon : le nouveau medecin n'est
+      // pas prevenu. Mais si elle deloge un medecin deja attribue, lui perd
+      // sa garde pour de bon (C).
+      if (shift.status === 'assigned' && shift.assigned_doctor_id !== doctorId) {
+        notifier([shift.assigned_doctor_id], texteGardesRetirees([gardeDepuisShift(shift)]));
+      }
 
       onSuccess();
       onClose();
@@ -505,6 +542,8 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
 
     try {
       let liberees = 1;
+      // 8R -- C : gardes attribuees lues avant liberation, prevenues apres.
+      let aPrevenir: Awaited<ReturnType<typeof lireGardesAssignees>> = [];
 
       if (scope === 'rotation') {
         // Libere les gardes futures de la MEME case de roulement (jour +
@@ -518,6 +557,7 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
         // changer cela durablement, il faut passer par le fichier -- c'est
         // l'objet des « modifications souhaitees » de 6G.
         const { shiftIds } = await findRotationSlotShifts(shift);
+        aPrevenir = await lireGardesAssignees(shiftIds);
 
         if (shiftIds.length > 0) {
           const { error: updateError } = await supabase
@@ -537,6 +577,7 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
         // Voir findSeriesShiftsToFree : même médecin, à partir d'aujourd'hui,
         // et écriture sur une liste d'identifiants explicite.
         const shiftIds = await findSeriesShiftsToFree(shift);
+        aPrevenir = await lireGardesAssignees(shiftIds);
 
         if (shiftIds.length > 0) {
           const { error: updateError } = await supabase
@@ -553,6 +594,8 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
 
         liberees = shiftIds.length;
       } else {
+        aPrevenir = await lireGardesAssignees([shift.id]);
+
         const { error: updateError } = await supabase
           .from('shifts')
           .update({
@@ -564,6 +607,11 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
 
         if (updateError) throw updateError;
       }
+
+      notifierParMedecin(
+        aPrevenir.map(g => ({ ...gardeDepuisShift(g), doctorId: g.assigned_doctor_id })),
+        texteGardesRetirees
+      );
 
       const gardes = `${liberees} garde${liberees > 1 ? 's' : ''} libérée${liberees > 1 ? 's' : ''}`;
       signalerAction(
@@ -619,7 +667,7 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
 
       const { data: allShifts, error: fetchError } = await supabase
         .from('shifts')
-        .select('id, date, status, assigned_doctor_id')
+        .select('id, date, status, assigned_doctor_id, location, shift_type')
         .eq('site_id', shift.site_id)
         .eq('room_id', shift.room_id)
         .eq('shift_type_id', shift.shift_type_id)
@@ -669,6 +717,12 @@ export function useShiftDetail(shift: Shift, onSuccess: () => void, onClose: () 
             .eq('status', 'pending');
 
           if (rejectError) throw rejectError;
+
+          // 8R -- B : un seul push recapitulatif au medecin applique.
+          notifier(
+            [shift.assigned_doctor_id],
+            texteGardesAttribuees(matchingShifts.map(gardeDepuisShift))
+          );
         }
       }
 

@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { checkDoctorDailyConflict } from '../lib/shiftValidation';
 import BottomSheet from './ui/BottomSheet';
 import { libelleJourCourt } from '../lib/dates';
+import { GardeNotif, gardeDepuisShift, notifierParMedecin, texteGardesValidees } from '../lib/notifications';
 
 type BulkAssignPrevalidatedModalProps = {
   onClose: () => void;
@@ -40,7 +41,7 @@ export default function BulkAssignPrevalidatedModal({
           id,
           shift_id,
           doctor_id,
-          shifts!inner(date),
+          shifts!inner(date, location, shift_type),
           doctor:profiles!doctor_id(full_name)
         `)
         .eq('status', 'on_hold')
@@ -56,6 +57,8 @@ export default function BulkAssignPrevalidatedModal({
       }
 
       let successCount = 0;
+      // 8R -- A : gardes validees, pour UN push recapitulatif par medecin.
+      const validees: (GardeNotif & { doctorId: string })[] = [];
       let errorCount = 0;
       const conflictWarnings: string[] = [];
 
@@ -114,11 +117,14 @@ export default function BulkAssignPrevalidatedModal({
           }
 
           successCount++;
+          validees.push({ ...gardeDepuisShift(request.shifts as any), doctorId: request.doctor_id });
         } catch (err) {
           console.error('Error processing request:', err);
           errorCount++;
         }
       }
+
+      notifierParMedecin(validees, texteGardesValidees);
 
       if (conflictWarnings.length > 0) {
         setWarnings(conflictWarnings);

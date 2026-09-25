@@ -11,6 +11,7 @@ import { checkDoctorDailyConflict } from '../lib/shiftValidation';
 import ConflictErrorModal from './ConflictErrorModal';
 import BottomSheet from './ui/BottomSheet';
 import { aujourdhuiCabinet, depuisJour, libelleJourCourt } from '../lib/dates';
+import { GardeNotif, gardeDepuisShift, notifier, texteGardesAttribuees } from '../lib/notifications';
 
 type Doctor = {
   id: string;
@@ -105,6 +106,19 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
     }
   };
 
+  // 8R -- B : UN push au medecin, a la FIN du parcours, pour ne pas prevenir
+  // d'une attribution que « Annuler » defait ensuite, ni envoyer deux push
+  // quand on etend au roulement. Toutes les sorties qui gardent l'attribution
+  // passent par ici ; handleCancelAssignment, lui, ne previent personne.
+  const terminerEtPrevenir = (autresGardes: GardeNotif[] = []) => {
+    notifier(
+      [selectedDoctorId],
+      texteGardesAttribuees([gardeDepuisShift(shift), ...autresGardes])
+    );
+    onSuccess();
+    onClose();
+  };
+
   const handleAssign = async () => {
     if (!selectedDoctorId) {
       setError('Veuillez sélectionner un médecin');
@@ -159,8 +173,7 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
         setShowRotationPrompt(true);
         setLoading(false);
       } else {
-        onSuccess();
-        onClose();
+        terminerEtPrevenir();
       }
     } catch (err: any) {
       setError(err.message);
@@ -169,13 +182,14 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
   };
 
   const handleOnlyThisShift = () => {
-    onSuccess();
-    onClose();
+    terminerEtPrevenir();
   };
 
   const handleApplyToRotation = async () => {
     setLoading(true);
     setError('');
+    // Gardes du roulement effectivement attribuees en plus de la premiere.
+    let etendues: GardeNotif[] = [];
 
     try {
       // Applique le medecin aux gardes futures de la meme case du roulement.
@@ -205,7 +219,7 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
 
       const { data: allShifts, error: fetchError } = await supabase
         .from('shifts')
-        .select('id, date, status, assigned_doctor_id')
+        .select('id, date, status, assigned_doctor_id, location, shift_type')
         .eq('site_id', shift.site_id)
         .eq('room_id', shift.room_id)
         .eq('shift_type_id', shift.shift_type_id)
@@ -291,6 +305,10 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
               .eq('status', 'pending');
 
             if (rejectError) throw rejectError;
+
+            etendues = matchingShifts
+              .filter(m => validShiftIds.includes(m.id))
+              .map(gardeDepuisShift);
           } else if (conflictDates.length > 0) {
             setLoading(false);
             return;
@@ -298,8 +316,7 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
         }
       }
 
-      onSuccess();
-      onClose();
+      terminerEtPrevenir(etendues);
     } catch (err: any) {
       setError(err.message);
       setLoading(false);
@@ -349,7 +366,9 @@ export default function AssignDoctorModal({ shift, onClose, onSuccess, isCoordin
 
   if (showRotationPrompt) {
     return (
-      <BottomSheet title="Appliquer aux gardes du roulement ?" onClose={onClose} busy={loading}>
+      // Fermer par la croix GARDE l'attribution deja faite : c'est une sortie
+      // comme « Assigner seulement cette garde », donc avec le push (8R).
+      <BottomSheet title="Appliquer aux gardes du roulement ?" onClose={() => terminerEtPrevenir()} busy={loading}>
         <div className="mb-4 flex items-start gap-3">
           <div className="rounded-pill bg-canard/10 p-2">
             <Repeat className="h-5 w-5 text-canard" />

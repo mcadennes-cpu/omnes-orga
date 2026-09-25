@@ -13,6 +13,8 @@
 
 import { notifyUsers } from '../../../lib/notify';
 import { libelleJour } from './dates';
+import { nomCourtCreneau } from './horaireStyles';
+import { supabaseOrga } from './supabase';
 
 // Pages ouvertes au clic. Le parametre ?vue= est lu a partir de 8R-4 ;
 // avant, il est simplement ignore et le Planning s'ouvre sur l'onglet
@@ -31,6 +33,23 @@ export type GardeNotif = {
   shift_type?: string | null;
   creneau?: string | null;
 };
+
+// Une garde telle que les ecrans du module la chargent -> GardeNotif. Le nom
+// court (« J3 ») n'est calcule que si l'ecran a charge le creneau.
+export function gardeDepuisShift(shift: {
+  date: string;
+  location?: string | null;
+  shift_type?: string | null;
+  shift_type_data?: { name?: string | null } | null;
+}): GardeNotif {
+  const nom = shift.shift_type_data?.name;
+  return {
+    date: shift.date,
+    location: shift.location,
+    shift_type: shift.shift_type,
+    creneau: nom ? nomCourtCreneau(nom, shift.location ? [shift.location] : []) || null : null,
+  };
+}
 
 export type ContenuNotif = { title: string; body: string; url: string };
 
@@ -120,20 +139,35 @@ export function texteSemainesOuvertes(debut: string, fin: string): ContenuNotif 
 
 // ---- L'envoi ----
 
+// L'auteur du geste = l'utilisateur connecte. Le module partage la session
+// de l'appli principale (lib/supabase.ts) : on la lit ici plutot que de faire
+// passer l'identifiant par chaque ecran. getSession lit le stockage local,
+// sans appel reseau.
+async function auteurCourant(): Promise<string | null> {
+  const { data } = await supabaseOrga.auth.getSession();
+  return data.session?.user.id ?? null;
+}
+
 /**
  * Envoie un meme contenu a plusieurs personnes, auteur exclu.
  * Fire-and-forget : on n'attend pas, rien ne remonte.
  */
 export function notifier(
   destinataires: (string | null | undefined)[],
-  auteurId: string | null | undefined,
   contenu: ContenuNotif
 ): void {
-  const ids = [...new Set(destinataires)].filter(
-    (id): id is string => !!id && id !== auteurId
-  );
-  if (ids.length === 0) return;
-  void notifyUsers({ userIds: ids, ...contenu });
+  void (async () => {
+    try {
+      const auteur = await auteurCourant();
+      const ids = [...new Set(destinataires)].filter(
+        (id): id is string => !!id && id !== auteur
+      );
+      if (ids.length === 0) return;
+      await notifyUsers({ userIds: ids, ...contenu });
+    } catch (err) {
+      console.error('[agenda] echec notification', err);
+    }
+  })();
 }
 
 /**
@@ -142,17 +176,16 @@ export function notifier(
  */
 export function notifierParMedecin(
   gardes: (GardeNotif & { doctorId: string | null | undefined })[],
-  auteurId: string | null | undefined,
   fabrique: (gardes: GardeNotif[]) => ContenuNotif
 ): void {
   const parMedecin = new Map<string, GardeNotif[]>();
   for (const { doctorId, ...garde } of gardes) {
-    if (!doctorId || doctorId === auteurId) continue;
+    if (!doctorId) continue;
     const liste = parMedecin.get(doctorId) ?? [];
     liste.push(garde);
     parMedecin.set(doctorId, liste);
   }
   for (const [doctorId, liste] of parMedecin) {
-    notifier([doctorId], auteurId, fabrique(liste));
+    notifier([doctorId], fabrique(liste));
   }
 }
