@@ -1495,6 +1495,7 @@ ses photos sont servies hors RLS, restreindre la policy ne changerait rien
 | `23-22-test-compte-actif.py` | Les 5 contrôles A→E, transactions annulées | jamais |
 | `23-23-cloner-storage-env-test.py` | Clone buckets + policies storage vers le test | test seul |
 | `23-24-storage-compte-actif.py` | 2 policies restrictives sur `storage.objects` | `--go` |
+| `23-27-profils-recursion-modification.py` | Réécrit la policy 4D d'auto-modification de `profiles` sans relecture de la table (régression du 21/09, trouvée le 28/09) ; 7 contrôles en transactions annulées | `--go` |
 
 Tous : simulation par défaut, `--retour-arriere`, sauvegarde `23-16` de
 moins de 6 h exigée mécaniquement avant toute écriture en production.
@@ -1533,6 +1534,35 @@ Joué pour de vrai sur l'environnement de test avant la bascule : état
 identique à l'empreinte d'origine, policy par policy et fonction par
 fonction. Empreintes d'avant conservées dans
 `~/Documents/claude-projets/archives/orga-mesures/`.
+
+**⚠ Régression trouvée le 28/09/2026, corrigée par `23-27`.** La restrictive
+`exiger_compte_actif_lecture` rendait **toute modification de `profiles`
+impossible** (`42P17`, récursion infinie) : la policy d'auto-modification de
+l'étape 4D, `profiles_update_own_safe_fields`, vérifiait le rôle et le statut
+actif en **relisant la table** (`role = (select role from profiles where id =
+auth.uid())`), et cette relecture repassait par la nouvelle policy de
+lecture. Isolé sur l'environnement de test : sans la restrictive de lecture,
+ça passe ; sans celle de modification, ça boucle encore. Effet réel : plus
+aucune fiche modifiée du 21/09 à 10h20 au 28/09 — ni jeton de notification,
+ni photo, ni édition du Trombinoscope, même par un super_admin. Découvert
+parce que Charlotte ne pouvait pas enregistrer son jeton (étape 8R-6 de
+l'agenda).
+
+**Correctif** : `docs/sql/23-27-profils-recursion-modification.py`. La
+policy 4D est réécrite à **contrôle identique** via deux fonctions
+`security definer` existantes, qui lisent la table sans repasser par ses
+policies : `role = current_user_role()`, `actif = est_actif()`. Le chantier D
+n'est pas touché. Rejoué sur l'environnement de test (correction, retour
+arrière au caractère près, correction), puis appliqué en production le 28/09
+après la sauvegarde `23-16` de 10h51. **7 contrôles au vert**, en
+transactions annulées : son jeton (1 fiche), la fiche d'un autre (0), changer
+son rôle (refusé), se désactiver (refusé), compte inactif (0), super_admin sur
+sa fiche (1) et sur celle d'un remplaçant (1).
+
+**Leçon** : la suite `23-22` ne testait que la **lecture**. Une couche de
+sécurité se teste aussi en écriture, sur chaque commande, avant la bascule.
+Et une policy ne doit jamais relire sa propre table : passer par une fonction
+`security definer`.
 
 **Reste ouvert.** `anon` dispose des droits DML sur les 27 tables de
 `public` — seule la RLS l'arrête, et les 31 policies `to public` ne le
@@ -1651,7 +1681,8 @@ se citent mutuellement.
 - **Inconsistance du nom auteur dans Discussion CardMessage** — sur Immobilier, quand un auteur envoie plusieurs messages consécutifs, son nom n'est affiché qu'au-dessus du premier message du groupe (`showAuthor` est false pour les suivants). Sur Discussion, le nom est répété au-dessus de chaque bulle des autres, quel que soit le groupement. Cohérent avec l'inconsistance plus large de nommage entre les deux modules (cf. limitation "Cohérence du nommage Discussion"). À harmoniser en passe ultérieure si pertinent.
 - **Cache d'URL signée non partagé entre fenêtres** — le cache `avatarCache` est en mémoire, donc spécifique à l'onglet courant. Un hard refresh (F5) vide le cache et regénère toutes les URL signées au prochain affichage. Pas un problème pratique (généralement transparent côté utilisateur), juste à savoir si on cherche à mesurer les coûts Supabase.
 - **Sondage Discussion sans temps réel ni édition (V1)** — depuis l'étape 16 ter, chaque carte de Discussion peut porter un sondage à options personnalisées (choix unique, vote nominatif). Limites assumées en V1 : pas de Realtime (votes vus au rechargement de la carte), pas de remontée `last_activity_at` (créer ou voter n'allume pas le point « non-lu », comme les pièces jointes), question et options non modifiables après création (supprimer / recréer pour corriger). Le nommage anglais des 3 tables `discussion_polls*` s'ajoute à la dette de nommage du module Discussion (renommage prévu avec le reste en 12 ter).
-- **Push : un seul appareil par utilisateur** — la colonne `profiles.fcm_token` ne stocke qu'un token. Activer les notifications sur un nouvel appareil remplace le précédent (les push iront alors sur le dernier appareil activé). Gérer plusieurs appareils par personne demanderait une table de tokens dédiée.
+- **Push : un seul appareil par utilisateur** — la colonne `profiles.fcm_token` ne stocke qu'un token. Activer les notifications sur un nouvel appareil remplace le précédent (les push iront alors sur le dernier appareil activé). Gérer plusieurs appareils par personne demanderait une table de tokens dédiée. Depuis le 28/09/2026, le Profil propose « Recevoir les notifications sur cet appareil » même quand la permission est déjà accordée : « Activées » ne dit que la permission du navigateur de cet appareil, pas que c'est lui qui reçoit. Sans ce bouton, une personne passée sur un autre appareil voyait « Activées » partout sans rien recevoir, et sans moyen d'y remédier (cas de Charlotte, 8R-6).
+- **Push du Planning : l'adoption est le vrai frein** — depuis l'étape 8R de l'agenda, les gestes du Planning notifient les médecins concernés, mais au 25/09/2026 seuls 2 remplaçants actifs sur 23 avaient activé les notifications. Un bandeau dans le Planning les y invite tant que leur fiche n'a pas de jeton ; il faudra suivre ce chiffre, et le relayer par un message au cabinet (installation sur l'écran d'accueil obligatoire sur iPhone).
 - **Deep-link des notifications — RÉSOLU (18E-3).** Le clic sur une notification ouvre désormais directement la carte / l'événement concerné, app en arrière-plan comme fermée. Mécanisme : `postMessage` du service worker vers l'app ouverte + navigation via React Router (`ServiceWorkerNavigation` dans `App.jsx`), et `openWindow(url)` si l'app est fermée. L'ancienne approche `client.navigate()` depuis le service worker, peu fiable sur iOS, a été abandonnée.
 - **Pastille d'icône numérique : iOS seulement.** Le chiffre sur l'icône (App Badging) s'affiche sur iOS 16.4+ (PWA installée + permission notifications) et sur desktop Chrome/Edge. Sur Android, Chromium ne rend pas le chiffre : l'OS affiche un simple point lié à la présence d'une notification non lue dans le volet (pas au compteur « en attente » exact). Comportement « dégradé » assumé et sans code spécifique.
 - **Feed « En attente » : tri mixte des événements** — les lignes sont triées par `ref_at` décroissant. Pour les événements, `ref_at = date_debut` (futur), donc un événement à venir peut remonter au-dessus d'un message récent. Sémantiques de tri volontairement mélangées en V1 (activité récente vs date d'échéance). Ajustable en un point unique dans `useMonActivite` (tri des événements à part, ou sous-section dédiée) si l'usage le justifie.
