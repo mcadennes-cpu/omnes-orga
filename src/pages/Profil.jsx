@@ -169,10 +169,24 @@ function InfoRow({ icon: Icon, label, value, multiline = false }) {
 // Sous-composant local : NotificationsSection
 // Active les notifications push (geste utilisateur requis sur iOS) et affiche
 // l'etat courant (non supporte / a activer / activees / bloquees).
+//
+// 28/09/2026 (8R-6) : « Activées » ne dit que la PERMISSION du navigateur de
+// cet appareil. La fiche, elle, ne garde qu'UN jeton : celui du dernier
+// appareil active. Un medecin passe sur un nouveau telephone (ou active sur
+// son ordinateur) voyait « Activées » partout sans rien recevoir, et sans
+// bouton pour y remedier -- cas constate chez Charlotte. Le bouton reste donc
+// propose une fois la permission accordee : il designe CET appareil comme
+// celui qui recoit.
 // ----------------------------------------------------------------------------
 
 function NotificationsSection() {
   const { supported, permission, enabling, error, enableNotifications } = useNotifications()
+  const [cetAppareil, setCetAppareil] = useState(false)
+
+  const recevoirIci = async () => {
+    setCetAppareil(false)
+    if (await enableNotifications()) setCetAppareil(true)
+  }
 
   // Detection en cours : on n'affiche rien pour eviter un flash.
   if (supported === null) return null
@@ -187,7 +201,7 @@ function NotificationsSection() {
     statusText =
       'Bloquées. Réactivez-les dans les réglages de votre navigateur ou de votre téléphone.'
   } else {
-    statusText = 'Soyez prévenu des nouveaux messages et tableaux.'
+    statusText = 'Soyez prévenu de vos gardes, des nouveaux messages et tableaux.'
   }
 
   return (
@@ -220,6 +234,29 @@ function NotificationsSection() {
             <Bell size={16} strokeWidth={2} />
             {enabling ? 'Activation…' : 'Activer les notifications'}
           </button>
+        )}
+
+        {supported && permission === 'granted' && (
+          <>
+            <p className="mt-3 text-caption text-muted">
+              Les notifications ne vont qu'à un seul appareil : le dernier sur lequel
+              vous les avez activées. Vous ne recevez rien ici ? Appuyez ci-dessous.
+            </p>
+            <button
+              type="button"
+              onClick={recevoirIci}
+              disabled={enabling}
+              className="mt-3 h-12 w-full rounded-input border border-border text-marine text-button flex items-center justify-center gap-2 hover:bg-fond disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <Bell size={16} strokeWidth={2} />
+              {enabling ? 'Enregistrement…' : 'Recevoir les notifications sur cet appareil'}
+            </button>
+            {cetAppareil && (
+              <p className="mt-3 text-caption text-olive">
+                C'est fait : cet appareil recevra désormais vos notifications.
+              </p>
+            )}
+          </>
         )}
 
         {error && <p className="mt-3 text-caption text-brique">{error}</p>}
