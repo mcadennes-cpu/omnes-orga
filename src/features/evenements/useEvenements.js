@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../hooks/useAuth'
-import { notifyUsers } from '../../lib/notify'
+import { notifyUsers, nomExpediteur, titreNotif, texteNotif } from '../../lib/notify'
 
 /**
  * Liste des evenements du cabinet, enrichie pour l'affichage des cartes :
@@ -151,10 +151,11 @@ export function useEvenements() {
           const recipients = (profs || [])
             .map((p) => p.id)
             .filter((uid) => uid && uid !== user.id)
+          const nom = await nomExpediteur(user.id)
           notifyUsers({
             userIds: recipients,
-            title: 'Sondage de présence',
-            body: `${values.titre} : merci de répondre`.slice(0, 140),
+            title: titreNotif('Sondage de présence', values.titre),
+            body: texteNotif(nom, 'merci de répondre'),
             url: `/evenements/${data.id}`,
           })
         } catch (err) {

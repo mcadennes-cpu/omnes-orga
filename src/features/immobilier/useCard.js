@@ -12,7 +12,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import { deleteAttachment } from './immobilierStorage';
-import { notifyUsers } from '../../lib/notify';
+import { notifyUsers, nomExpediteur, titreNotif, texteNotif } from '../../lib/notify';
 import { refreshAppBadge } from '../../lib/appBadge';
 
 export function useCard(cardId) {
@@ -210,10 +210,12 @@ export function useCard(cardId) {
       const recipients = (members || [])
         .map((m) => m.user_id)
         .filter((uid) => uid && uid !== authorId);
+      if (recipients.length === 0) return;
+      const nom = await nomExpediteur(authorId);
       notifyUsers({
         userIds: recipients,
-        title: board?.titre || 'Immobilier',
-        body: messageText.slice(0, 140),
+        title: titreNotif(board?.titre || 'Immobilier', card.titre),
+        body: texteNotif(nom, messageText),
         url: `/immobilier/${card.board_id}/${card.id}`,
       });
     } catch (err) {

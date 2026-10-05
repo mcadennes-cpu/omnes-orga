@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
-import { notifyUsers } from '../../lib/notify'
+import { notifyUsers, nomExpediteur, titreNotif } from '../../lib/notify'
 
 /**
  * Hook du sondage d'une carte de discussion (etape 16 ter).
@@ -166,7 +166,7 @@ export function usePoll(cardId, userId) {
       try {
         const { data: cardRow } = await supabase
           .from('discussion_cards')
-          .select('board_id, board:discussion_boards(title)')
+          .select('board_id, title, board:discussion_boards(title)')
           .eq('id', cardId)
           .maybeSingle()
         const boardId = cardRow?.board_id
@@ -178,10 +178,13 @@ export function usePoll(cardId, userId) {
           const recipients = (members || [])
             .map((m) => m.user_id)
             .filter((uid) => uid && uid !== userId)
+          const nom = await nomExpediteur(userId)
           notifyUsers({
             userIds: recipients,
-            title: cardRow?.board?.title || 'Discussion',
-            body: `Nouveau sondage : ${q}`.slice(0, 140),
+            title: titreNotif(cardRow?.board?.title || 'Discussion', cardRow?.title),
+            body: nom
+              ? `${nom} a lancé un sondage : ${q}`.slice(0, 140)
+              : `Nouveau sondage : ${q}`.slice(0, 140),
             url: `/discussion/${boardId}/${cardId}`,
           })
         }

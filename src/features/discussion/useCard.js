@@ -5,7 +5,7 @@ import {
   removeAttachmentFile,
   validateAttachmentFile,
 } from './discussionStorage'
-import { notifyUsers } from '../../lib/notify'
+import { notifyUsers, nomExpediteur, titreNotif, texteNotif } from '../../lib/notify'
 import { refreshAppBadge } from '../../lib/appBadge'
 
 /**
@@ -309,16 +309,18 @@ export function useCard(cardId) {
       const recipients = (members || [])
         .map((m) => m.user_id)
         .filter((uid) => uid && uid !== userId)
+      if (recipients.length === 0) return
+      const nom = await nomExpediteur(userId)
       notifyUsers({
         userIds: recipients,
-        title: board.title || 'Discussion',
-        body: messageText.slice(0, 140),
+        title: titreNotif(board.title || 'Discussion', card?.title),
+        body: texteNotif(nom, messageText),
         url: `/discussion/${board.id}/${cardId}`,
       })
     } catch (err) {
       console.error('[useCard] notifyOtherMembers error:', err)
     }
-  }, [board?.id, board?.title, userId, cardId])
+  }, [board?.id, board?.title, card?.title, userId, cardId])
 
   const sendMessage = useCallback(async (body) => {
     if (!userId) throw new Error('Utilisateur non connecte')

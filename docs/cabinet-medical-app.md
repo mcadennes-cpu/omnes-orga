@@ -780,6 +780,7 @@ Composant clé : `CodeRow` — code **masqué par défaut** (`••••••
 - Création d'un nouveau tableau Discussion ou Immobilier → notification à tous les invités
 - Nouveau message dans une carte → notification à tous les participants du tableau
 - Format : nom du tableau en titre + aperçu du message (style WhatsApp)
+- **Depuis le 05/10/2026 : l'expéditeur est nommé.** Titre « Tableau · Carte », texte « Charlotte : message » (messages Discussion et Immobilier). Sondage Discussion : « Charlotte a lancé un sondage : question ». Sondage de présence : titre « Sondage de présence · Titre de l'événement », texte « Charlotte : merci de répondre ». Le nom est le prénom seul, ou « Prénom N. » si un autre médecin **actif** porte le même prénom (cas des deux Louis au 05/10). Helpers `nomExpediteur`, `titreNotif`, `texteNotif` dans `src/lib/notify.js` ; si le nom ne peut être lu, la notification part sans nom. Inchangés : les invitations à un tableau et les push du Planning (leur titre dit déjà le geste). La ligne « From Omnès Orga » est ajoutée par iOS à toute notification de PWA et ne peut pas être retirée ; un avatar de l'expéditeur a été écarté (iOS affiche toujours l'icône de l'appli, et les photos sont dans un bucket privé).
 
 **Implémentation :**
 - Stocker le `fcm_token` dans la table `profiles` à chaque login
