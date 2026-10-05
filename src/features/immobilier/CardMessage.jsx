@@ -13,6 +13,7 @@ import { getBoardColorClasses } from './immobilierColors';
 import { formatTime } from '../../lib/dateFormat';
 import { formatName } from '../../lib/profileFormat';
 import Avatar from '../../components/common/Avatar';
+import TexteAvecLiens from '../../components/common/TexteAvecLiens';
 
 const BODY_MAX = 2000;
 
@@ -195,7 +196,7 @@ export default function CardMessage({
           }`}
         >
           <p className="text-sm whitespace-pre-wrap break-words">
-            {message.contenu}
+            <TexteAvecLiens texte={message.contenu} inverse={isMine} />
           </p>
           <div
             className={`mt-0.5 flex items-center justify-end gap-1 text-[10px] ${

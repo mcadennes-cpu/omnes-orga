@@ -30,6 +30,7 @@ import EditCardModal from './EditCardModal';
 import CardAttachments from './CardAttachments';
 import HeaderWatermark from '../../components/common/HeaderWatermark';
 import LogoOmnes from '../../components/common/LogoOmnes';
+import TexteAvecLiens from '../../components/common/TexteAvecLiens';
 
 export default function CardPage({ boardId, cardId }) {
   const navigate = useNavigate();
@@ -229,7 +230,7 @@ export default function CardPage({ boardId, cardId }) {
           {descriptionOpen && (
             <div className="px-4 pb-3">
               <p className="text-body-m text-ink whitespace-pre-wrap break-words">
-                {card.description}
+                <TexteAvecLiens texte={card.description} />
               </p>
             </div>
           )}

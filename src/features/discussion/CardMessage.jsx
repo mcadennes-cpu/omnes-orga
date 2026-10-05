@@ -4,6 +4,7 @@ import { getBoardColorClasses } from './boardColors'
 import { formatTime } from '../../lib/dateFormat'
 import { formatName } from '../../lib/profileFormat'
 import Avatar from '../../components/common/Avatar'
+import TexteAvecLiens from '../../components/common/TexteAvecLiens'
 
 const BODY_MAX = 2000
 
@@ -178,7 +179,7 @@ export default function CardMessage({
               : 'bg-fond text-marine rounded-bl-sm'
           }`}
         >
-          <p className="text-sm whitespace-pre-wrap break-words">{message.body}</p>
+          <p className="text-sm whitespace-pre-wrap break-words"><TexteAvecLiens texte={message.body} inverse={isOwn} /></p>
           <div
             className={`mt-0.5 flex items-center justify-end gap-1 text-[10px] ${
               isOwn ? 'opacity-70' : 'text-faint'

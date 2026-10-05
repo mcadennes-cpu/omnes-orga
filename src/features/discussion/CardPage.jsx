@@ -9,6 +9,7 @@ import PollSection from './PollSection'
 import { formatDayLabel } from '../../lib/dateFormat'
 import HeaderWatermark from '../../components/common/HeaderWatermark'
 import LogoOmnes from '../../components/common/LogoOmnes'
+import TexteAvecLiens from '../../components/common/TexteAvecLiens'
 
 /** Deux dates tombent-elles le meme jour calendaire ? */
 function sameDay(a, b) {
@@ -140,7 +141,7 @@ export default function CardPage({
               </button>
               {descExpanded && (
                 <p className="mt-2 text-marine text-sm whitespace-pre-wrap leading-relaxed">
-                  {card.description}
+                  <TexteAvecLiens texte={card.description} />
                 </p>
               )}
             </>

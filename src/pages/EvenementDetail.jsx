@@ -21,6 +21,7 @@ import { canEditEvenement, canDeleteEvenement } from '../lib/permissions'
 import { getEventColorClasses } from '../features/evenements/eventColors'
 import { formatDateLong } from '../features/evenements/eventDate'
 import HeaderWatermark from '../components/common/HeaderWatermark'
+import TexteAvecLiens from '../components/common/TexteAvecLiens'
 
 // "Prenom N." a partir de l'auteur joint ({ prenom, nom }).
 function formatAuteurCourt(auteur) {
@@ -278,7 +279,7 @@ export default function EvenementDetail() {
                   Description
                 </h2>
                 <p className="text-marine text-[15px] leading-relaxed whitespace-pre-wrap break-words">
-                  {evenement.description}
+                  <TexteAvecLiens texte={evenement.description} />
                 </p>
               </div>
             )}
