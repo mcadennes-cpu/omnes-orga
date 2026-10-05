@@ -119,7 +119,7 @@ export default function CardPage({
           }}
         />
         {/* Zone qui defile, transparente pour laisser voir le filigrane. */}
-        <div className="absolute inset-0 overflow-y-auto z-10">
+        <div className="absolute inset-0 overflow-y-auto overflow-x-hidden z-10">
         <div className="px-4 pt-3 pb-3 border-b border-border bg-carte">
           {card.description ? (
             <>
@@ -140,7 +140,7 @@ export default function CardPage({
                 />
               </button>
               {descExpanded && (
-                <p className="mt-2 text-marine text-sm whitespace-pre-wrap leading-relaxed">
+                <p className="mt-2 text-marine text-sm whitespace-pre-wrap break-words leading-relaxed">
                   <TexteAvecLiens texte={card.description} />
                 </p>
               )}

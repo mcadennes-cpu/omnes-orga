@@ -264,7 +264,7 @@ export default function CardPage({ boardId, cardId }) {
           }}
         />
         {/* Zone qui defile, transparente pour laisser voir le filigrane. */}
-        <main className="absolute inset-0 overflow-y-auto px-3 py-3 z-10">
+        <main className="absolute inset-0 overflow-y-auto overflow-x-hidden px-3 py-3 z-10">
         {decoratedMessages.length === 0 ? (
           <div className="text-center mt-12">
             <p className="text-body-m text-muted">

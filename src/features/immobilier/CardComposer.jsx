@@ -72,7 +72,7 @@ export default function CardComposer({
         rows={1}
         placeholder="Écrire un message…"
         className="flex-1 px-3 py-2 rounded-2xl bg-fond border border-border
-                   text-marine text-sm placeholder:text-faint
+                   text-marine text-base placeholder:text-faint
                    focus:outline-none focus:ring-2 focus:ring-canard/30
                    resize-none max-h-[120px]"
       />
