@@ -61,9 +61,13 @@ type Correspondance = {
 
 type Etape = 'depot' | 'controle' | 'termine';
 
+// Exemple volontairement generique : un exemple concret (nom + date d'un
+// vrai plan) a deja ete copie-colle tel quel lors d'un import, reproduisant
+// une date d'ancrage perimee (cf. docs/integration-agenda.md, anomalie du
+// start_date du V2, trouvee et corrigee le 19/10/2026).
 const COMMANDE =
   'python3 docs/sql/22-6E-1-export-roulement-json.py <fichier.xlsx> \\\n' +
-  '    --nom "Roulement V2 - 9 associes" --date-debut 2027-01-04';
+  '    --nom "<nom du plan>" --date-debut <lundi d\'ancrage du cycle>';
 
 // Les anomalies du parseur, traduites. Le type brut (« creneau_ambigu ») est
 // utile dans un terminal, pas a l'ecran.

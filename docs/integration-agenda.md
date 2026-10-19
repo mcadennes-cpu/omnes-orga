@@ -2136,6 +2136,72 @@ le parseur des deux formats existait déjà et était éprouvé. Détail en 6E-1
 
 ---
 
+##### 24. Remplacement du V2 avant son entrée en vigueur — anomalie du `start_date` trouvée et corrigée (19/10/2026)
+
+Matthieu a transmis un nouveau fichier Excel du roulement, légèrement modifié
+par rapport au V2 (quelques créneaux réaffectés entre 5 médecins — IEG, LD,
+XB, MY, AS). Aucune vraie garde n'existant encore pour une date ≥ 04/01/2027,
+c'était le bon moment pour remplacer le V2 plutôt que de corriger après coup.
+
+**Anomalie trouvée en mesurant l'état réel avant de commencer.** La doc
+« Décisions du 01/08/2026 » fixait le `start_date` du V2 à **2026-11-30**
+(pour que le 04/01/2027 se lise S6, en continuité avec le V1). En base, le
+V2 avait en réalité `start_date` = **2027-01-04**, identique à son
+`effective_from` — le 04/01/2027 aurait donc été lu **S1**, pas S6. Invisible
+jusqu'ici puisqu'aucune garde réelle n'a encore été générée sur cette
+période. Cause probable : l'écran d'import
+([RotationPlanImport.tsx](../src/modules/agenda/components/settings/RotationPlanImport.tsx))
+affichait un exemple de commande codé en dur avec cette date précise
+(`--date-debut 2027-01-04`), vraisemblablement copié tel quel lors de
+l'import du V2 en août. **Corrigé au passage** : l'exemple est désormais
+générique (`<nom du plan>`, `<lundi d'ancrage du cycle>`), pour ne pas
+reproduire l'erreur au prochain import.
+
+**Obstacle mécanique pour « remplacer le V2 » via l'écran normal.**
+`agenda.activer_plan_roulement()` ferme le plan sortant en lui donnant
+`effective_to = p_effective_from - 1`. Si le sortant est le V2 lui-même
+(`effective_from` = 2027-01-04) et qu'on l'active de nouveau à la même date,
+cela donne `effective_to` = 2027-01-03 — **avant** son propre
+`effective_from`, rejeté par la contrainte `rotation_plans_periode_coherente`.
+De plus, l'écran de différentiel
+([RotationPlanDiff.tsx](../src/modules/agenda/components/settings/RotationPlanDiff.tsx))
+compare toujours au plan actif **aujourd'hui** (le V1), jamais à un plan
+futur comme le V2 — inutile ici pour vérifier « seulement quelques
+changements ».
+
+**Chemin suivi :**
+1. Script numéroté
+   [23-28-agenda-archiver-v2-premature.sql](sql/23-28-agenda-archiver-v2-premature.sql) :
+   archive le V2 (`status = 'archived'`) sans toucher au V1. Légitime car le
+   V2 n'a jamais couvert une seule date réelle — exactement le cas que ce
+   statut est fait pour décrire (cf. 6F : « un plan qui n'a jamais servi »).
+2. Comparaison manuelle en lecture seule (hors écran, qui ne le permet pas)
+   entre le nouveau fichier et le V2 archivé : **24 changements sur 265
+   cases** (11 ajoutées, 10 supprimées, 3 modifiées) — confirmé par Matthieu
+   comme correspondant aux demandes réelles des médecins.
+3. Import normal du fichier via l'écran (6E), cette fois avec
+   `--date-debut 2026-11-30` (anomalie corrigée pour ce nouveau plan).
+4. Activation via l'écran (6F) au 04/01/2027.
+
+**Un faux départ au passage.** La première tentative d'activation a échoué
+(« l'ancrage du cycle est postérieur à l'entrée en vigueur ») : le champ date
+de l'écran se pré-remplit avec *le lundi prochain* à l'ouverture
+(`prochainLundi()`), et n'avait pas été changé pour 04/01/2027 avant de
+cliquer. Aucune écriture : l'erreur est levée avant toute modification en
+base (reconfirmé dans les journaux Supabase). Le message d'erreur s'affiche
+bien à l'écran mais peut passer inaperçu s'il n'est pas vu en haut de
+l'écran — à surveiller si la manip se reproduit un jour.
+
+**État final (vérifié) :**
+
+| Plan | Statut | `start_date` | Période | Règles |
+|---|---|---|---|---|
+| Roulement V1 — décembre 2025 | active | 2025-12-29 | 29/12/2025 → 03/01/2027 | 266 |
+| Roulement V2 - 9 associes | archived | 2027-01-04 | — | 264 |
+| Roulement V2 - 9 associes (corrige janvier 2027) | active | 2026-11-30 | 04/01/2027 → (ouvert) | 265 |
+
+---
+
 ### MOD-2 — Refonte du bouton d'annulation
 
 #### Le système actuel
