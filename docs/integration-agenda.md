@@ -2200,6 +2200,42 @@ l'écran — à surveiller si la manip se reproduit un jour.
 | Roulement V2 - 9 associes | archived | 2027-01-04 | — | 264 |
 | Roulement V2 - 9 associes (corrige janvier 2027) | active | 2026-11-30 | 04/01/2027 → (ouvert) | 265 |
 
+**Suite du 21/10/2026 — première ouverture, un doublon dans la journée.**
+L'ouverture des semaines à partir du 04/01/2027 échouait sur l'index
+`unique_doctor_per_day` (un médecin ne peut pas avoir deux gardes affectées
+le même jour). Le lundi de S6 (le 04/01/2027 en est un), le nouveau fichier
+plaçait Laurène Daudin en J4 Beaune **et** en J7 Dijon — seule case du plan
+dans ce cas. La comparaison du 19/10 montrait bien l'ajout du J4 Beaune, mais
+personne n'a vérifié qu'il créait un doublon dans la journée, et le script de
+conversion (`22-6E-1`) ne contrôle pas ce cas. **À ajouter à ses anomalies**
+(« médecin deux fois le même jour ») : c'est le contrôle qui aurait arrêté
+l'erreur avant l'import.
+
+- Arbitrage de Matthieu : LD reste en J7 Dijon. Le fichier
+  `planning-V2_2026-10 2.xlsx` est corrigé, et
+  [23-29](sql/23-29-agenda-retirer-doublon-ld-s6.sql) retire la règle J4
+  Beaune du plan actif. Fichier et plan : 264 cases chacun, zéro écart.
+  On n'est pas repassé par l'import, qui aurait obligé à réarchiver un plan
+  actif à la même date pour une seule case.
+- Ouverture relancée sans J5 Dijon (créneau abandonné, retiré aussi de la
+  « Semaine type hiver »). Le J5 n'a jamais figuré dans le roulement : il
+  venait de la grille d'ouverture.
+- Une semaine de trop ouverte (14 au lieu de 13) :
+  [23-30](sql/23-30-agenda-retirer-semaine-0504-2027.sql) retire en
+  suppression douce les 56 gardes du 05/04 au 11/04/2027 (aucune demande
+  dessus). L'interface ne le permet pas : une garde à la fois, et refus des
+  gardes affectées. **Planning ouvert du 04/01 au 04/04/2027, 723 gardes.**
+- Sauvegardes 23-16 prises avant 23-29 et avant 23-30. Elle avait été
+  oubliée avant 23-28, malgré son en-tête.
+
+**Leçon d'écran** : deux saisies se sont trompées dans la même opération,
+sur des gestes rares. La date d'activation pré-remplie (le lundi suivant)
+n'a pas été changée, et le message d'erreur en haut de la fenêtre n'a pas été
+vu. Le nombre de semaines de l'ouverture a dépassé la date de fin voulue, et
+l'écran n'affiche pas la date de fin correspondante. À reprendre si ces
+écrans sont retouchés : afficher « jusqu'au dimanche JJ/MM » à côté du nombre
+de semaines.
+
 ---
 
 ### MOD-2 — Refonte du bouton d'annulation

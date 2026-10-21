@@ -5,7 +5,7 @@
     "date_debut": "2026-11-30",
     "source": "planning-V2_2026-10 2.xlsx",
     "feuille": "Roulement V2",
-    "exporte_le": "2026-10-19T18:08:59+02:00"
+    "exporte_le": "2026-10-21T10:29:36+02:00"
   },
   "sites": [
     "Beaune",
@@ -1203,13 +1203,6 @@
       "jour": "Lundi",
       "site": "Beaune",
       "creneau": "J3"
-    },
-    {
-      "medecin": "LD",
-      "semaine": 6,
-      "jour": "Lundi",
-      "site": "Beaune",
-      "creneau": "J4"
     },
     {
       "medecin": "MY",
