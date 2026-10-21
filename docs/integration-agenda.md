@@ -2225,7 +2225,16 @@ l'erreur avant l'import.
   suppression douce les 56 gardes du 05/04 au 11/04/2027 (aucune demande
   dessus). L'interface ne le permet pas : une garde à la fois, et refus des
   gardes affectées. **Planning ouvert du 04/01 au 04/04/2027, 723 gardes.**
-- Sauvegardes 23-16 prises avant 23-29 et avant 23-30. Elle avait été
+- [23-31](sql/23-31-agenda-j8-dijon-et-we2-dimanche.sql), sur la même
+  période : **23 J8 Dijon libres créés** (Cabinet B3, mardi et jeudi ; le
+  créneau manquait à la semaine type, seuls les 3 J8 du roulement
+  existaient) et **19 WE2 du dimanche retirés** (libres et sans demande,
+  Beaune et Dijon). Restent 6 WE2 affectés et celui du 17/01 à Dijon,
+  demandé par Anne Demongeot. Pas de push pour les J8 créés par script.
+  ⚠ `shifts.shift_type` porte l'horaire : l'index `unique_shift` refuse un
+  J8 dans une salle déjà prise par un J3/J4/J7 le même jour — piste pour la
+  création manuelle qui échouait (non reproduite, journaux incomplets).
+- Sauvegardes 23-16 prises avant 23-29, 23-30 et 23-31. Elle avait été
   oubliée avant 23-28, malgré son en-tête.
 
 **Leçon d'écran** : deux saisies se sont trompées dans la même opération,
