@@ -1162,6 +1162,7 @@ Le module Discussion est désormais complet (étapes 7A à 7D).
    - 8E : Page détail `/evenements/:id` (résumé, description, menu trois-points) + édition + suppression (`ConfirmDialog`).
    - 8F : Section documents (hook `useEvenementFichiers`, `EvenementUploadModal`, liste avec icônes par type, téléchargement, suppression).
    - 8G : Sondage de présence (hook `useSondage`, `PollSection` Oui / Non / Peut-être, optimistic UI, résultats).
+     - **Correctif du 03/11/2026** : dans la liste des réponses, « + N autres » était un simple texte, donc les noms au-delà du 5e restaient inaccessibles. C'est désormais un bouton qui déroule la liste complète (« Voir moins » pour replier), indépendamment pour chaque groupe Oui / Non / Peut-être (sous-composant `PollGroup`).
    - 8H : Tests multi-rôles + mise à jour doc.
 9. ✓ **Étape 9 — FAITE** (sous-étapes 9A → 9G) — Module SIM (Drive restreint)
    - 9A : Fondations SQL — tables `sim_dossiers` + `sim_fichiers`, fonction `is_sim_member()` `SECURITY DEFINER`, RLS + 8 policies (SELECT/INSERT par rôle, UPDATE/DELETE par rôle + auteur), bucket Storage `sim` (privé, 25 Mo) + 3 storage policies. Scripts archivés dans `docs/sql/9A-1` à `9A-5`.

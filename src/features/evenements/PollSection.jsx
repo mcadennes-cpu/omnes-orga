@@ -29,37 +29,63 @@ function nomComplet(prenom, nom) {
 // Sous-composant : liste des votants groupee par reponse
 // ----------------------------------------------------------------------------
 
-function PollResults({ voters }) {
+// Un groupe par reponse : chaque groupe retient seul s'il est deplie, pour
+// pouvoir derouler les "Oui" sans toucher aux "Non".
+function PollGroup({ label, list, linkClass }) {
+  const [expanded, setExpanded] = useState(false)
+  const visibles = expanded ? list : list.slice(0, MAX_VISIBLE)
+  const reste = list.length - MAX_VISIBLE
+
+  return (
+    <div>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-faint mb-2">
+        {label} · {list.length}
+      </p>
+      <ul className="space-y-1.5">
+        {visibles.map((v) => (
+          <li key={v.userId} className="flex items-center gap-2.5">
+            <span className="w-7 h-7 rounded-full bg-canard/15 text-canard flex items-center justify-center font-semibold text-[11px] shrink-0">
+              {initialesDe(v.prenom, v.nom)}
+            </span>
+            <span className="text-marine text-sm truncate">
+              {nomComplet(v.prenom, v.nom)}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {reste > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          className={`mt-1.5 ml-[38px] inline-flex items-center gap-1 text-[12px] font-semibold ${linkClass}`}
+        >
+          {expanded ? 'Voir moins' : `+ ${reste} autre${reste > 1 ? 's' : ''}`}
+          <ChevronDown
+            className={`w-3.5 h-3.5 transition-transform ${
+              expanded ? 'rotate-180' : ''
+            }`}
+            strokeWidth={2}
+          />
+        </button>
+      )}
+    </div>
+  )
+}
+
+function PollResults({ voters, linkClass }) {
   return (
     <div className="mt-3 pt-3 border-t border-border space-y-4">
       {ANSWERS.map(({ key }) => {
         const list = voters[key] ?? []
         if (list.length === 0) return null
-        const visibles = list.slice(0, MAX_VISIBLE)
-        const reste = list.length - visibles.length
         return (
-          <div key={key}>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-faint mb-2">
-              {GROUP_LABELS[key]} · {list.length}
-            </p>
-            <ul className="space-y-1.5">
-              {visibles.map((v) => (
-                <li key={v.userId} className="flex items-center gap-2.5">
-                  <span className="w-7 h-7 rounded-full bg-canard/15 text-canard flex items-center justify-center font-semibold text-[11px] shrink-0">
-                    {initialesDe(v.prenom, v.nom)}
-                  </span>
-                  <span className="text-marine text-sm truncate">
-                    {nomComplet(v.prenom, v.nom)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            {reste > 0 && (
-              <p className="text-muted text-[12px] mt-1.5 pl-[38px]">
-                + {reste} autre{reste > 1 ? 's' : ''}
-              </p>
-            )}
-          </div>
+          <PollGroup
+            key={key}
+            label={GROUP_LABELS[key]}
+            list={list}
+            linkClass={linkClass}
+          />
         )
       })}
     </div>
@@ -149,7 +175,9 @@ export default function PollSection({ evenementId, couleur }) {
                   strokeWidth={2}
                 />
               </button>
-              {showResults && <PollResults voters={voters} />}
+              {showResults && (
+                <PollResults voters={voters} linkClass={colors.softText} />
+              )}
             </>
           )}
         </>
