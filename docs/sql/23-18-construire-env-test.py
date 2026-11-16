@@ -414,9 +414,12 @@ def main():
         print("\n--- Effacement du projet de TEST ---")
         # Les comptes aussi : sans cela, 23-19 ne pourrait pas repartir d'une
         # base vide (les fiches sont creees par le declencheur de Supabase).
-        ecrire_test(["delete from auth.users",
-                     "drop schema if exists agenda cascade",
+        # Les schemas AVANT les comptes : des tables du planning (ex.
+        # agenda.rotation_plan_rules) referencent profiles sans cascade, et
+        # bloqueraient le `delete from auth.users` (constate le 16/11/2026).
+        ecrire_test(["drop schema if exists agenda cascade",
                      "drop schema public cascade",
+                     "delete from auth.users",
                      "create schema public",
                      "grant usage on schema public to anon, authenticated, service_role",
                      "grant all on schema public to postgres"], "schemas effaces puis recrees")

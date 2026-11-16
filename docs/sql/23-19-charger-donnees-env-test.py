@@ -59,6 +59,7 @@ TEMOIN = "_environnement_de_test"
 ARCHIVES = Path.home() / "Documents/claude-projets/archives/orga-sauvegardes"
 LIGNES_PAR_INSERT = 200
 INSERTS_PAR_TRANSACTION = 10
+OCTETS_PAR_REQUETE = 2_000_000    # l API refuse au-dela de quelques Mo
 
 # Colonnes remplacees par des valeurs fictives : table -> {colonne: valeur}.
 # `None` efface, une chaine remplace. Les emails sont traites a part.
@@ -208,15 +209,28 @@ def charger(nom_table, lignes, colonnes, sur_conflit=None, identite=()):
     entete = (f"insert into {q(nom_table.split('.')[0])}.{q(nom_table.split('.')[1])} "
               f"({', '.join(q(c) for c in noms)}){forcer} values ")
     fin = f" {sur_conflit}" if sur_conflit else ""
-    instructions = []
-    for debut in range(0, len(lignes), LIGNES_PAR_INSERT):
-        paquet = lignes[debut:debut + LIGNES_PAR_INSERT]
-        valeurs = ", ".join(
-            "(" + ", ".join(litteral(ligne.get(c), colonnes[c]) for c in noms) + ")"
-            for ligne in paquet)
-        instructions.append(entete + valeurs + fin)
-    for debut in range(0, len(instructions), INSERTS_PAR_TRANSACTION):
-        lot = instructions[debut:debut + INSERTS_PAR_TRANSACTION]
+    # Decoupage par NOMBRE de lignes ET par TAILLE : les lignes du journal du
+    # planning (agenda.activity_log) portent des instantanes JSON volumineux,
+    # et l'API refuse une requete trop grosse (« request entity too large »,
+    # constate le 16/11/2026).
+    instructions, paquet, taille = [], [], 0
+    for ligne in lignes:
+        tuple_sql = "(" + ", ".join(litteral(ligne.get(c), colonnes[c]) for c in noms) + ")"
+        if paquet and (len(paquet) >= LIGNES_PAR_INSERT or taille + len(tuple_sql) > OCTETS_PAR_REQUETE):
+            instructions.append(entete + ", ".join(paquet) + fin)
+            paquet, taille = [], 0
+        paquet.append(tuple_sql)
+        taille += len(tuple_sql)
+    if paquet:
+        instructions.append(entete + ", ".join(paquet) + fin)
+    lot, taille = [], 0
+    for inst in instructions:
+        if lot and (len(lot) >= INSERTS_PAR_TRANSACTION or taille + len(inst) > OCTETS_PAR_REQUETE):
+            sql("begin;\n" + ";\n".join(lot) + ";\ncommit;\n")
+            lot, taille = [], 0
+        lot.append(inst)
+        taille += len(inst)
+    if lot:
         sql("begin;\n" + ";\n".join(lot) + ";\ncommit;\n")
     return len(lignes)
 
