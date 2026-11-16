@@ -59,12 +59,21 @@ export default function Home() {
       navigate('/planning')
       return
     }
+    if (moduleKey === 'signatures') {
+      navigate('/signatures')
+      return
+    }
     alert(`Module "${moduleKey}" à venir`)
   }
 
   // Clic sur une ligne du feed "Ce qui m'attend" -> on ouvre la carte
   // (Discussion / Immobilier) ou l'evenement concerne.
   function handleActiviteClick(item) {
+    if (item.module === 'signatures') {
+      // card_id porte l'identifiant de la demande (cf. 24F-1).
+      navigate(`/signatures/${item.card_id}`)
+      return
+    }
     if (item.module === 'evenements') {
       navigate(`/evenements/${item.evenement_id}`)
       return
@@ -88,6 +97,7 @@ export default function Home() {
     discussion: parModule.discussion.total,
     immobilier: parModule.immobilier.total,
     evenements: parModule.evenements.total,
+    signatures: parModule.signatures.total,
   }
 
   return (

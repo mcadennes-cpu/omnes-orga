@@ -12,6 +12,10 @@ const DOT_BG = {
 
 // Ligne secondaire (meta) selon le type d'item.
 function metaLabel(item) {
+  if (item.item_type === 'signature') {
+    // Signatures (etape 24) : board_titre porte la nature du document.
+    return item.board_titre ? `À signer · ${item.board_titre}` : 'À signer'
+  }
   if (item.item_type === 'sondage') {
     if (item.module === 'evenements') return 'Sondage de présence à répondre'
     // sondage Discussion (Immobilier n'a pas de sondage)

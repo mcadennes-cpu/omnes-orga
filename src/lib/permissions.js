@@ -445,3 +445,30 @@ export function canAccessAgenda(role) {
       || role === ROLES.ASSOCIE
       || role === ROLES.REMPLACANT
 }
+
+// ============================================================================
+// Signatures (etape 24)
+// ============================================================================
+
+/**
+ * Acces au module Signatures : les quatre roles medecins (tout medecin peut
+ * etre signataire). poste_bureau exclu : on ne signe jamais sur la borne
+ * partagee. Miroir de la liste blanche de `peut_voir_signature()` et du
+ * declencheur `signature_signataires_verrou` (24A-1 / 24A-2), et des
+ * `allowedRoles` de l'entree `signatures` dans modules.js.
+ */
+export function canAccessSignatures(role) {
+  return role === ROLES.SUPER_ADMIN
+      || role === ROLES.ASSOCIE_GERANT
+      || role === ROLES.ASSOCIE
+      || role === ROLES.REMPLACANT
+}
+
+/**
+ * Creer une demande de signature : super_admin uniquement (cadrage du
+ * 16/11/2026 : Charlotte pour les contrats, Matthieu pour l'association).
+ * Miroir de `peut_creer_signature()` (24A-2).
+ */
+export function canCreateSignature(role) {
+  return role === ROLES.SUPER_ADMIN
+}

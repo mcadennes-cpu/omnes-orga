@@ -117,7 +117,9 @@ class Scenario:
             ECHECS.append(f"{self.nom} : {len(lignes)} resultats pour {len(self.etapes)} etapes")
         for (libelle, attendu), ligne in zip(self.etapes, lignes):
             obtenu = ligne["res"]
-            if attendu == "UUID":
+            if attendu == "NOMBRE":
+                ok = obtenu.isdigit()
+            elif attendu == "UUID":
                 ok = len(obtenu) == 36 and obtenu.count("-") == 4
             elif attendu.startswith("ERREUR"):
                 extrait = attendu[7:] if attendu.startswith("ERREUR:") else ""
@@ -405,6 +407,44 @@ s.etape("apres envoi, le createur ne supprime plus le fichier", SA,
         "get diagnostics n = row_count; v := n::text;", "0")
 s.etape("non connecte : aucun fichier", "anon",
         "select count(*) into n from storage.objects where bucket_id = 'signatures'; v := n::text;", "0")
+s.jouer()
+
+
+# --- Scenario 5 (24F) ---------------------------------------------------------
+def a_signer(qui):
+    return ("select count(*) into n from get_mon_activite() where module = 'signatures'; "
+            "v := n::text;")
+
+
+def compteur(qui):
+    return f"v := get_activite_count('{qui}')::text;"
+
+
+s = Scenario("5. FIL « EN ATTENTE » (24F)")
+if not lire("select 1 from pg_proc where proname = 'get_mon_activite' "
+            "and pg_get_functiondef(oid) like '%signatures%'"):
+    raise SystemExit("ARRET : get_mon_activite sans la branche signatures (24F-1 non execute).")
+creer_brouillon(s, ordre_impose="true")
+s.etape("signataires : associe_gerant (1) puis remplacant (2)", SA,
+        f"insert into signature_signataires (demande_id, profil_id, ordre) values "
+        f"({D}::uuid, '{AG}', 1), ({D}::uuid, '{RP}', 2);", "ok")
+s.etape("brouillon : rien en attente pour le signataire", AG, a_signer(AG), "0")
+s.etape("compteur de l'icone avant envoi (reference)", None,
+        compteur(AG) + " " + poser("c0", "v"), "IGNORE")
+s.etapes[-1] = (s.etapes[-1][0], "NOMBRE")
+envoyer(s)
+s.etape("apres envoi : 1 document a signer pour le 1er", AG, a_signer(AG), "1")
+s.etape("apres envoi : rien pour le 2e (pas son tour)", RP, a_signer(RP), "0")
+s.etape("compteur de l'icone : +1 pour le 1er", None,
+        f"v := (get_activite_count('{AG}') - {val('c0')}::int)::text;", "1")
+s.etape("associe_gerant ouvre le document", AG, f"perform signature_marquer_consulte({D}::uuid);", "ok")
+preparer(s, "code prepare pour associe_gerant", SIG_AG, AG)
+signer(s, "associe_gerant signe", SIG_AG, AG)
+s.etape("apres sa signature : plus rien pour le 1er", AG, a_signer(AG), "0")
+s.etape("apres sa signature : c'est au tour du 2e", RP, a_signer(RP), "1")
+s.etape("remplacant refuse", None,
+        f"perform signature_refuser({SIG_RP}, '{RP}', 'Motif de test', null, null);", "ok")
+s.etape("demande refusee : plus rien en attente", RP, a_signer(RP), "0")
 s.jouer()
 
 

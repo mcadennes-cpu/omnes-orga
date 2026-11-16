@@ -8,6 +8,7 @@ import {
   FileText,
   Home,
   KeyRound,
+  Signature,
 } from 'lucide-react'
 
 export const ROLES = {
@@ -98,6 +99,17 @@ export const MODULES = [
     // blanche de agenda.peut_acceder() en base (23-25) : les trois doivent
     // rester alignees. Le drapeau agenda_beta_access qui pilotait cette tuile
     // pendant la phase beta a ete retire le 22/09/2026.
+    allowedRoles: ['super_admin', 'associe_gerant', 'associe', 'remplacant'],
+  },
+  {
+    key: 'signatures',
+    label: 'Signatures',
+    icon: Signature,
+    // Meme valeur que COULEUR_MODULE (features/signatures/signaturesLabels.js).
+    color: 'marine',
+    // Tout medecin peut etre signataire ; seul le super_admin cree (cf.
+    // canCreateSignature). poste_bureau exclu, comme en base (24A-1/24A-2) et
+    // dans canAccessSignatures() de permissions.js : les trois restent alignes.
     allowedRoles: ['super_admin', 'associe_gerant', 'associe', 'remplacant'],
   },
 ]

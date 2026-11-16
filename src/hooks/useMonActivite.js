@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient'
 import { useAuth } from './useAuth'
 
 // Modules renvoyes par la RPC get_mon_activite (cf. champ `module`).
-const MODULES_SUIVIS = ['discussion', 'immobilier', 'evenements']
+const MODULES_SUIVIS = ['discussion', 'immobilier', 'evenements', 'signatures']
 
 // Agrege la liste plate renvoyee par la RPC en compteurs par module.
 // On initialise les 3 modules a zero pour que l'UI puisse lire
@@ -11,7 +11,7 @@ const MODULES_SUIVIS = ['discussion', 'immobilier', 'evenements']
 function agregerParModule(items) {
   const base = {}
   for (const m of MODULES_SUIVIS) {
-    base[m] = { nonLus: 0, sondages: 0, cartes: 0, total: 0 }
+    base[m] = { nonLus: 0, sondages: 0, cartes: 0, signatures: 0, total: 0 }
   }
 
   for (const it of items) {
@@ -20,6 +20,9 @@ function agregerParModule(items) {
 
     if (it.item_type === 'sondage') {
       slot.sondages += 1
+    } else if (it.item_type === 'signature') {
+      // Document qui attend ma signature (etape 24, card_id = id de la demande).
+      slot.signatures += 1
     } else {
       // item_type === 'message' : une ligne = une carte avec du non-lu.
       slot.cartes += 1
@@ -32,7 +35,7 @@ function agregerParModule(items) {
   // recommandee pour la pastille de la tuile. Le detail (nb de messages
   // via nonLus) reste dispo si on prefere afficher ca a la place.
   for (const m of MODULES_SUIVIS) {
-    base[m].total = base[m].cartes + base[m].sondages
+    base[m].total = base[m].cartes + base[m].sondages + base[m].signatures
   }
 
   return base
