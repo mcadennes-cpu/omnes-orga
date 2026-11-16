@@ -38,11 +38,11 @@
 --
 -- COMMENT EXECUTER : apres 24A-1, sur le test puis en production.
 --
--- COMMENT VERIFIER : le SELECT final liste 11 policies
+-- COMMENT VERIFIER : le SELECT final liste 12 policies
 --   (demandes 5, signataires 5, journal 2, codes 0 -- dont 3 restrictives).
 --
 -- POUR ANNULER :
---   drop policy ... (les 11 noms ci-dessous) ;
+--   drop policy ... (les 12 noms ci-dessous) ;
 --   drop function public.peut_creer_signature(), public.peut_voir_signature(uuid),
 --                 public.est_createur_brouillon(uuid);
 --
