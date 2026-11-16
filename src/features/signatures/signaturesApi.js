@@ -83,3 +83,38 @@ export async function ouvrirDocument({ demande, final = false, marquerConsulte =
     mimeType: 'application/pdf',
   })
 }
+
+// --- Etape « saisie du code » memorisee (16/11/2026) ----------------------
+// Sur iPhone, aller lire le code dans Mail peut recharger la page Safari au
+// retour (onglet decharge par iOS). Sans memoire, la feuille se refermait et
+// le signataire redemandait un code en boucle. On garde donc 10 minutes (la
+// duree de vie du code), dans l'onglet seulement, que le code a ete envoye.
+// Rien de secret ici : ni le code, ni le texte, juste l'e-mail masque.
+const CLE_CODE = (demandeId) => `omnes-signature-code:${demandeId}`
+const DUREE_CODE_MS = 10 * 60 * 1000
+
+export function memoriserCodeEnvoye(demandeId, email) {
+  try {
+    sessionStorage.setItem(CLE_CODE(demandeId), JSON.stringify({ email, at: Date.now() }))
+  } catch {
+    // stockage indisponible (navigation privee...) : simple confort perdu
+  }
+}
+
+export function codeEnCours(demandeId) {
+  try {
+    const v = JSON.parse(sessionStorage.getItem(CLE_CODE(demandeId)) || 'null')
+    if (v && Date.now() - v.at < DUREE_CODE_MS) return v
+  } catch {
+    // ignore
+  }
+  return null
+}
+
+export function oublierCode(demandeId) {
+  try {
+    sessionStorage.removeItem(CLE_CODE(demandeId))
+  } catch {
+    // ignore
+  }
+}

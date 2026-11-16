@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react'
 import { Loader2, MailCheck } from 'lucide-react'
 import Feuille, { CLASSE_BOUTON_PRIMAIRE, CLASSE_BOUTON_SECONDAIRE } from './Feuille'
+import { codeEnCours, memoriserCodeEnvoye, oublierCode } from './signaturesApi'
 
 // Le contenu n'est monte qu'a l'ouverture : son etat repart ainsi de zero a
 // chaque fois, sans reinitialisation dans un effet.
@@ -17,12 +18,15 @@ export default function SignerSheet(props) {
   return <SignerSheetContenu {...props} />
 }
 
-function SignerSheetContenu({ open, onClose, agir, onSigne }) {
-  const [etape, setEtape] = useState('consentement') // 'consentement' | 'code'
+function SignerSheetContenu({ open, onClose, demandeId, agir, onSigne }) {
+  // Code deja envoye il y a moins de 10 min (page rechargee au retour de
+  // Mail) : on reprend directement a la saisie du code.
+  const [enCours] = useState(() => codeEnCours(demandeId))
+  const [etape, setEtape] = useState(enCours ? 'code' : 'consentement') // 'consentement' | 'code'
   const [texte, setTexte] = useState('')
   const [version, setVersion] = useState(null)
-  const [coche, setCoche] = useState(false)
-  const [email, setEmail] = useState('')
+  const [coche, setCoche] = useState(Boolean(enCours))
+  const [email, setEmail] = useState(enCours?.email ?? '')
   const [code, setCode] = useState('')
   const [occupe, setOccupe] = useState(true) // chargement du texte de consentement
   const [erreur, setErreur] = useState(null)
@@ -44,6 +48,7 @@ function SignerSheetContenu({ open, onClose, agir, onSigne }) {
     try {
       const r = await agir('demander_code')
       setEmail(r.email)
+      memoriserCodeEnvoye(demandeId, r.email)
       setEtape('code')
       setCode('')
     } catch (e) {
@@ -58,6 +63,7 @@ function SignerSheetContenu({ open, onClose, agir, onSigne }) {
     setErreur(null)
     try {
       const r = await agir('signer', { code, consentement: coche, consentementVersion: version })
+      oublierCode(demandeId)
       onClose()
       onSigne?.(r)
     } catch (e) {
@@ -68,16 +74,21 @@ function SignerSheetContenu({ open, onClose, agir, onSigne }) {
 
   const codeComplet = /^\d{6}$/.test(code)
 
+  function fermer() {
+    oublierCode(demandeId)
+    onClose()
+  }
+
   return (
     <Feuille
       open={open}
-      onClose={onClose}
+      onClose={fermer}
       occupe={occupe}
       titre="Signer le document"
       pied={
         etape === 'consentement' ? (
           <>
-            <button type="button" onClick={onClose} disabled={occupe} className={CLASSE_BOUTON_SECONDAIRE}>
+            <button type="button" onClick={fermer} disabled={occupe} className={CLASSE_BOUTON_SECONDAIRE}>
               Annuler
             </button>
             <button
@@ -158,7 +169,8 @@ function SignerSheetContenu({ open, onClose, agir, onSigne }) {
             />
           </div>
           <p className="text-faint text-[12px]">
-            Pas reçu ? Vérifiez vos courriers indésirables, puis demandez un nouveau code.
+            Astuce : le code figure aussi dans l'objet du mail, lisible dans la notification sans quitter
+            cette page. Pas reçu ? Vérifiez vos courriers indésirables, puis demandez un nouveau code.
           </p>
         </>
       )}

@@ -27,7 +27,7 @@ import { useRole } from '../hooks/useRole'
 import { canAccessSignatures } from '../lib/permissions'
 import { formatName } from '../lib/profileFormat'
 import { useSignature } from '../features/signatures/useSignature'
-import { ouvrirDocument } from '../features/signatures/signaturesApi'
+import { codeEnCours, ouvrirDocument } from '../features/signatures/signaturesApi'
 import DemandeFormModal from '../features/signatures/DemandeFormModal'
 import SignatairesSheet from '../features/signatures/SignatairesSheet'
 import SignerSheet from '../features/signatures/SignerSheet'
@@ -104,7 +104,8 @@ export default function SignatureDetail() {
   const fichierRef = useRef(null)
   const [message, setMessage] = useState(null) // { couleur, texte }
   const [occupe, setOccupe] = useState(null) // nom du geste en cours
-  const [feuille, setFeuille] = useState(null) // 'modifier' | 'signataires' | 'signer' | 'refus' | 'annulation'
+  // Retour de Mail avec une page rechargee : on rouvre la saisie du code.
+  const [feuille, setFeuille] = useState(() => (codeEnCours(id) ? 'signer' : null)) // 'modifier' | 'signataires' | 'signer' | 'refus' | 'annulation'
   const [confirmation, setConfirmation] = useState(null) // 'envoyer' | 'supprimer'
   const [historique, setHistorique] = useState(false)
 
@@ -570,8 +571,9 @@ export default function SignatureDetail() {
             onSubmit={s.ajouterSignataires}
           />
           <SignerSheet
-            open={feuille === 'signer'}
+            open={feuille === 'signer' && monTour}
             onClose={() => setFeuille(null)}
+            demandeId={demande.id}
             agir={s.agir}
             onSigne={(r) =>
               setMessage({
