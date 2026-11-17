@@ -22,7 +22,11 @@ begin
   end if;
 end $$;
 
--- 25A-4 : donnees
+-- 25A-4 : donnees (le contrat d'exercice en commun revient d'abord a sa place)
+update public.sim_fichiers set dossier_id = '9328e7bd-5e8b-4533-93f8-e7d8dfc16cdc'
+ where id = '4e0f3017-5aed-4c47-ac6d-21388e9d1a27'
+   and dossier_id = (select id from public.sim_dossiers
+                      where parent_id is null and nom = 'Contrat d''exercice en commun');
 update public.sim_dossiers set nom = 'Contrats d''exercice médecins'
  where id = '9328e7bd-5e8b-4533-93f8-e7d8dfc16cdc' and nom = 'Contrats médecins/SIM';
 delete from public.sim_dossiers d

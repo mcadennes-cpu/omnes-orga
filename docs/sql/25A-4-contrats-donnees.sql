@@ -9,7 +9,12 @@
 --     associes ;
 --   - « Asso 1901 OMNES MEDECINS » est ouvert aux associes ;
 --   - nouveau dossier racine « Contrats de remplacement » (membres SIM ;
---     chaque medecin y voit SES contrats via « Mes contrats »).
+--     chaque medecin y voit SES contrats via « Mes contrats ») ;
+--   - le contrat d'exercice en commun signe (« CONTRAT 01/05/2025 9
+--     associés... ») passe de « Contrats médecins/SIM » au nouveau dossier
+--     « Contrat d'exercice en commun » (accord de Matthieu du 17/11/2026).
+--     L'appli ne sait pas deplacer un fichier : le blob ne bouge pas (son nom
+--     est l'id du fichier), seule la ligne change de dossier.
 --
 --   Auteur des nouveaux dossiers : Matthieu (super_admin), comme les six
 --   dossiers racine existants.
@@ -43,8 +48,16 @@ select 'Contrats de remplacement', null, 'bleu',
                     where parent_id is null and nom = 'Contrats de remplacement');
 
 
+update public.sim_fichiers
+   set dossier_id = (select id from public.sim_dossiers
+                      where parent_id is null and nom = 'Contrat d''exercice en commun')
+ where id = '4e0f3017-5aed-4c47-ac6d-21388e9d1a27'
+   and dossier_id = '9328e7bd-5e8b-4533-93f8-e7d8dfc16cdc';
+
+
 -- Verification ------------------------------------------------------------------
-select nom, couleur, ouvert_associes
-  from public.sim_dossiers
- where parent_id is null
- order by nom;
+select d.nom, d.couleur, d.ouvert_associes,
+       (select count(*) from public.sim_fichiers f where f.dossier_id = d.id) as fichiers
+  from public.sim_dossiers d
+ where d.parent_id is null
+ order by d.nom;
