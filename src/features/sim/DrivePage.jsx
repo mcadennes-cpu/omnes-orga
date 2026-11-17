@@ -1,7 +1,7 @@
 import {
   ChevronLeft, ChevronRight, FolderPlus, Upload, Download,
   Folder, FileText, FileImage, FileSpreadsheet, File, MoreVertical, Inbox,
-  Search, X,
+  Search, X, ShieldCheck,
 } from 'lucide-react'
 import HeaderWatermark from '../../components/common/HeaderWatermark'
 import ImageViewerModal from '../../components/common/ImageViewerModal'
@@ -177,7 +177,7 @@ function FolderRow({ name, count, meta, accent = '#1C3D52', canMenu, showMeta = 
 }
 
 // ─── Ligne fichier ──────────────────────────────────────────────────────────
-function FileRow({ name, author, when, meta, canMenu, showMeta = true, onOpen, onMenu, onDownload }) {
+function FileRow({ name, author, when, meta, signe = false, canMenu, showMeta = true, onOpen, onMenu, onDownload }) {
   const { Icon, color, label } = fileTypeMeta(name)
   const metaText = meta !== undefined ? meta : `${author} · ${when}`
 
@@ -202,6 +202,13 @@ function FileRow({ name, author, when, meta, canMenu, showMeta = true, onOpen, o
       </div>
       <div className="min-w-0 flex-1">
         <div className="font-sans font-semibold text-[14.5px] text-marine truncate">{name}</div>
+        {signe && (
+          // Etape 25 : document issu d'une signature electronique, verrouille.
+          <div className="mt-0.5 inline-flex items-center gap-1 text-olive text-[11px] font-semibold">
+            <ShieldCheck size={12} strokeWidth={2} />
+            Signé électroniquement
+          </div>
+        )}
         {showMeta && metaText && (
           <div className="font-sans text-xs text-muted truncate mt-0.5">
             {metaText}
@@ -319,6 +326,7 @@ function NoSearchResults({ search, onClear }) {
 //   ne s'affiche que si une action est possible sur cet element). Calcule par
 //   le parent via canEditSim / canDeleteSim.
 export default function DrivePage({
+  header,
   trail,
   subtitle,
   accent = '#1C3D52',
@@ -352,7 +360,9 @@ export default function DrivePage({
 
   return (
     <>
-      <Breadcrumb trail={trail} subtitle={subtitle} onBack={onBack} onCrumb={onCrumb} />
+      {/* Etape 25 : la racine passe son propre en-tete (titre + onglets du
+          module Contrats) ; les sous-dossiers gardent le fil d'Ariane. */}
+      {header ?? <Breadcrumb trail={trail} subtitle={subtitle} onBack={onBack} onCrumb={onCrumb} />}
       <DriveActions canWrite={canWrite} accent={accent} onNewFolder={onNewFolder} onUpload={onUpload} />
 
       {isEmpty ? (

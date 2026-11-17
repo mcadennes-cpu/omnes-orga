@@ -5,10 +5,9 @@ import {
   MessageSquare,
   Calendar,
   CalendarClock,
-  FileText,
+  FileSignature,
   Home,
   KeyRound,
-  Signature,
 } from 'lucide-react'
 
 export const ROLES = {
@@ -64,11 +63,15 @@ export const MODULES = [
     allowedRoles: ['super_admin', 'associe_gerant', 'associe', 'remplacant'],
   },
   {
+    // « sim » reste l'identifiant interne (tables, bucket, routes /sim) ;
+    // le module s'appelle « Contrats » depuis l'etape 25 (fusion avec
+    // Signatures). Les quatre roles medecins le voient : la RLS (25A-2) decide
+    // de ce que chacun y trouve. Meme liste que canAccessContrats().
     key: 'sim',
-    label: 'SIM',
-    icon: FileText,
+    label: 'Contrats',
+    icon: FileSignature,
     color: 'olive',
-    allowedRoles: ['super_admin', 'associe_gerant'],
+    allowedRoles: ['super_admin', 'associe_gerant', 'associe', 'remplacant'],
   },
   {
     key: 'immobilier',
@@ -99,17 +102,6 @@ export const MODULES = [
     // blanche de agenda.peut_acceder() en base (23-25) : les trois doivent
     // rester alignees. Le drapeau agenda_beta_access qui pilotait cette tuile
     // pendant la phase beta a ete retire le 22/09/2026.
-    allowedRoles: ['super_admin', 'associe_gerant', 'associe', 'remplacant'],
-  },
-  {
-    key: 'signatures',
-    label: 'Signatures',
-    icon: Signature,
-    // Meme valeur que COULEUR_MODULE (features/signatures/signaturesLabels.js).
-    color: 'marine',
-    // Tout medecin peut etre signataire ; seul le super_admin cree (cf.
-    // canCreateSignature). poste_bureau exclu, comme en base (24A-1/24A-2) et
-    // dans canAccessSignatures() de permissions.js : les trois restent alignes.
     allowedRoles: ['super_admin', 'associe_gerant', 'associe', 'remplacant'],
   },
 ]

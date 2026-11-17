@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Plus, Signature } from 'lucide-react'
+import { ChevronRight, Plus, Signature } from 'lucide-react'
 import AppLayout from '../components/layout/AppLayout'
-import HeaderWatermark from '../components/common/HeaderWatermark'
 import Pill from '../components/common/Pill'
+import ContratsEntete from '../features/sim/ContratsEntete'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
 import { useRole } from '../hooks/useRole'
@@ -11,7 +11,6 @@ import { canAccessSignatures, canCreateSignature } from '../lib/permissions'
 import { useSignatures } from '../features/signatures/useSignatures'
 import DemandeFormModal from '../features/signatures/DemandeFormModal'
 import {
-  COULEUR_MODULE,
   STATUTS_DEMANDE,
   dateCourte,
   libelleType,
@@ -109,26 +108,14 @@ export default function Signatures() {
       .select('id')
       .single()
     if (err) throw new Error("La demande n'a pas pu être créée.")
-    navigate(`/signatures/${data.id}`)
+    navigate(`/sim/signatures/${data.id}`)
   }
 
   return (
     <AppLayout>
       <div className="flex flex-col">
-        <header className="sticky top-0 z-10 bg-fond/95 backdrop-blur-sm border-b border-border relative overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 relative z-10">
-            <button
-              type="button"
-              onClick={() => navigate('/')}
-              aria-label="Retour"
-              className="h-9 w-9 flex items-center justify-center rounded-full shrink-0"
-            >
-              <ChevronLeft size={20} strokeWidth={2} className="text-marine" />
-            </button>
-            <h1 className="flex-1 font-display font-extrabold text-marine text-2xl">Signatures</h1>
-          </div>
-          <HeaderWatermark color={COULEUR_MODULE} fill offsetRight={64} />
-        </header>
+        {/* Etape 25 : Signatures est un onglet du module Contrats. */}
+        <ContratsEntete actif="signatures" />
 
         <div className="px-4 pt-3 space-y-3">
           <div className="flex gap-1 p-1 rounded-input bg-carte border border-border">
@@ -189,7 +176,7 @@ export default function Signatures() {
           ) : (
             <div className="space-y-3">
               {liste.map((d) => (
-                <DemandeTile key={d.id} demande={d} onClick={() => navigate(`/signatures/${d.id}`)} />
+                <DemandeTile key={d.id} demande={d} onClick={() => navigate(`/sim/signatures/${d.id}`)} />
               ))}
             </div>
           )}

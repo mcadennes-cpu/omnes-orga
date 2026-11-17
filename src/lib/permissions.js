@@ -245,15 +245,19 @@ export function canAccessSim(role) {
 
 /**
  * true si l'utilisateur peut modifier (renommer) un dossier ou un fichier SIM.
- * super_admin : tout. associe_gerant : uniquement ses propres elements.
+ * super_admin : tout. associe_gerant : uniquement ses propres elements, et
+ * jamais un document signe (etape 25, miroir du declencheur
+ * sim_fichiers_verrou de 25A-1).
  *
  * @param {object} p
  * @param {string} p.role           role de l'utilisateur courant
  * @param {string} p.currentUserId  id de l'utilisateur courant
  * @param {string} p.auteurId       auteur_id de l'element (dossier ou fichier)
+ * @param {boolean} [p.signe]       fichier issu d'une signature electronique
  */
-export function canEditSim({ role, currentUserId, auteurId }) {
+export function canEditSim({ role, currentUserId, auteurId, signe = false }) {
   if (role === 'super_admin') return true
+  if (signe) return false
   if (role === 'associe_gerant') return currentUserId === auteurId
   return false
 }
@@ -264,6 +268,41 @@ export function canEditSim({ role, currentUserId, auteurId }) {
  */
 export function canDeleteSim(params) {
   return canEditSim(params)
+}
+
+// ─── Contrats (etape 25 : fusion SIM + Signatures) ─────────────────────────
+//
+// Le module SIM s'affiche sous le nom « Contrats » aux quatre roles medecins.
+// Ce que chacun voit est decide par la RLS (25A-2) ; ces helpers ne font que
+// choisir les onglets et masquer les gestes impossibles.
+
+const CONTRATS_ROLES = ['super_admin', 'associe_gerant', 'associe', 'remplacant']
+
+/** Tuile « Contrats » et onglets « Mes contrats » / « Signatures ». */
+export function canAccessContrats(role) {
+  return CONTRATS_ROLES.includes(role)
+}
+
+/**
+ * Onglet « Dossiers » : membres SIM (tout le Drive) et associes (dossiers
+ * ouverts aux associes, en lecture seule). Miroir de sim_peut_voir_dossier().
+ */
+export function canVoirDossiersSim(role) {
+  return SIM_ROLES.includes(role) || role === 'associe'
+}
+
+/** Onglet « Mes contrats » : tous sauf les membres SIM (ils voient tout). */
+export function canVoirMesContrats(role) {
+  return role === 'associe' || role === 'remplacant'
+}
+
+/**
+ * Rattacher des personnes a un fichier, ouvrir un dossier aux associes :
+ * super_admin seul (cadrage du 17/11/2026). Miroir des policies
+ * sim_concernes_ajout / _retrait et du declencheur sim_dossiers_verrou.
+ */
+export function canGererAccesSim(role) {
+  return role === 'super_admin'
 }
 
 // =============================================================

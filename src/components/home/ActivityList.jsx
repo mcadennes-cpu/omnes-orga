@@ -29,6 +29,13 @@ function metaLabel(item) {
   return item.board_titre ? `${n} ${mots} · ${item.board_titre}` : `${n} ${mots}`
 }
 
+// Couleur de la pastille. Les documents a signer arrivent en « marine »
+// (24F-1, ecrit avant la fusion) : depuis l'etape 25 ils appartiennent au
+// module Contrats, olive. Corrige ici plutot que de reecrire get_mon_activite.
+function couleurItem(item) {
+  return item.item_type === 'signature' ? 'olive' : item.couleur
+}
+
 // Cle stable pour le rendu de liste.
 function itemKey(item) {
   if (item.module === 'evenements') return `ev-${item.evenement_id}`
@@ -67,7 +74,7 @@ export default function ActivityList({ items = [], loading = false, onSelect }) 
                 className="flex w-full items-center gap-3 p-[14px] text-left transition-opacity active:opacity-70"
               >
                 <span
-                  className={`h-2.5 w-2.5 shrink-0 rounded-full ${DOT_BG[item.couleur] ?? DOT_BG.marine}`}
+                  className={`h-2.5 w-2.5 shrink-0 rounded-full ${DOT_BG[couleurItem(item)] ?? DOT_BG.marine}`}
                 />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold text-ink">

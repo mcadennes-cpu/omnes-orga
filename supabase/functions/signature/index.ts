@@ -12,6 +12,9 @@
 //   relancer      -> rappel aux signataires attendus (1 fois par heure max)
 //   annuler       -> annulation motivee par le createur ou un super_admin
 //   sceller       -> relance un scellement qui aurait echoue
+//   classer       -> range le PDF scelle dans le module Contrats (SIM) ;
+//                    appele aussi automatiquement apres chaque scellement
+//                    (etape 25, rejouable sans doublon)
 //
 // PARTAGE DES ROLES
 //   Cette fonction fait ce que SQL ne sait pas faire : verifier le jeton de
@@ -89,6 +92,7 @@ const MESSAGES: Array<[string, string]> = [
   ["Seule une demande en cours peut etre annulee", "Seule une demande en cours peut être annulée."],
   ["Compte inactif", "Votre compte est désactivé."],
   ["Tous les signataires n'ont pas signe", "Tous les signataires n'ont pas encore signé."],
+  ["Seul un document entierement signe peut etre classe", "Seul un document entièrement signé peut être rangé."],
 ];
 
 function messageAffichable(brut: string): string {
@@ -221,6 +225,7 @@ interface Demande {
   id: string; type: string; titre: string; statut: string; ordre_impose: boolean;
   source_chemin: string | null; source_nom: string | null; source_empreinte: string | null;
   createur_id: string; envoyee_at: string | null; created_at: string;
+  final_chemin: string | null; sim_dossier_id: string | null;
 }
 interface Signataire {
   id: string; profil_id: string; ordre: number; qualite: string | null; statut: string;
@@ -271,15 +276,15 @@ async function prevenirSignataires(params: {
       titre,
       lignes: [
         `Bonjour ${echapperHtml(s.nom_fige ?? "")},`,
-        `Le document <strong>« ${echapperHtml(d.titre)} »</strong> attend votre signature dans le module Signatures d'Omnès Orga.`,
+        `Le document <strong>« ${echapperHtml(d.titre)} »</strong> attend votre signature dans le module Contrats d'Omnès Orga.`,
         "Ouvrez-le dans l'application, lisez-le, puis signez avec le code que vous recevrez par e-mail.",
       ],
-      lien: `${appUrl}/signatures/${d.id}`,
+      lien: `${appUrl}/sim/signatures/${d.id}`,
     });
   }
   await pousser(authHeader, cibles.map((s) => s.profil_id),
     motif === "relance" ? "Rappel · Signature" : "Signature",
-    `Document à signer : ${d.titre}`.slice(0, 140), `/signatures/${d.id}`);
+    `Document à signer : ${d.titre}`.slice(0, 140), `/sim/signatures/${d.id}`);
 }
 
 // ============================================================================
@@ -451,6 +456,59 @@ async function sceller(admin: SupabaseClient, demandeId: string): Promise<{ ok: 
   return { ok: true };
 }
 
+// ============================================================================
+// Classement dans le module Contrats (etape 25)
+// ============================================================================
+// Copie le PDF scelle dans le bucket `sim` (nom = id de la demande), puis
+// `signature_classer_sim` cree la ligne sim_fichiers et les personnes
+// concernees en une transaction. Rejouable : le blob est ecrase a
+// l'identique, et la fonction SQL renvoie le fichier deja classe.
+// On COPIE plutot que de pointer vers le bucket `signatures` : le PDF classe
+// suit les droits du SIM, et l'original scelle reste intact comme preuve.
+const BUCKET_SIM = "sim";
+
+async function classer(admin: SupabaseClient, demandeId: string): Promise<{ ok: boolean; erreur?: string }> {
+  const d = await lireDemande(admin, demandeId);
+  if (!d || d.statut !== "terminee" || !d.final_chemin) {
+    return { ok: false, erreur: "Seul un document entièrement signé peut être rangé." };
+  }
+  const { data: deja } = await admin.from("sim_fichiers").select("id")
+    .eq("signature_demande_id", d.id).maybeSingle();
+  if (deja) return { ok: true };
+
+  const { data: fichier, error: errDl } = await admin.storage.from(BUCKET).download(d.final_chemin);
+  if (errDl || !fichier) {
+    console.error("Classement : PDF scelle introuvable", d.id, errDl);
+    return { ok: false, erreur: "Document signé introuvable." };
+  }
+  const octets = new Uint8Array(await fichier.arrayBuffer());
+  const { error: errUp } = await admin.storage.from(BUCKET_SIM).upload(
+    d.id, new Blob([octets], { type: "application/pdf" }),
+    { upsert: true, contentType: "application/pdf" });
+  if (errUp) {
+    console.error("Classement : depot dans le SIM impossible", d.id, errUp);
+    return { ok: false, erreur: "Rangement dans Contrats impossible." };
+  }
+  const base = (d.source_nom || d.titre || "document").replace(/\.pdf$/i, "");
+  const { error } = await admin.rpc("signature_classer_sim", {
+    p_demande_id: d.id, p_nom: `${base} - signé.pdf`, p_taille: octets.byteLength,
+  });
+  if (error) {
+    console.error("signature_classer_sim :", error.message);
+    return { ok: false, erreur: messageAffichable(error.message) };
+  }
+  return { ok: true };
+}
+
+// Scelle puis range ; un rangement manque n'empeche jamais de prevenir.
+async function scellerEtClasser(admin: SupabaseClient, demandeId: string): Promise<{ ok: boolean; erreur?: string }> {
+  const res = await sceller(admin, demandeId);
+  if (!res.ok) return res;
+  const rang = await classer(admin, demandeId);
+  if (!rang.ok) console.error("Classement differe :", rang.erreur);
+  return res;
+}
+
 async function prevenirFin(authHeader: string, admin: SupabaseClient, demandeId: string) {
   const d = await lireDemande(admin, demandeId);
   if (!d) return;
@@ -467,13 +525,13 @@ async function prevenirFin(authHeader: string, admin: SupabaseClient, demandeId:
       titre: "Document signé par tous",
       lignes: [
         `Bonjour ${echapperHtml(nom)},`,
-        `Tous les signataires ont signé <strong>« ${echapperHtml(d.titre)} »</strong>. Le document scellé, avec son certificat de signature, est disponible dans Omnès Orga.`,
+        `Tous les signataires ont signé <strong>« ${echapperHtml(d.titre)} »</strong>. Le document scellé, avec son certificat de signature, est rangé dans le module Contrats d'Omnès Orga.`,
       ],
-      lien: `${appUrl}/signatures/${d.id}`,
+      lien: `${appUrl}/sim/signatures/${d.id}`,
     });
   }
   await pousser(authHeader, [...destinataires.keys()], "Signature",
-    `Document signé par tous : ${d.titre}`.slice(0, 140), `/signatures/${d.id}`);
+    `Document signé par tous : ${d.titre}`.slice(0, 140), `/sim/signatures/${d.id}`);
 }
 
 // ============================================================================
@@ -529,6 +587,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         if (d.createur_id !== user.id || d.statut !== "brouillon") {
           return echec("Seul le créateur peut envoyer un brouillon.");
         }
+        if (!d.sim_dossier_id) return echec("Choisissez le dossier où ranger le document signé.");
         const source = await telechargerSource(admin, d);
         if (!source) return echec("Déposez d'abord le PDF à faire signer.");
         if (new TextDecoder().decode(source.slice(0, 5)) !== "%PDF-") return echec("Le fichier déposé n'est pas un PDF.");
@@ -630,7 +689,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         }
 
         if (data.derniere) {
-          const res = await sceller(admin, d.id);
+          const res = await scellerEtClasser(admin, d.id);
           if (res.ok) await prevenirFin(authHeader, admin, d.id);
           else console.error("Scellement differe :", res.erreur);
           return json({ ok: true, signe: true, termine: res.ok, scellementEnAttente: !res.ok });
@@ -662,11 +721,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
               `Motif : ${echapperHtml(motif)}`,
               "La demande est bloquée : annulez-la puis préparez une nouvelle version si besoin.",
             ],
-            lien: `${appUrl}/signatures/${d.id}`,
+            lien: `${appUrl}/sim/signatures/${d.id}`,
           });
         }
         await pousser(authHeader, [d.createur_id], "Signature refusée",
-          `${monSig.nom_fige} : ${motif}`.slice(0, 140), `/signatures/${d.id}`);
+          `${monSig.nom_fige} : ${motif}`.slice(0, 140), `/sim/signatures/${d.id}`);
         return json({ ok: true });
       }
 
@@ -692,7 +751,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         });
         if (error) return echec(messageAffichable(error.message));
         await pousser(authHeader, sigs.filter((s) => s.statut === "en_attente").map((s) => s.profil_id),
-          "Signature annulée", `Demande annulée : ${d.titre}`.slice(0, 140), `/signatures/${d.id}`);
+          "Signature annulée", `Demande annulée : ${d.titre}`.slice(0, 140), `/sim/signatures/${d.id}`);
         return json({ ok: true });
       }
 
@@ -701,9 +760,19 @@ Deno.serve(async (req: Request): Promise<Response> => {
         if (d.createur_id !== user.id && moi.role !== "super_admin" && !monSig) {
           return echec("Accès refusé.");
         }
-        const res = await sceller(admin, d.id);
+        const res = await scellerEtClasser(admin, d.id);
         if (!res.ok) return echec(res.erreur ?? "Scellement impossible.");
         await prevenirFin(authHeader, admin, d.id);
+        return json({ ok: true });
+      }
+
+      // ---------------------------------------------------------------
+      case "classer": {
+        if (d.createur_id !== user.id && moi.role !== "super_admin" && !monSig) {
+          return echec("Accès refusé.");
+        }
+        const res = await classer(admin, d.id);
+        if (!res.ok) return echec(res.erreur ?? "Rangement impossible.");
         return json({ ok: true });
       }
 

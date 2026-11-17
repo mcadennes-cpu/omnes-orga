@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom'
-import { X, Pencil, Download, Trash2 } from 'lucide-react'
+import { X, Pencil, Download, Trash2, Signature, Users, Eye, EyeOff } from 'lucide-react'
 
 /**
  * Bottom-sheet declenche par le bouton "..." sur une ligne dossier ou fichier
@@ -26,6 +26,12 @@ import { X, Pencil, Download, Trash2 } from 'lucide-react'
  * - onRename    : declenche le RenameModal (parent)
  * - onDownload  : (fichier uniquement) declenche downloadSimFile
  * - onDelete    : declenche le DeleteConfirmModal (parent)
+ *
+ * Etape 25 (module Contrats), actions super_admin, affichees si fournies :
+ * - onFaireSigner : (PDF) prepare une demande de signature de ce fichier
+ * - onConcernes   : (fichier) personnes concernees, qui le voient
+ * - onOuverture   : (dossier) ouvrir / fermer aux associes
+ * - ouvertAssocies: etat actuel du dossier (libelle de onOuverture)
  */
 export default function ActionsMenu({
   kind,
@@ -36,6 +42,10 @@ export default function ActionsMenu({
   onRename,
   onDownload,
   onDelete,
+  onFaireSigner,
+  onConcernes,
+  onOuverture,
+  ouvertAssocies = false,
 }) {
   const isFile = kind === 'file'
 
@@ -97,6 +107,54 @@ export default function ActionsMenu({
               <Download size={18} className="text-marine shrink-0" />
               <span className="font-sans font-semibold text-[15px] text-marine">
                 Télécharger
+              </span>
+            </button>
+          )}
+
+          {onFaireSigner && (
+            <button
+              type="button"
+              onClick={onFaireSigner}
+              className="w-full h-12 px-3 rounded-xl flex items-center gap-3 text-left active:bg-fond"
+            >
+              <Signature size={18} className="text-marine shrink-0" />
+              <span className="font-sans font-semibold text-[15px] text-marine">
+                Faire signer
+              </span>
+            </button>
+          )}
+
+          {onConcernes && (
+            <button
+              type="button"
+              onClick={onConcernes}
+              className="w-full h-12 px-3 rounded-xl flex items-center gap-3 text-left active:bg-fond"
+            >
+              <Users size={18} className="text-marine shrink-0" />
+              <span className="font-sans font-semibold text-[15px] text-marine">
+                Personnes concernées
+              </span>
+            </button>
+          )}
+
+          {onOuverture && (
+            <button
+              type="button"
+              onClick={onOuverture}
+              className="w-full min-h-12 px-3 py-2 rounded-xl flex items-center gap-3 text-left active:bg-fond"
+            >
+              {ouvertAssocies
+                ? <EyeOff size={18} className="text-marine shrink-0" />
+                : <Eye size={18} className="text-marine shrink-0" />}
+              <span className="min-w-0">
+                <span className="block font-sans font-semibold text-[15px] text-marine">
+                  {ouvertAssocies ? 'Ne plus montrer aux associés' : 'Rendre visible par les associés'}
+                </span>
+                <span className="block font-sans text-xs text-muted">
+                  {ouvertAssocies
+                    ? 'Actuellement visible par tous les associés (lecture seule).'
+                    : 'Réservé aux gérants. Les sous-dossiers suivent.'}
+                </span>
               </span>
             </button>
           )}

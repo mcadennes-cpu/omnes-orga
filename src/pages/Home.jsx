@@ -44,7 +44,9 @@ export default function Home() {
       return
     }
     if (moduleKey === 'sim') {
-      navigate('/sim')
+      // Module Contrats (etape 25) : s'il y a un document a signer, on ouvre
+      // directement l'onglet Signatures.
+      navigate(parModule.signatures.total > 0 ? '/sim/signatures' : '/sim')
       return
     }
     if (moduleKey === 'immobilier') {
@@ -59,10 +61,6 @@ export default function Home() {
       navigate('/planning')
       return
     }
-    if (moduleKey === 'signatures') {
-      navigate('/signatures')
-      return
-    }
     alert(`Module "${moduleKey}" à venir`)
   }
 
@@ -71,7 +69,7 @@ export default function Home() {
   function handleActiviteClick(item) {
     if (item.module === 'signatures') {
       // card_id porte l'identifiant de la demande (cf. 24F-1).
-      navigate(`/signatures/${item.card_id}`)
+      navigate(`/sim/signatures/${item.card_id}`)
       return
     }
     if (item.module === 'evenements') {
@@ -97,7 +95,9 @@ export default function Home() {
     discussion: parModule.discussion.total,
     immobilier: parModule.immobilier.total,
     evenements: parModule.evenements.total,
-    signatures: parModule.signatures.total,
+    // Etape 25 : les documents a signer s'affichent sur la tuile Contrats
+    // (cle interne « sim »), Signatures n'ayant plus de tuile propre.
+    sim: parModule.signatures.total,
   }
 
   return (

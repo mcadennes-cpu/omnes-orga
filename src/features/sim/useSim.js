@@ -68,6 +68,7 @@ function toFolderRow(d) {
     couleur: d.couleur,
     accent: couleurToHex(d.couleur),
     auteurId: d.auteur_id,
+    ouvertAssocies: Boolean(d.ouvert_associes),
   }
 }
 
@@ -80,8 +81,16 @@ function toFileRow(f) {
     mimeType: f.mime_type,
     tailleOctets: f.taille_octets,
     auteurId: f.auteur_id,
+    // Etape 25 : document issu d'une signature electronique (verrouille).
+    signe: Boolean(f.signature_demande_id),
+    dossierId: f.dossier_id ?? null,
   }
 }
+
+const COLONNES_DOSSIER = 'id, nom, couleur, auteur_id, ouvert_associes'
+const COLONNES_FICHIER =
+  'id, nom, mime_type, taille_octets, created_at, auteur_id, dossier_id, signature_demande_id, ' +
+  'auteur:auteur_id(prenom, nom)'
 
 // ─── Hook racine : dossiers + fichiers ou parent_id/dossier_id IS NULL ─────
 export function useSimRoot() {
@@ -108,12 +117,12 @@ export function useSimRoot() {
     Promise.all([
       supabase
         .from('sim_dossiers')
-        .select('id, nom, couleur, auteur_id')
+        .select(COLONNES_DOSSIER)
         .is('parent_id', null)
         .order('nom', { ascending: true }),
       supabase
         .from('sim_fichiers')
-        .select('id, nom, mime_type, taille_octets, created_at, auteur_id, auteur:auteur_id(prenom, nom)')
+        .select(COLONNES_FICHIER)
         .is('dossier_id', null)
         .order('nom', { ascending: true }),
     ]).then(([foldersRes, filesRes]) => {
@@ -165,7 +174,7 @@ export function useSimFolder(id) {
       try {
         const folderRes = await supabase
           .from('sim_dossiers')
-          .select('id, nom, couleur, auteur_id')
+          .select(COLONNES_DOSSIER)
           .eq('id', id)
           .maybeSingle()
 
@@ -179,12 +188,12 @@ export function useSimFolder(id) {
         const [childFoldersRes, childFilesRes] = await Promise.all([
           supabase
             .from('sim_dossiers')
-            .select('id, nom, couleur, auteur_id')
+            .select(COLONNES_DOSSIER)
             .eq('parent_id', id)
             .order('nom', { ascending: true }),
           supabase
             .from('sim_fichiers')
-            .select('id, nom, mime_type, taille_octets, created_at, auteur_id, auteur:auteur_id(prenom, nom)')
+            .select(COLONNES_FICHIER)
             .eq('dossier_id', id)
             .order('nom', { ascending: true }),
         ])
@@ -200,6 +209,7 @@ export function useSimFolder(id) {
           couleur: folderRes.data.couleur,
           accent: couleurToHex(folderRes.data.couleur),
           auteurId: folderRes.data.auteur_id,
+          ouvertAssocies: Boolean(folderRes.data.ouvert_associes),
         })
         setFolders((childFoldersRes.data ?? []).map(toFolderRow))
         setFiles((childFilesRes.data ?? []).map(toFileRow))
@@ -227,4 +237,99 @@ export function filterByTerm(items, term) {
   const norm = normalize((term || '').trim())
   if (!norm) return items
   return items.filter((it) => normalize(it.name).includes(norm))
+}
+
+// ─── Etape 25 : arborescence complete (choix d'une destination) ────────────
+// Tous les dossiers VISIBLES (la RLS filtre), avec leur chemin lisible
+// « SAS SIM › Contrats types », tries par chemin. Sert au choix du dossier
+// ou ranger un document signe (createur = super_admin, qui voit tout).
+export function construireChemins(dossiers) {
+  const parId = new Map(dossiers.map((d) => [d.id, d]))
+  const chemin = (d) => {
+    const noms = []
+    let courant = d
+    let garde = 0
+    while (courant && garde < 20) {
+      noms.unshift(courant.nom)
+      courant = courant.parent_id ? parId.get(courant.parent_id) : null
+      garde += 1
+    }
+    return noms.join(' › ')
+  }
+  return dossiers
+    .map((d) => ({ id: d.id, chemin: chemin(d) }))
+    .sort((a, b) => a.chemin.localeCompare(b.chemin, 'fr'))
+}
+
+export function useSimArborescence(actif = true) {
+  const [dossiers, setDossiers] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!actif) return undefined
+    let vivant = true
+    supabase
+      .from('sim_dossiers')
+      .select('id, nom, parent_id')
+      .then(({ data }) => {
+        if (!vivant) return
+        setDossiers(construireChemins(data ?? []))
+        setLoading(false)
+      })
+    return () => { vivant = false }
+  }, [actif])
+
+  return { dossiers, loading }
+}
+
+// ─── Etape 25 : « Mes contrats » ────────────────────────────────────────────
+// Les fichiers ou je suis « concerne » (sim_fichiers_concernes), a plat, sans
+// le dossier (cadrage du 17/11/2026 : un non-membre ne voit jamais
+// l'arborescence). archive_at est MON archivage, personnel.
+export function useMesContrats() {
+  const { user, loading: authLoading } = useAuth()
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [reloadKey, setReloadKey] = useState(0)
+
+  const refetch = useCallback(() => setReloadKey((k) => k + 1), [])
+
+  useEffect(() => {
+    if (authLoading || !user?.id) return undefined
+    let vivant = true
+    supabase
+      .from('sim_fichiers_concernes')
+      .select(`archive_at, fichier:sim_fichiers!inner(${COLONNES_FICHIER})`)
+      .eq('profil_id', user.id)
+      .then(({ data, error: err }) => {
+        if (!vivant) return
+        if (err) { setError(err); setLoading(false); return }
+        const lignes = (data ?? [])
+          .filter((l) => l.fichier)
+          .map((l) => ({
+            ...toFileRow(l.fichier),
+            creeLe: l.fichier.created_at,
+            archiveAt: l.archive_at,
+          }))
+          .sort((a, b) => (b.creeLe || '').localeCompare(a.creeLe || ''))
+        setItems(lignes)
+        setError(null)
+        setLoading(false)
+      })
+    return () => { vivant = false }
+  }, [user?.id, authLoading, reloadKey])
+
+  const userId = user?.id
+  const archiver = useCallback(async (fichierId, archive) => {
+    const { error: err } = await supabase
+      .from('sim_fichiers_concernes')
+      .update({ archive_at: archive ? new Date().toISOString() : null })
+      .eq('fichier_id', fichierId)
+      .eq('profil_id', userId)
+    if (err) throw new Error("L'archivage n'a pas pu être enregistré.")
+    refetch()
+  }, [userId, refetch])
+
+  return { items, loading, error, refetch, archiver }
 }

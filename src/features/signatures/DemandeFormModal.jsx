@@ -1,6 +1,8 @@
 // src/features/signatures/DemandeFormModal.jsx
 // Creation (ou modification) d'un brouillon : titre, nature, description,
-// ordre de signature.
+// ordre de signature, et (etape 25) dossier du module Contrats ou le
+// document signe sera range -- obligatoire, l'Edge Function refuse l'envoi
+// sans lui.
 
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
@@ -11,6 +13,7 @@ import Feuille, {
   CLASSE_LABEL,
 } from './Feuille'
 import { TYPES } from './signaturesLabels'
+import { useSimArborescence } from '../sim/useSim'
 
 const TITRE_MAX = 200
 
@@ -43,15 +46,20 @@ export default function DemandeFormModal(props) {
   return <DemandeFormModalContenu {...props} />
 }
 
-function DemandeFormModalContenu({ open, onClose, initial = null, onSubmit }) {
-  const [titre, setTitre] = useState(initial?.titre ?? '')
+function DemandeFormModalContenu({ open, onClose, initial = null, prerempli = null, onSubmit }) {
+  // initial : brouillon existant (modification) ; prerempli : valeurs de
+  // depart d'une creation (« Faire signer » depuis un PDF du Drive).
+  const depart = initial ?? prerempli ?? {}
+  const { dossiers, loading: dossiersLoading } = useSimArborescence()
+  const [dossierId, setDossierId] = useState(depart.sim_dossier_id ?? '')
+  const [titre, setTitre] = useState(depart.titre ?? '')
   const [type, setType] = useState(initial?.type ?? 'avenant')
   const [description, setDescription] = useState(initial?.description ?? '')
   const [ordreImpose, setOrdreImpose] = useState(Boolean(initial?.ordre_impose))
   const [occupe, setOccupe] = useState(false)
   const [erreur, setErreur] = useState(null)
 
-  const possible = titre.trim().length > 0 && !occupe
+  const possible = titre.trim().length > 0 && Boolean(dossierId) && !occupe
 
   async function valider() {
     if (!possible) return
@@ -63,6 +71,7 @@ function DemandeFormModalContenu({ open, onClose, initial = null, onSubmit }) {
         type,
         description: description.trim() || null,
         ordre_impose: ordreImpose,
+        sim_dossier_id: dossierId,
       })
       onClose()
     } catch (e) {
@@ -131,6 +140,29 @@ function DemandeFormModalContenu({ open, onClose, initial = null, onSubmit }) {
           placeholder="Contexte, points à vérifier…"
           className={`${CLASSE_CHAMP} resize-none`}
         />
+      </div>
+
+      <div>
+        <label className={CLASSE_LABEL}>
+          Ranger le document signé dans <span className="text-brique">*</span>
+        </label>
+        <select
+          value={dossierId}
+          onChange={(e) => setDossierId(e.target.value)}
+          disabled={dossiersLoading}
+          className={CLASSE_CHAMP}
+        >
+          <option value="">{dossiersLoading ? 'Chargement…' : 'Choisir un dossier…'}</option>
+          {dossiers.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.chemin}
+            </option>
+          ))}
+        </select>
+        <p className="text-faint text-[12px] mt-1.5">
+          Une fois signé par tous, le document y sera rangé automatiquement, et chaque signataire le
+          retrouvera dans « Mes contrats ».
+        </p>
       </div>
 
       <Interrupteur

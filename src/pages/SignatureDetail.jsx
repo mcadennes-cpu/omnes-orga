@@ -8,6 +8,7 @@ import {
   ChevronUp,
   FileCheck2,
   FileText,
+  FolderOpen,
   Loader2,
   Pencil,
   Plus,
@@ -28,6 +29,8 @@ import { canAccessSignatures } from '../lib/permissions'
 import { formatName } from '../lib/profileFormat'
 import { useSignature } from '../features/signatures/useSignature'
 import { codeEnCours, ouvrirDocument } from '../features/signatures/signaturesApi'
+import { useClassement } from '../features/signatures/useClassement'
+import { openSimFile } from '../features/sim/simStorage'
 import DemandeFormModal from '../features/signatures/DemandeFormModal'
 import SignatairesSheet from '../features/signatures/SignatairesSheet'
 import SignerSheet from '../features/signatures/SignerSheet'
@@ -100,6 +103,8 @@ export default function SignatureDetail() {
   const { role, loading: roleLoading } = useRole()
   const s = useSignature(id)
   const { demande, signataires, journal, createur, loading, error } = s
+  // Etape 25 : ou le document sera / est range dans le module Contrats.
+  const classement = useClassement(demande)
 
   const fichierRef = useRef(null)
   const [message, setMessage] = useState(null) // { couleur, texte }
@@ -282,6 +287,62 @@ export default function SignatureDetail() {
           )}
         </Section>
 
+        {/* Rangement dans le module Contrats (etape 25) */}
+        <Section titre="Rangement">
+          {demande.statut === 'terminee' && classement.fichier ? (
+            <button
+              type="button"
+              onClick={() =>
+                geste('rangement', () =>
+                  openSimFile(classement.fichier.id, classement.fichier.nom, 'application/pdf'),
+                )
+              }
+              disabled={!!occupe}
+              className="w-full flex items-center gap-3 p-3 rounded-input bg-olive/10 text-left active:opacity-80 disabled:opacity-50"
+            >
+              <FolderOpen className="w-6 h-6 text-olive shrink-0" strokeWidth={1.8} />
+              <span className="flex-1 min-w-0">
+                <span className="block text-marine text-sm font-semibold truncate">{classement.fichier.nom}</span>
+                <span className="block text-muted text-[12px]">
+                  Rangé dans Contrats{classement.chemin ? ` › ${classement.chemin}` : ''}
+                </span>
+              </span>
+            </button>
+          ) : demande.statut === 'terminee' ? (
+            <div className="space-y-2">
+              <p className="text-muted text-sm">
+                Le document signé n'est pas encore rangé dans le module Contrats.
+              </p>
+              {(estCreateur || role === 'super_admin') && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    geste('classer', async () => {
+                      await s.agir('classer')
+                      classement.refetch()
+                    }, 'Document rangé dans Contrats.')
+                  }
+                  disabled={!!occupe}
+                  className="w-full h-11 rounded-input bg-olive text-white font-semibold text-sm inline-flex items-center justify-center gap-2 disabled:opacity-40"
+                >
+                  {occupe === 'classer' && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Ranger dans Contrats
+                </button>
+              )}
+            </div>
+          ) : demande.statut === 'annulee' ? (
+            <p className="text-muted text-sm">Demande annulée : rien ne sera rangé.</p>
+          ) : (
+            <p className="text-muted text-sm">
+              {classement.chemin
+                ? <>Une fois signé par tous, le document sera rangé dans <span className="font-semibold text-marine">Contrats › {classement.chemin}</span>.</>
+                : brouillon && estCreateur
+                  ? 'Choisissez le dossier de rangement avec « Modifier » avant l’envoi.'
+                  : 'Une fois signé par tous, le document sera rangé dans le module Contrats.'}
+            </p>
+          )}
+        </Section>
+
         {/* Mon action de signataire */}
         {monTour && (
           <section className="bg-carte rounded-card shadow-card p-4 space-y-3 border-2 border-marine/15">
@@ -425,15 +486,16 @@ export default function SignatureDetail() {
             <button
               type="button"
               onClick={() => setConfirmation('envoyer')}
-              disabled={!demande.source_chemin || signataires.length === 0 || !!occupe}
+              disabled={!demande.source_chemin || signataires.length === 0 || !demande.sim_dossier_id || !!occupe}
               className="w-full h-12 rounded-input bg-marine text-white font-semibold shadow-button flex items-center justify-center gap-2 disabled:opacity-40 active:opacity-90"
             >
               <Send className="w-5 h-5" strokeWidth={2} />
               Envoyer en signature
             </button>
-            {(!demande.source_chemin || signataires.length === 0) && (
+            {(!demande.source_chemin || signataires.length === 0 || !demande.sim_dossier_id) && (
               <p className="text-faint text-[12px] text-center">
-                Déposez le PDF et ajoutez au moins un signataire pour pouvoir envoyer.
+                Déposez le PDF, ajoutez au moins un signataire et choisissez le dossier de rangement
+                pour pouvoir envoyer.
               </p>
             )}
             <div className="flex gap-2">
@@ -543,7 +605,7 @@ export default function SignatureDetail() {
           <div className="flex items-center gap-2 px-4 py-3 relative z-10">
             <button
               type="button"
-              onClick={() => navigate('/signatures')}
+              onClick={() => navigate('/sim/signatures')}
               aria-label="Retour"
               className="h-9 w-9 flex items-center justify-center rounded-full shrink-0"
             >
@@ -562,7 +624,10 @@ export default function SignatureDetail() {
             open={feuille === 'modifier'}
             onClose={() => setFeuille(null)}
             initial={demande}
-            onSubmit={s.modifier}
+            onSubmit={async (champs) => {
+              await s.modifier(champs)
+              classement.refetch()
+            }}
           />
           <SignatairesSheet
             open={feuille === 'signataires'}
@@ -624,7 +689,7 @@ export default function SignatureDetail() {
               setOccupe('suppression')
               try {
                 await s.supprimerBrouillon()
-                navigate('/signatures')
+                navigate('/sim/signatures')
               } catch (e) {
                 setMessage({ couleur: 'brique', texte: e.message })
                 setOccupe(null)

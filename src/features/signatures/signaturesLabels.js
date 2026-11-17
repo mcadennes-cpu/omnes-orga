@@ -1,9 +1,9 @@
 // src/features/signatures/signaturesLabels.js
 // Libelles affiches et couleur du module Signatures.
 
-// Couleur d'accent du module (une seule constante : la changer ici suffit).
-// Marine : documents officiels, comme Cabinet pratique.
-export const COULEUR_MODULE = 'marine'
+// Couleur d'accent : depuis l'etape 25, Signatures est un onglet du module
+// Contrats (ex-SIM), donc olive comme lui.
+export const COULEUR_MODULE = 'olive'
 
 export const TYPES = [
   { key: 'avenant', label: 'Avenant' },

@@ -16,7 +16,10 @@ CE QUE L'ESSAI FAIT, COMME LE FERAIT L'APPLI
      demande un code ; un code faux est refuse ; le bon code fait signer ;
   4. la derniere signature declenche le scellement : on telecharge le PDF
      final, on recalcule son empreinte, on compte ses pages, et on verifie
-     que le journal est intact.
+     que le journal est intact ;
+  5. (etape 25) le PDF scelle est range dans le module Contrats : copie
+     identique dans le bucket `sim`, ligne sim_fichiers dans le dossier
+     choisi, signataires « concernes » ; un second rangement ne cree rien.
 
 POURQUOI UN CODE POSE A LA MAIN
 L'environnement de test n'a pas de cle Resend : le mail du code ne part
@@ -53,6 +56,7 @@ if TEST not in URL:
     raise SystemExit("ARRET : .env.test ne pointe pas sur le projet de test.")
 if len(SECRET) < 32:
     raise SystemExit("ARRET : SIGNATURE_CODE_SECRET_TEST absent de .env.test.")
+ESSAI_MDP = ENV.get("ESSAI_SIGNATURES_MOT_DE_PASSE", "").strip().replace("'", "")
 GARDER = sys.argv[sys.argv.index("--garder") + 1] if "--garder" in sys.argv else None
 
 _TOK = base64.b64decode(subprocess.check_output(
@@ -132,7 +136,9 @@ par_role = {c["role"]: c for c in comptes}
 jetons = {}
 for role in ("super_admin", "associe_gerant", "remplacant"):
     c = par_role[role]
-    mdp = secrets.token_urlsafe(24)
+    # Mot de passe des comptes d'essai de .env.test s'il existe (sinon
+    # l'essai reel sur telephone perdrait ses comptes), aleatoire sinon.
+    mdp = ESSAI_MDP or secrets.token_urlsafe(24)
     # 23-19 recharge auth.users sans `aud` ni `instance_id` (colonnes absentes
     # de la sauvegarde) : Supabase Auth ne retrouve alors pas le compte. On
     # complete ces deux champs et on pose le mot de passe, en base de TEST.
@@ -172,6 +178,8 @@ def fonction(role, corps):
 
 
 print("\n--- 1. Brouillon (super_admin) ---")
+DOSSIER = sql("select id::text from sim_dossiers where parent_id is null "
+              "and nom = 'Contrats de remplacement'")[0]["id"]
 st, rep = rest("super_admin", "POST", "signature_demandes?select=id",
                {"type": "avenant", "titre": "Essai 24C-2 — avenant n°1", "createur_id": SA},
                {"Prefer": "return=representation"})
@@ -188,6 +196,10 @@ controle("depot de source.pdf", st, 200)
 st, _ = rest("super_admin", "PATCH", f"signature_demandes?id=eq.{D}",
              {"source_chemin": f"{D}/source.pdf", "source_nom": "avenant-test.pdf", "source_taille": len(source)})
 controle("renseignement du fichier", st, 204)
+st, rep = fonction("super_admin", {"action": "envoyer", "demandeId": D})
+controle("envoi refuse sans dossier de destination", rep.get("erreur", "")[:20], "Choisissez le dossie")
+st, _ = rest("super_admin", "PATCH", f"signature_demandes?id=eq.{D}", {"sim_dossier_id": DOSSIER})
+controle("choix du dossier de destination", st, 204)
 st, rep = fonction("associe_gerant", {"action": "envoyer", "demandeId": D})
 controle("un non-createur ne peut pas envoyer", rep.get("ok"), False)
 st, rep = fonction("super_admin", {"action": "envoyer", "demandeId": D})
@@ -208,12 +220,16 @@ for role, sig_id_requete, dernier in (("associe_gerant", AG, False), ("remplacan
     controle(f"{role} : texte de consentement recu", bool(rep.get("texte")), True)
     version = rep.get("version")
     st, rep = fonction(role, {"action": "demander_code", "demandeId": D})
-    controle(f"{role} : sans cle Resend, le code n'est pas envoye", rep.get("ok"), False)
     sig = sql(f"select id::text from signature_signataires where demande_id = '{D}' "
               f"and profil_id = '{sig_id_requete}'")[0]["id"]
-    controle(f"{role} : ce code non envoye a ete invalide",
-             sql(f"select count(*) as n from signature_codes where signataire_id = '{sig}' "
-                 "and utilise_at is null and invalide_at is null")[0]["n"], 0)
+    actifs = sql(f"select count(*) as n from signature_codes where signataire_id = '{sig}' "
+                 "and utilise_at is null and invalide_at is null")[0]["n"]
+    # Depuis l'essai reel du 16/11, le test a une cle Resend : le code part
+    # vraiment (aux adresses des comptes d'essai). Sans cle, il est invalide.
+    controle(f"{role} : code envoye <=> code actif en base", (rep.get("ok") is True), actifs == 1)
+    # Code inconnu de l'essai : on l'invalide pour en poser un connu.
+    sql(f"update signature_codes set invalide_at = now() where signataire_id = '{sig}' "
+        "and utilise_at is null and invalide_at is null")
     code = f"{secrets.randbelow(1_000_000):06d}"
     empreinte_code = hmac.new(SECRET.encode(), f"{sig}:{code}".encode(), hashlib.sha256).hexdigest()
     sql(f"insert into signature_codes (signataire_id, code_hmac, email_destinataire, expire_at) "
@@ -244,6 +260,33 @@ controle("le PDF scelle a une page de plus (certificat)",
 evts = [e["evenement"] for e in sql(f"select evenement from signature_journal where demande_id = '{D}' order by id")]
 controle("journal : envoi ... scellement", (evts[0], evts[-1]), ("envoi", "scellement"))
 controle("journal : 2 signatures", evts.count("signature"), 2)
+
+print("\n--- 4. Rangement dans Contrats (etape 25) ---")
+classe = sql(f"select dossier_id::text, auteur_id::text, nom, taille_octets, "
+             f"(select count(*) from sim_fichiers_concernes c where c.fichier_id = f.id) as concernes "
+             f"from sim_fichiers f where signature_demande_id = '{D}' and id = '{D}'")
+controle("fichier classe (id = celui de la demande)", len(classe), 1)
+if classe:
+    controle("dans le dossier choisi", classe[0]["dossier_id"], DOSSIER)
+    controle("au nom du createur", classe[0]["auteur_id"], SA)
+    controle("nom du fichier", classe[0]["nom"], "avenant-test - signé.pdf")
+    controle("taille = PDF scelle", classe[0]["taille_octets"], len(final))
+    controle("concernes = les 2 signataires", classe[0]["concernes"], 2)
+st, copie = http("GET", f"{URL}/storage/v1/object/authenticated/sim/{D}", None,
+                 {"apikey": ANON, "Authorization": f"Bearer {jetons['remplacant']}"}, brut=True)
+controle("le remplacant concerne lit la copie dans le SIM", st, 200)
+controle("copie identique au PDF scelle", hashlib.sha256(copie).hexdigest() if st == 200 else None,
+         etat["final_empreinte"])
+st, rep = fonction("remplacant", {"action": "classer", "demandeId": D})
+controle("second rangement : accepte", rep.get("ok"), True)
+controle("... sans doublon",
+         sql(f"select count(*) as n from sim_fichiers where signature_demande_id = '{D}'")[0]["n"], 1)
+st, _ = http("DELETE", f"{URL}/storage/v1/object/sim/{D}", None,
+             {"apikey": ANON, "Authorization": f"Bearer {jetons['associe_gerant']}"})
+st, copie = http("GET", f"{URL}/storage/v1/object/authenticated/sim/{D}", None,
+                 {"apikey": ANON, "Authorization": f"Bearer {jetons['remplacant']}"}, brut=True)
+controle("un gerant ne peut pas supprimer la copie signee", st, 200)
+
 if GARDER:
     Path(GARDER).write_bytes(final)
     print(f"\n  PDF scelle enregistre : {GARDER}")

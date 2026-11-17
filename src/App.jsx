@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
 import MotDePasseOublie from './pages/MotDePasseOublie'
@@ -21,6 +21,7 @@ import Evenements from './pages/Evenements'
 import EvenementDetail from './pages/EvenementDetail'
 import Sim from './pages/Sim'
 import SimFolder from './pages/SimFolder'
+import MesContrats from './pages/MesContrats'
 import Immobilier from './pages/Immobilier'
 import ImmobilierBoard from './pages/ImmobilierBoard'
 import ImmobilierCard from './pages/ImmobilierCard'
@@ -36,6 +37,13 @@ import SignatureDetail from './pages/SignatureDetail'
 // notification) et navigue via le routeur, sans rechargement. Plus fiable sur
 // iOS que client.navigate() appele depuis le service worker. Doit etre monte
 // a l'interieur du Router (il utilise useNavigate).
+// /signatures/:id (liens des mails et notifications d'avant l'etape 25)
+// -> /sim/signatures/:id.
+function RedirectionSignature() {
+  const { id } = useParams()
+  return <Navigate to={`/sim/signatures/${id}`} replace />
+}
+
 function ServiceWorkerNavigation() {
   const navigate = useNavigate()
   useEffect(() => {
@@ -76,7 +84,13 @@ export default function App() {
           <Route path="/discussion/:boardId/:cardId" element={<DiscussionCard />} />
           <Route path="/evenements" element={<Evenements />} />
           <Route path="/evenements/:id" element={<EvenementDetail />} />
+          {/* Module Contrats (ex-SIM + Signatures, etape 25). Les routes
+              fixes passent avant /sim/:id (React Router classe les segments
+              statiques avant les parametres). */}
           <Route path="/sim" element={<Sim />} />
+          <Route path="/sim/mes-contrats" element={<MesContrats />} />
+          <Route path="/sim/signatures" element={<Signatures />} />
+          <Route path="/sim/signatures/:id" element={<SignatureDetail />} />
           <Route path="/sim/:id" element={<SimFolder />} />
           <Route path="/immobilier" element={<Immobilier />} />
           <Route path="/immobilier/:boardId" element={<ImmobilierBoard />} />
@@ -86,8 +100,10 @@ export default function App() {
           <Route path="/codes" element={<CodesAcces />} />
           <Route path="/codes/nouveau" element={<LieuNouveau />} />
           <Route path="/codes/:id" element={<LieuDetail />} />
-          <Route path="/signatures" element={<Signatures />} />
-          <Route path="/signatures/:id" element={<SignatureDetail />} />
+          {/* Anciennes adresses du module Signatures (etape 24) : les liens
+              deja envoyes par mail ou par notification restent valables. */}
+          <Route path="/signatures" element={<Navigate to="/sim/signatures" replace />} />
+          <Route path="/signatures/:id" element={<RedirectionSignature />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -136,7 +136,7 @@ Depuis l'étape 18, chaque tuile de module (Discussion, Immobilier, Événements
 | 3 | Cabinet pratique | Drive |
 | 4 | Discussion | Cartes + chat |
 | 5 | Événements | Drive |
-| 6 | SIM | Drive (restreint) |
+| 6 | Contrats (ex-SIM + Signatures, étape 25) | Drive + signatures |
 | 7 | Immobilier | Cartes + chat |
 | 8 | Codes d'accès | Liste collaborative (sensible) |
 
@@ -500,11 +500,44 @@ Dossier `src/features/evenements/` : hooks `useEvenements`, `useEvenement`, `use
 
 ---
 
-### 6. SIM (Société d'Intendance Médicale)
+### 6. Contrats (ex-SIM + Signatures)
 
-**Type :** Drive (documents)
+**Type :** Drive (documents) + signature électronique de PDF. Couleur **olive**, icône `FileSignature`, tuile « Contrats ».
 
-**Concept :** Espace documentaire privé réservé aux associés gérants de la SIM. Collecte tous les documents de la société (statuts, PV d'AG, comptabilité, contrats…). Complètement invisible pour les associés simples et les remplaçants — le module n'apparaît pas dans leur page d'accueil et l'URL directe `/sim` les redirige vers un écran « Accès restreint ».
+**Concept :** à l'origine (étape 9), espace documentaire privé des associés gérants de la SIM (statuts, PV d'AG, comptabilité, contrats de toutes les entités). **Depuis l'étape 25 (17/11/2026)**, le SIM et le module Signatures sont fusionnés dans le module **Contrats**, ouvert aux quatre rôles médecins : les documents signés y sont rangés automatiquement, et chacun voit **ses propres contrats** sans voir le reste. L'identifiant interne reste `sim` (tables, bucket, routes `/sim`). Le dossier contient de la comptabilité : c'est un espace confidentiel, l'ouverture se fait dossier par dossier.
+
+#### Étape 25 — fusion SIM + Signatures (17/11/2026)
+
+**Qui voit quoi** (cadrage de Matthieu du 17/11/2026) :
+
+| Rôle | Onglets | Ce qu'il voit |
+|---|---|---|
+| super_admin, associe_gerant | Dossiers · Signatures | Tout le Drive (inchangé). |
+| associe | Dossiers · Mes contrats · Signatures | Les dossiers **ouverts aux associés** et leurs sous-dossiers, en **lecture seule** (au 17/11 : « Asso 1901 OMNES MEDECINS » et « Contrat d'exercice en commun ») + ses propres documents. |
+| remplacant | Mes contrats · Signatures | Ses propres documents uniquement, jamais l'arborescence. |
+| poste_bureau, compte inactif | — | Rien (tuile masquée, RLS). |
+
+- **Dossiers** (script `25A-4`) : « Contrats d'exercice médecins » renommé **« Contrats médecins/SIM »** et réservé aux gérants (les contrats individuels ne doivent pas être vus par les autres associés) ; nouveaux dossiers racine **« Contrat d'exercice en commun »** (ouvert aux associés) et **« Contrats de remplacement »** (gérants ; chacun y voit ses contrats via « Mes contrats »).
+- **Personnes concernées** : table `sim_fichiers_concernes (fichier_id, profil_id, archive_at, ajoute_par)`. Une personne concernée voit le fichier (et son blob) même sans être membre SIM. Rattacher / détacher : **super_admin seul** (menu ⋮ d'un fichier → « Personnes concernées »). Les signataires d'un document signé sont rattachés automatiquement. `archive_at` = **archivage personnel** (chacun range ses contrats terminés dans « Archivés », sans effet pour les autres). Pourquoi une table plutôt qu'un tableau dans `sim_fichiers` : clés étrangères, index sur la personne (« Mes contrats » est la requête fréquente), RLS ligne par ligne simple.
+- **Ouverture aux associés** : colonne `sim_dossiers.ouvert_associes`, héritée par les sous-dossiers (fonction récursive `sim_dossier_ouvert_associes`). Réglage « Rendre visible par les associés » dans le menu ⋮ d'un dossier, **super_admin seul** (déclencheur `sim_dossiers_verrou`).
+- **Classement automatique au scellement** : `signature_demandes.sim_dossier_id` (destination choisie dans le formulaire, **obligatoire à l'envoi** — l'Edge Function refuse sinon). Après `signature_sceller`, l'Edge Function **copie** `final.pdf` dans le bucket `sim` sous le nom `{id de la demande}`, puis `signature_classer_sim` (`25A-3`, service_role) crée en une transaction la ligne `sim_fichiers` (id = celui de la demande, auteur = créateur, nom « … - signé.pdf ») et les personnes concernées. Geste séparé du scellement et **rejouable** sans doublon (`signature_sceller` refuse une demande déjà terminée : un classement raté juste après n'aurait sinon jamais pu être relancé) ; bouton « Ranger dans Contrats » sur la demande si besoin. Pourquoi copier plutôt que pointer vers le bucket `signatures` : le PDF classé suit les droits du SIM, et l'original scellé reste intact comme preuve.
+- **Document signé verrouillé** : colonne `sim_fichiers.signature_demande_id` (unique). Déclencheur `sim_fichiers_verrou` : seul le serveur classe un document signé, le lien est immuable, renommer / déplacer / supprimer = super_admin seul. Côté fichiers, la policy restrictive `sim_storage_suppression_signe` réserve la suppression du blob signé au super_admin — elle ferme au passage une faille de l'étape 9 : **n'importe quel gérant pouvait supprimer n'importe quel blob** du bucket (la règle de suppression ne regardait que `is_sim_member()`).
+- **Seule retouche du moteur de signature** : le verrou `signature_demandes_verrou` tolère, sur une demande close, une modification qui ne touche **que** `sim_dossier_id`. Sans cela, la clé étrangère `on delete set null` aurait rendu impossible, pour toujours, la suppression d'un dossier visé par une demande close.
+- **« Faire signer »** (menu ⋮ d'un PDF, super_admin) : ouvre le formulaire de demande prérempli (titre = nom du fichier, destination = son dossier) ; le PDF est **copié** dans le bucket `signatures` (l'original reste dans le Drive). PDF de plus de 20 Mo refusé.
+- **Fonctions `SECURITY DEFINER`** (`25A-2`) : `sim_peut_voir_dossier`, `sim_peut_voir_fichier`, `sim_fichier_du_chemin`, `sim_fichier_est_signe`, `sim_profil_medecin`. Elles exigent elles-mêmes un compte actif d'un rôle médecin (double sécurité au-dessus de la couche « compte actif » du chantier D, posée aussi sur la nouvelle table). Une policy ne relit jamais sa propre table (leçon du 28/09).
+- **Fil « En attente »** : `get_mon_activite` inchangée (`module = 'signatures'`) ; la pastille est portée par la tuile Contrats, dont le clic ouvre directement l'onglet Signatures s'il y a quelque chose à signer. La pastille du fil est forcée en olive côté React (`ActivityList`), la fonction SQL disant encore « marine ».
+- **Code** : `src/features/sim/` gagne `ContratsEntete` (titre + onglets), `useSimGestes` (gestes communs aux deux pages Drive, qui dupliquaient ce code), `ConcernesSheet`, et dans `useSim.js` les hooks `useMesContrats` et `useSimArborescence` ; page `src/pages/MesContrats.jsx` ; `src/features/signatures/useClassement.js`. Helpers `canAccessContrats`, `canVoirDossiersSim`, `canVoirMesContrats`, `canGererAccesSim` dans `permissions.js` ; `canEditSim` / `canDeleteSim` prennent un drapeau `signe`.
+- **Routes** : `/sim` (Dossiers ; un remplaçant est renvoyé vers « Mes contrats »), `/sim/mes-contrats`, `/sim/signatures`, `/sim/signatures/:id`, `/sim/:id`. Les anciennes `/signatures` et `/signatures/:id` redirigent (liens déjà envoyés par mail ou push). Mails et push de l'Edge Function pointent désormais vers `/sim/signatures/:id`.
+- **Scripts** : `25A-1` structure, `25A-2` droits, `25A-3` classement, `25A-4` dossiers, `25A-5` suite de test (**121 contrôles**, 3 scénarios, transactions annulées, jouable en production), `25A-9` retour arrière complet (refusé dès qu'un document signé est classé). Sur le test : retour arrière joué pour de vrai, empreinte `23-20` identique à celle d'avant, verrou des demandes identique au caractère près à la production. `24A-3` 119/119 inchangée ; `24C-2` étendue au rangement (**47 contrôles**) et rendue compatible avec la clé Resend désormais posée sur le test (elle réutilise le mot de passe des comptes d'essai de `.env.test` au lieu d'en tirer un au hasard).
+
+**Limitations connues de l'étape 25 :**
+- **Pas de déplacement de fichier** dans le Drive (ni avant, ni depuis la fusion) : un document rangé au mauvais endroit se télécharge puis se réimporte. Le contrat d'exercice en commun signé (« CONTRAT 01/05/2025 9 associés… ») est encore dans « Contrats médecins/SIM », réservé aux gérants.
+- **« Mes contrats » sans recherche ni tri** autre que la date : volume attendu faible (quelques contrats par personne).
+- **Les gérants n'ont pas d'onglet « Mes contrats »** : ils voient tout dans Dossiers.
+- **Liste des rôles à plusieurs endroits** (fonctions SQL `sim_peut_voir_*`, `modules.js`, `permissions.js`), comme pour les autres modules.
+- **Signature : un gérant ne voit que les demandes où il signe** (inchangé, décision du 17/11) ; le résultat signé lui arrive de toute façon dans Dossiers.
+
+**Historique (étape 9) — l'état avant la fusion est décrit ci-dessous.**
 
 #### Tables (Supabase)
 
@@ -574,6 +607,99 @@ Dossier `src/features/sim/` : hooks `useSimRoot`, `useSimFolder`, helper de filt
 - **Suppression de fichier** : nettoyage best-effort du blob dans le bucket Storage. Un échec laisse le fichier orphelin (inaccessible, sans fuite de données) — même stratégie qu'en Cabinet pratique et Événements.
 - **Suppression d'un dossier non vide** : refusée par la contrainte SQL `ON DELETE RESTRICT`. Le code Postgres 23503 est intercepté et traduit en message utilisateur clair (« Ce dossier n'est pas vide. Supprimez d'abord les éléments qu'il contient. »).
 - **Pas de Realtime** : les listes sont rafraîchies au chargement de la page et après chaque mutation locale (`refetch`). Un utilisateur qui consulte un dossier ne voit pas en direct un fichier déposé par un autre membre — il faut un rechargement de la page. Cohérent avec Cabinet pratique.
+
+---
+
+#### Moteur de signature (étape 24, ex-module 9)
+
+> Depuis l'étape 25, Signatures n'est plus un module à part : c'est l'onglet « Signatures » du module Contrats, en olive. Le moteur ci-dessous (tables, fonctions SQL, Edge Function, preuves, journal chaîné) n'a pas changé sur le fond ; seules différences : la colonne `sim_dossier_id` (destination, obligatoire à l'envoi), l'action `classer` de l'Edge Function, et les routes `/sim/signatures` et `/sim/signatures/:id` (les anciennes `/signatures…` redirigent). Le tableau « Écrans & routing » ci-dessous décrit l'état de l'étape 24.
+
+**Type :** demandes de signature électronique de PDF (liste + détail), couleur **marine** (constante `COULEUR_MODULE` de `signaturesLabels.js`, à confirmer), icône `Signature`.
+
+**Concept :** faire signer un PDF à plusieurs médecins sans abonnement externe : avenants au contrat d'exercice en commun, procès-verbaux, feuilles de présence, puis (étape 26) contrats de remplacement. Le moteur est générique : une colonne `type`, des `metadonnees` JSON propres au type, une liste ordonnée de signataires.
+
+**Niveau visé : signature électronique SIMPLE** (articles 1366-1367 du Code civil, règlement eIDAS n° 910/2014) — identification du signataire par son compte personnel **et** un code à usage unique reçu par e-mail, intégrité du document par empreinte SHA-256, traçabilité par un journal chaîné. Ce n'est **pas** une signature avancée ni qualifiée (cf. limitations).
+
+##### Cycle de vie
+
+```
+brouillon --(envoi)--> en_cours --(dernier signataire)--> terminee (PDF scellé)
+                                \--(annulation motivée)--> annulee
+```
+
+1. **Brouillon** (créateur seul) : titre, nature, message, ordre imposé ou non ; dépôt du PDF (20 Mo max, PDF non protégé) ; choix des signataires (ordre de sélection = ordre de signature) et de leur qualité.
+2. **Envoi** : le serveur relit le PDF, calcule son **empreinte SHA-256**, fige le document, la liste et l'identité des signataires (nom et e-mail au moment de l'envoi). Mail + push aux signataires attendus.
+3. **Signature** : le signataire **ouvre le document** (inscrit au journal ; le bouton « Signer » ne s'active qu'ensuite), lit le texte de consentement fourni par le serveur, coche la case, reçoit un **code à 6 chiffres** par e-mail (10 min, 5 essais, 5 codes par heure au plus), le saisit. Le serveur vérifie le code, **recalcule l'empreinte du PDF stocké** (refus si elle a changé), puis enregistre la signature avec l'horodatage serveur, l'IP, l'appareil, le texte et la version du consentement.
+4. **Scellement** : la dernière signature déclenche la fabrication du PDF final — mention « Signé électroniquement par… » en pied de chaque page + **certificat** en dernière page (document, empreinte d'origine, signataires avec date/IP/appareil, texte de consentement, journal, empreinte du dernier maillon du journal, valeur juridique). Mail + push à tous. Si le scellement échoue, un bouton « Finaliser le document signé » le relance.
+5. **Refus** (motif obligatoire) : la demande est bloquée, le créateur est prévenu ; il l'annule puis prépare une nouvelle version. **Relance** : une par heure et par signataire au plus. **Annulation** : créateur ou super_admin, motif obligatoire.
+
+##### Tables (Supabase) — scripts `24A-1`, `24A-2`, `24C-1`
+
+- **`signature_demandes`** — `type` (avenant / pv / feuille_presence / contrat_remplacement / autre), `titre`, `description`, `statut`, `ordre_impose`, `source_chemin` (imposé : `{id}/source.pdf`), `source_nom`, `source_taille`, `source_empreinte`, `final_chemin` (`{id}/final.pdf`), `final_empreinte`, `metadonnees` (jsonb), `createur_id` (RESTRICT), `envoyee_at`, `terminee_at`, `annulee_at`, `motif_annulation`. Contraintes de cohérence par statut (un brouillon n'a ni empreinte figée ni document final ; une demande terminée a forcément son PDF scellé…).
+- **`signature_signataires`** — `profil_id` (RESTRICT), `ordre`, `qualite`, `statut` (en_attente / signe / refuse), `nom_fige`, `email_fige`, `consulte_at`, preuve (`signe_at`, `ip`, `user_agent`, `consentement_texte`, `consentement_version`, `empreinte_validee`, `code_id`), refus (`refuse_at`, `motif_refus`), relances.
+- **`signature_codes`** — HMAC-SHA256 du code (clé secrète de l'Edge Function, jamais le code), e-mail destinataire, identifiant Resend, expiration, essais. **Invisible pour l'appli** (RLS sans policy, aucun droit).
+- **`signature_journal`** — **ajout seul** (déclencheurs qui refusent modification, suppression et vidage, même au serveur) et **chaîné** : chaque ligne porte l'empreinte SHA-256 de la précédente. `signature_verifier_journal(demande)` recompte les maillons cassés (0 = intact). Le chaînage ne protège pas contre l'administrateur de la base (qui peut désactiver un déclencheur) : il rend la retouche **détectable** — la suite de test le prouve.
+
+**Verrous (déclencheurs, valables pour tout le monde, Edge Function comprise)** : après l'envoi, le contenu de la demande et la liste des signataires sont figés ; une signature donnée ne bouge plus ; une demande terminée ou annulée ne bouge plus ; seul un brouillon peut être supprimé ; un signataire doit être un compte actif d'un rôle médecin (`poste_bureau` jamais).
+
+##### Sécurité — pourquoi ce découpage
+
+- **L'appli ne prépare que le brouillon** (tables + bucket, sous RLS). Elle ne peut même pas *nommer* les colonnes de statut, d'empreinte ou de preuve : **droits par colonne** (24A-2). Conséquence pour le code : `select('*')` est refusé sur `signature_signataires` et `signature_journal` (IP et appareil illisibles) ; les hooks listent leurs colonnes.
+- **Tout geste qui compte passe par l'Edge Function `signature`** (vérifie le jeton, relit le PDF, calcule le HMAC, envoie les mails, fabrique le PDF) et par **une fonction SQL transactionnelle par geste** (`signature_envoyer`, `_preparer_code`, `_confirmer_code`, `_signer`, `_refuser`, `_relancer`, `_annuler`, `_sceller`), réservées à `service_role`, qui verrouillent la ligne de la demande (deux signatures simultanées passent l'une après l'autre) et re-vérifient les droits. Pourquoi pas des écritures directes depuis l'Edge Function : l'API REST n'enchaîne pas plusieurs écritures dans une transaction ; un plantage laisserait une signature sans journal.
+- Seule exception appelée par l'appli : `signature_marquer_consulte(demande)` (bornée à `auth.uid()`).
+- Policy restrictive « compte actif » du chantier D posée sur les tables du module ; `anon` n'a aucun droit.
+
+| Geste | super_admin | associe_gerant | associe | remplacant | poste_bureau |
+|---|:---:|:---:|:---:|:---:|:---:|
+| Voir le module | ✓ | ✓ | ✓ | ✓ | — |
+| Créer / préparer / envoyer une demande | ✓ | — | — | — | — |
+| Voir une demande | toutes | si signataire (hors brouillon) | idem | idem | — |
+| Signer / refuser | si signataire | si signataire | si signataire | si signataire | jamais |
+| Relancer / annuler | créateur ou tout super_admin | — | — | — | — |
+
+Cadrage du 16/11/2026 : seuls les super_admin créent (Charlotte prépare les contrats, Matthieu les documents de l'association). Fonctions SQL `peut_creer_signature()`, `peut_voir_signature(demande)`, `est_createur_brouillon(demande)` ; miroirs React `canAccessSignatures` / `canCreateSignature` dans `permissions.js`.
+
+##### Storage — script `24B-1`
+
+Bucket **`signatures`** privé, 20 Mo, PDF uniquement. Lecture : mêmes personnes que la demande. Dépôt / remplacement / suppression : le créateur, **en brouillon seulement**, et seulement `{id}/source.pdf`. Dès l'envoi, plus aucune policy n'autorise l'écriture : le document est figé. Le PDF scellé est posé par l'Edge Function. La fonction `signature_demande_du_chemin(name)` lit l'identifiant dans le chemin sans planter sur un nom inattendu.
+
+##### Edge Function `signature` (24C, 24E)
+
+Actions : `consentement`, `envoyer`, `demander_code`, `signer`, `refuser`, `relancer`, `annuler`, `sceller`. Réponses métier en HTTP 200 (`{ ok, erreur }`), messages SQL traduits en français. Déployée avec `--no-verify-jwt` (comme `create-medecin`) : l'authentification est vérifiée dans le code. Dépendance : **pdf-lib 1.17.1** importée via `npm:` dans la fonction uniquement (accord du 16/11/2026) — aucun paquet ajouté au projet. Secrets : `RESEND_API_KEY` (existant), **`SIGNATURE_CODE_SECRET`** (nouveau, 64 caractères aléatoires), `APP_URL` (optionnel). Le texte de consentement et sa version (`v1-2026-11`) vivent dans la fonction : toute modification du texte doit changer la version.
+
+Notifications : mail (Resend) **et** push (via `send-notification`, avec le jeton de l'appelant) à l'envoi, au tour suivant (ordre imposé), à la relance, au refus (créateur), à l'annulation (push seul) et à la fin. Le mail compense la faible adoption des push (2 remplaçants sur 23 au 25/09).
+
+##### Fil « En attente » — script `24F-1`
+
+5e branche de `get_mon_activite` **et** de `get_activite_count` (toujours dupliquées, réécrites ensemble) : les demandes en cours où j'ai à signer, c'est mon tour, et personne n'a refusé. Le type de retour ne pouvant changer sans perdre les droits, la branche réutilise les colonnes : `module = 'signatures'`, `item_type = 'signature'`, `card_id` = identifiant de la **demande**, `board_titre` = nature du document. Pastille sur la tuile Signatures et sur l'icône de l'app.
+
+##### Écrans & routing
+
+| Route | Page | Contenu |
+|---|---|---|
+| `/signatures` | `Signatures` | Onglets À signer / En cours / Terminées (ouvre sur « À signer » s'il y a quelque chose), CTA « Nouvelle demande » (super_admin), tuiles avec nature, statut, « n/m signatures », date. |
+| `/signatures/:id` | `SignatureDetail` | En-tête (nature, statut, titre, préparée par), bandeaux (annulée, refus, terminée), Document (ouvrir le PDF signé / d'origine via `openOrDownload`), bloc « Votre signature est attendue », signataires (avatar, qualité, statut, date, relances), gestes du créateur (déposer, ajouter/retirer/réordonner, modifier, supprimer, envoyer ; puis relancer, annuler, finaliser), historique repliable. |
+
+Feuilles bottom-sheet (`src/features/signatures/`) : `Feuille` (base commune), `DemandeFormModal`, `SignatairesSheet`, `SignerSheet` (consentement puis code, champ `one-time-code` pour le remplissage automatique iOS), `MotifSheet` (refus / annulation). Hooks `useSignatures`, `useSignature` ; accès `signaturesApi.js` ; libellés `signaturesLabels.js`. Les contenus de feuille ne sont montés qu'à l'ouverture (état remis à zéro sans effet, exigence du lint React).
+
+Le PDF s'ouvre dans le lecteur natif (pas de visionneuse PDF dans l'appli, pas de pdf.js) : l'ouverture est inscrite au journal **avant** d'ouvrir le fichier, car sur iPhone l'ouverture fait sortir de la page.
+
+##### Tests
+
+- `docs/sql/24A-3-test-signatures.py` — **119 contrôles** en 5 scénarios, transactions annulées (jouable en production) : droits par rôle, verrous, droits par colonne, code faux puis blocage, document altéré, scellement, journal intact puis falsification détectée, ordre imposé, refus, relance, annulation, suppression de brouillon, fichiers du bucket, fil « En attente ». `OMNES_CIBLE` obligatoire.
+- `docs/sql/24C-2-test-edge-signature.py` — essai de bout en bout de l'Edge Function **sur le test uniquement** (34 contrôles) : vrais jetons de connexion, dépôt, envoi, consentement, code, signature, PDF scellé téléchargé et vérifié (empreinte, nombre de pages, journal). Faute de clé Resend sur le test, le code est posé en base avec la clé HMAC de test rangée dans `.env.test`.
+
+##### Limitations connues
+
+- **Signature simple, pas qualifiée.** Sa valeur probatoire est appréciée par le juge au cas par cas ; en cas de contestation, c'est au cabinet de prouver la fiabilité du procédé (journal, certificat, empreintes). **Ne pas utiliser pour des actes avec des tiers** (bail, banque, administration, ordre des médecins quand un formalisme est exigé).
+- **Un juriste doit relire** le texte de consentement (`texteConsentement` dans l'Edge Function) et le certificat avant tout usage réel ; toute modification du texte = nouvelle version.
+- **Identification par e-mail** : quiconque contrôle à la fois le compte Omnès et la boîte mail d'un médecin peut signer à sa place. Pas de second facteur indépendant (SMS) en V1.
+- **Pas d'horodatage qualifié** : l'heure est celle du serveur Supabase, pas d'un tiers horodateur.
+- **Le PDF scellé n'est pas signé cryptographiquement** (pas de certificat X.509 dans le fichier) : son intégrité se prouve par l'empreinte enregistrée en base et au journal, pas par un lecteur PDF.
+- **Conservation** : les demandes envoyées ne peuvent jamais être supprimées (verrous + journal). Durée de conservation à fixer avec le juriste (proposition : durée de l'acte + 5 ans) ; l'IP est une donnée personnelle.
+- **PDF protégés par mot de passe refusés** (impossible de les sceller) ; police standard du PDF : un caractère hors Latin-1 dans un nom est remplacé par « ? » sur le certificat.
+- **Fichier orphelin possible** à la suppression d'un brouillon (blob supprimé en best-effort avant la ligne), sans fuite.
+- **Liste des rôles autorisés à trois endroits** (fonctions SQL, `modules.js`, `permissions.js`), comme pour SIM, Codes d'accès et Planning.
 
 ---
 
@@ -755,97 +881,6 @@ Composant clé : `CodeRow` — code **masqué par défaut** (`••••••
 - **Entrées « Domicile » sensibles** : elles associent l'adresse d'un patient à son digicode. Consigne d'usage : nommage sobre, pas d'information médicale dans les notes.
 - **Module hors recherche globale** (`Recherche.jsx` non modifié) : volontaire, pour qu'aucun code ni nom de lieu sensible ne remonte dans une recherche générique.
 
-### 9. Signatures (étape 24)
-
-**Type :** demandes de signature électronique de PDF (liste + détail), couleur **marine** (constante `COULEUR_MODULE` de `signaturesLabels.js`, à confirmer), icône `Signature`.
-
-**Concept :** faire signer un PDF à plusieurs médecins sans abonnement externe : avenants au contrat d'exercice en commun, procès-verbaux, feuilles de présence, puis (étape 25) contrats de remplacement. Le moteur est générique : une colonne `type`, des `metadonnees` JSON propres au type, une liste ordonnée de signataires.
-
-**Niveau visé : signature électronique SIMPLE** (articles 1366-1367 du Code civil, règlement eIDAS n° 910/2014) — identification du signataire par son compte personnel **et** un code à usage unique reçu par e-mail, intégrité du document par empreinte SHA-256, traçabilité par un journal chaîné. Ce n'est **pas** une signature avancée ni qualifiée (cf. limitations).
-
-#### Cycle de vie
-
-```
-brouillon --(envoi)--> en_cours --(dernier signataire)--> terminee (PDF scellé)
-                                \--(annulation motivée)--> annulee
-```
-
-1. **Brouillon** (créateur seul) : titre, nature, message, ordre imposé ou non ; dépôt du PDF (20 Mo max, PDF non protégé) ; choix des signataires (ordre de sélection = ordre de signature) et de leur qualité.
-2. **Envoi** : le serveur relit le PDF, calcule son **empreinte SHA-256**, fige le document, la liste et l'identité des signataires (nom et e-mail au moment de l'envoi). Mail + push aux signataires attendus.
-3. **Signature** : le signataire **ouvre le document** (inscrit au journal ; le bouton « Signer » ne s'active qu'ensuite), lit le texte de consentement fourni par le serveur, coche la case, reçoit un **code à 6 chiffres** par e-mail (10 min, 5 essais, 5 codes par heure au plus), le saisit. Le serveur vérifie le code, **recalcule l'empreinte du PDF stocké** (refus si elle a changé), puis enregistre la signature avec l'horodatage serveur, l'IP, l'appareil, le texte et la version du consentement.
-4. **Scellement** : la dernière signature déclenche la fabrication du PDF final — mention « Signé électroniquement par… » en pied de chaque page + **certificat** en dernière page (document, empreinte d'origine, signataires avec date/IP/appareil, texte de consentement, journal, empreinte du dernier maillon du journal, valeur juridique). Mail + push à tous. Si le scellement échoue, un bouton « Finaliser le document signé » le relance.
-5. **Refus** (motif obligatoire) : la demande est bloquée, le créateur est prévenu ; il l'annule puis prépare une nouvelle version. **Relance** : une par heure et par signataire au plus. **Annulation** : créateur ou super_admin, motif obligatoire.
-
-#### Tables (Supabase) — scripts `24A-1`, `24A-2`, `24C-1`
-
-- **`signature_demandes`** — `type` (avenant / pv / feuille_presence / contrat_remplacement / autre), `titre`, `description`, `statut`, `ordre_impose`, `source_chemin` (imposé : `{id}/source.pdf`), `source_nom`, `source_taille`, `source_empreinte`, `final_chemin` (`{id}/final.pdf`), `final_empreinte`, `metadonnees` (jsonb), `createur_id` (RESTRICT), `envoyee_at`, `terminee_at`, `annulee_at`, `motif_annulation`. Contraintes de cohérence par statut (un brouillon n'a ni empreinte figée ni document final ; une demande terminée a forcément son PDF scellé…).
-- **`signature_signataires`** — `profil_id` (RESTRICT), `ordre`, `qualite`, `statut` (en_attente / signe / refuse), `nom_fige`, `email_fige`, `consulte_at`, preuve (`signe_at`, `ip`, `user_agent`, `consentement_texte`, `consentement_version`, `empreinte_validee`, `code_id`), refus (`refuse_at`, `motif_refus`), relances.
-- **`signature_codes`** — HMAC-SHA256 du code (clé secrète de l'Edge Function, jamais le code), e-mail destinataire, identifiant Resend, expiration, essais. **Invisible pour l'appli** (RLS sans policy, aucun droit).
-- **`signature_journal`** — **ajout seul** (déclencheurs qui refusent modification, suppression et vidage, même au serveur) et **chaîné** : chaque ligne porte l'empreinte SHA-256 de la précédente. `signature_verifier_journal(demande)` recompte les maillons cassés (0 = intact). Le chaînage ne protège pas contre l'administrateur de la base (qui peut désactiver un déclencheur) : il rend la retouche **détectable** — la suite de test le prouve.
-
-**Verrous (déclencheurs, valables pour tout le monde, Edge Function comprise)** : après l'envoi, le contenu de la demande et la liste des signataires sont figés ; une signature donnée ne bouge plus ; une demande terminée ou annulée ne bouge plus ; seul un brouillon peut être supprimé ; un signataire doit être un compte actif d'un rôle médecin (`poste_bureau` jamais).
-
-#### Sécurité — pourquoi ce découpage
-
-- **L'appli ne prépare que le brouillon** (tables + bucket, sous RLS). Elle ne peut même pas *nommer* les colonnes de statut, d'empreinte ou de preuve : **droits par colonne** (24A-2). Conséquence pour le code : `select('*')` est refusé sur `signature_signataires` et `signature_journal` (IP et appareil illisibles) ; les hooks listent leurs colonnes.
-- **Tout geste qui compte passe par l'Edge Function `signature`** (vérifie le jeton, relit le PDF, calcule le HMAC, envoie les mails, fabrique le PDF) et par **une fonction SQL transactionnelle par geste** (`signature_envoyer`, `_preparer_code`, `_confirmer_code`, `_signer`, `_refuser`, `_relancer`, `_annuler`, `_sceller`), réservées à `service_role`, qui verrouillent la ligne de la demande (deux signatures simultanées passent l'une après l'autre) et re-vérifient les droits. Pourquoi pas des écritures directes depuis l'Edge Function : l'API REST n'enchaîne pas plusieurs écritures dans une transaction ; un plantage laisserait une signature sans journal.
-- Seule exception appelée par l'appli : `signature_marquer_consulte(demande)` (bornée à `auth.uid()`).
-- Policy restrictive « compte actif » du chantier D posée sur les tables du module ; `anon` n'a aucun droit.
-
-| Geste | super_admin | associe_gerant | associe | remplacant | poste_bureau |
-|---|:---:|:---:|:---:|:---:|:---:|
-| Voir le module | ✓ | ✓ | ✓ | ✓ | — |
-| Créer / préparer / envoyer une demande | ✓ | — | — | — | — |
-| Voir une demande | toutes | si signataire (hors brouillon) | idem | idem | — |
-| Signer / refuser | si signataire | si signataire | si signataire | si signataire | jamais |
-| Relancer / annuler | créateur ou tout super_admin | — | — | — | — |
-
-Cadrage du 16/11/2026 : seuls les super_admin créent (Charlotte prépare les contrats, Matthieu les documents de l'association). Fonctions SQL `peut_creer_signature()`, `peut_voir_signature(demande)`, `est_createur_brouillon(demande)` ; miroirs React `canAccessSignatures` / `canCreateSignature` dans `permissions.js`.
-
-#### Storage — script `24B-1`
-
-Bucket **`signatures`** privé, 20 Mo, PDF uniquement. Lecture : mêmes personnes que la demande. Dépôt / remplacement / suppression : le créateur, **en brouillon seulement**, et seulement `{id}/source.pdf`. Dès l'envoi, plus aucune policy n'autorise l'écriture : le document est figé. Le PDF scellé est posé par l'Edge Function. La fonction `signature_demande_du_chemin(name)` lit l'identifiant dans le chemin sans planter sur un nom inattendu.
-
-#### Edge Function `signature` (24C, 24E)
-
-Actions : `consentement`, `envoyer`, `demander_code`, `signer`, `refuser`, `relancer`, `annuler`, `sceller`. Réponses métier en HTTP 200 (`{ ok, erreur }`), messages SQL traduits en français. Déployée avec `--no-verify-jwt` (comme `create-medecin`) : l'authentification est vérifiée dans le code. Dépendance : **pdf-lib 1.17.1** importée via `npm:` dans la fonction uniquement (accord du 16/11/2026) — aucun paquet ajouté au projet. Secrets : `RESEND_API_KEY` (existant), **`SIGNATURE_CODE_SECRET`** (nouveau, 64 caractères aléatoires), `APP_URL` (optionnel). Le texte de consentement et sa version (`v1-2026-11`) vivent dans la fonction : toute modification du texte doit changer la version.
-
-Notifications : mail (Resend) **et** push (via `send-notification`, avec le jeton de l'appelant) à l'envoi, au tour suivant (ordre imposé), à la relance, au refus (créateur), à l'annulation (push seul) et à la fin. Le mail compense la faible adoption des push (2 remplaçants sur 23 au 25/09).
-
-#### Fil « En attente » — script `24F-1`
-
-5e branche de `get_mon_activite` **et** de `get_activite_count` (toujours dupliquées, réécrites ensemble) : les demandes en cours où j'ai à signer, c'est mon tour, et personne n'a refusé. Le type de retour ne pouvant changer sans perdre les droits, la branche réutilise les colonnes : `module = 'signatures'`, `item_type = 'signature'`, `card_id` = identifiant de la **demande**, `board_titre` = nature du document. Pastille sur la tuile Signatures et sur l'icône de l'app.
-
-#### Écrans & routing
-
-| Route | Page | Contenu |
-|---|---|---|
-| `/signatures` | `Signatures` | Onglets À signer / En cours / Terminées (ouvre sur « À signer » s'il y a quelque chose), CTA « Nouvelle demande » (super_admin), tuiles avec nature, statut, « n/m signatures », date. |
-| `/signatures/:id` | `SignatureDetail` | En-tête (nature, statut, titre, préparée par), bandeaux (annulée, refus, terminée), Document (ouvrir le PDF signé / d'origine via `openOrDownload`), bloc « Votre signature est attendue », signataires (avatar, qualité, statut, date, relances), gestes du créateur (déposer, ajouter/retirer/réordonner, modifier, supprimer, envoyer ; puis relancer, annuler, finaliser), historique repliable. |
-
-Feuilles bottom-sheet (`src/features/signatures/`) : `Feuille` (base commune), `DemandeFormModal`, `SignatairesSheet`, `SignerSheet` (consentement puis code, champ `one-time-code` pour le remplissage automatique iOS), `MotifSheet` (refus / annulation). Hooks `useSignatures`, `useSignature` ; accès `signaturesApi.js` ; libellés `signaturesLabels.js`. Les contenus de feuille ne sont montés qu'à l'ouverture (état remis à zéro sans effet, exigence du lint React).
-
-Le PDF s'ouvre dans le lecteur natif (pas de visionneuse PDF dans l'appli, pas de pdf.js) : l'ouverture est inscrite au journal **avant** d'ouvrir le fichier, car sur iPhone l'ouverture fait sortir de la page.
-
-#### Tests
-
-- `docs/sql/24A-3-test-signatures.py` — **119 contrôles** en 5 scénarios, transactions annulées (jouable en production) : droits par rôle, verrous, droits par colonne, code faux puis blocage, document altéré, scellement, journal intact puis falsification détectée, ordre imposé, refus, relance, annulation, suppression de brouillon, fichiers du bucket, fil « En attente ». `OMNES_CIBLE` obligatoire.
-- `docs/sql/24C-2-test-edge-signature.py` — essai de bout en bout de l'Edge Function **sur le test uniquement** (34 contrôles) : vrais jetons de connexion, dépôt, envoi, consentement, code, signature, PDF scellé téléchargé et vérifié (empreinte, nombre de pages, journal). Faute de clé Resend sur le test, le code est posé en base avec la clé HMAC de test rangée dans `.env.test`.
-
-#### Limitations connues
-
-- **Signature simple, pas qualifiée.** Sa valeur probatoire est appréciée par le juge au cas par cas ; en cas de contestation, c'est au cabinet de prouver la fiabilité du procédé (journal, certificat, empreintes). **Ne pas utiliser pour des actes avec des tiers** (bail, banque, administration, ordre des médecins quand un formalisme est exigé).
-- **Un juriste doit relire** le texte de consentement (`texteConsentement` dans l'Edge Function) et le certificat avant tout usage réel ; toute modification du texte = nouvelle version.
-- **Identification par e-mail** : quiconque contrôle à la fois le compte Omnès et la boîte mail d'un médecin peut signer à sa place. Pas de second facteur indépendant (SMS) en V1.
-- **Pas d'horodatage qualifié** : l'heure est celle du serveur Supabase, pas d'un tiers horodateur.
-- **Le PDF scellé n'est pas signé cryptographiquement** (pas de certificat X.509 dans le fichier) : son intégrité se prouve par l'empreinte enregistrée en base et au journal, pas par un lecteur PDF.
-- **Conservation** : les demandes envoyées ne peuvent jamais être supprimées (verrous + journal). Durée de conservation à fixer avec le juriste (proposition : durée de l'acte + 5 ans) ; l'IP est une donnée personnelle.
-- **PDF protégés par mot de passe refusés** (impossible de les sceller) ; police standard du PDF : un caractère hors Latin-1 dans un nom est remplacé par « ? » sur le certificat.
-- **Fichier orphelin possible** à la suppression d'un brouillon (blob supprimé en best-effort avant la ligne), sans fuite.
-- **Liste des rôles autorisés à trois endroits** (fonctions SQL, `modules.js`, `permissions.js`), comme pour SIM, Codes d'accès et Planning.
-
----
-
 ## Matrice des accès — vue globale
 
 | Module | super_admin | associe_gerant | associe | remplacant | poste_bureau |
@@ -855,10 +890,9 @@ Le PDF s'ouvre dans le lecteur natif (pas de visionneuse PDF dans l'appli, pas d
 | Cabinet pratique | ✓ édition | ✓ édition | ✓ lecture | ✓ lecture | ✓ lecture |
 | Discussion | ✓ | ✓ | si invité | si invité | invisible |
 | Événements | ✓ édition complète | ✓ édition complète | ✓ création + édition de soi | ✓ lecture + sondage | invisible |
-| SIM | ✓ | ✓ | invisible | invisible | invisible |
+| Contrats (ex-SIM, étape 25) | ✓ tout le Drive + création de demandes | ✓ tout le Drive | dossiers ouverts aux associés (lecture) + ses documents + signer | ses documents + signer | invisible |
 | Immobilier | ✓ création + gestion complète | ✓ création + gestion complète | ✓ si invité (cartes + chat) | — invisible | invisible |
 | Codes d'accès | ✓ édition complète | ✓ édition complète | ✓ édition complète | ✓ lecture seule | invisible |
-| Signatures | ✓ création + gestion | ✓ si signataire | ✓ si signataire | ✓ si signataire | invisible |
 
 ---
 
@@ -1534,9 +1568,10 @@ Le module a sa **propre doc de référence** : `docs/integration-agenda.md` (con
 24. ✓ **Étape 24 — Module Signatures — EN PRODUCTION le 16/11/2026** (branche `feature/module-agenda`) — signature électronique simple de PDF, moteur générique (cf. module 9). 24A schéma + RLS (`24A-1`, `24A-2`, suite `24A-3`), 24B bucket (`24B-1`), 24C fonctions serveur (`24C-1`) + Edge Function `signature`, 24D écrans, 24E scellement (pdf-lib), 24F fil « En attente » (`24F-1`), 24G tests et doc.
    - **Essai réel sur l'environnement de test** (16/11, téléphone de Matthieu, 3 comptes d'essai redirigés vers sa boîte mail) : demande « Statuts » signée par deux comptes, codes reçus par mail, scellement et certificat vérifiés. Bug trouvé et corrigé : au retour de l'appli Mail, la page Safari se rechargeait et la saisie du code repartait de zéro (boucle de codes) ; l'étape « code » est désormais mémorisée 10 minutes dans l'onglet (`sessionStorage`), et le code figure dans l'objet du mail, lisible dans la notification.
    - **Bascule** (16/11, 17h) : sauvegarde `23-16` de 17h16, puis `24A-1`, `24A-2`, `24B-1`, `24C-1`, `24F-1` ; `24A-3` rejouée en production (119/119, transactions annulées) ; compteur « en attente » des 35 comptes actifs identique avant/après ; secret `SIGNATURE_CODE_SECRET` posé (la clé Resend de production est réutilisée) ; fonction `signature` déployée (`--use-api --no-verify-jwt`) ; code publié sur `main`.
-   - **Reste ouvert** : relecture juridique du texte de consentement et du certificat **avant le premier vrai document** ; confirmation de la couleur marine.
+   - **Reste ouvert** : relecture juridique du texte de consentement et du certificat **avant le premier vrai document**. (Couleur : réglée par l'étape 25, olive comme le module Contrats.)
    - **Environnement de test** : `23-18` corrigé (schémas effacés avant les comptes), `23-19` découpe ses insertions par taille. ⚠ `23-19` recharge `auth.users` sans `aud` ni `instance_id`, avec des jetons NULL : aucune connexion n'y est possible tant qu'on ne complète pas ces champs (fait par `24C-2` pour ses comptes et pour les 3 comptes d'essai `mcadennes+orga-test-*`).
-25. **Étape 25 — Contrats de remplacement** (à venir) — même moteur, type `contrat_remplacement`, modèle pré-rempli d'après l'annexe 3 du contrat d'exercice en commun (à fournir), champs variables dans `metadonnees` (remplacé, remplaçant, dates, conditions financières), lien éventuel en lecture seule avec le Planning.
+25. ✓ **Étape 25 — Fusion SIM + Signatures : module Contrats** (branche `feature/module-agenda`, code et tests sur l'environnement de test le 17/11/2026) — cf. module 6, sous-section « Étape 25 ». 25A données et droits (`25A-1` à `25A-4`, suite `25A-5`, retour arrière `25A-9`), 25B classement automatique (Edge Function, action `classer`), 25C écrans (tuile Contrats, onglets, Mes contrats, menus ⋮), 25D tests, 25E doc.
+26. **Étape 26 — Contrats de remplacement** (à venir) — même moteur, type `contrat_remplacement`, modèle pré-rempli d'après l'annexe 3 du contrat d'exercice en commun (à fournir), champs variables dans `metadonnees` (remplacé, remplaçant, dates, conditions financières), lien éventuel en lecture seule avec le Planning.
 
 ---
 
