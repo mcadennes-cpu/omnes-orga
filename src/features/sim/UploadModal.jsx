@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { X, UploadCloud, FileText, Check, AlertCircle, Loader2 } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../hooks/useAuth'
+import { nouvelIdentifiant } from '../../lib/identifiant'
 
 const BUCKET = 'sim'
 const MAX_OCTETS = 25 * 1024 * 1024 // 25 Mo
@@ -62,11 +63,22 @@ export default function UploadModal({ dossierId, dossierName, onClose, onUploade
 
   async function handleUpload() {
     if (!file) return
+    try {
+      await envoyer()
+    } catch (e) {
+      // Erreur imprevue (reseau coupe...) : on l'affiche au lieu de laisser
+      // tourner le chargement sans fin.
+      console.error('Import SIM', e)
+      setStep('idle')
+      setError("L'envoi a échoué. Vérifiez votre connexion et réessayez.")
+    }
+  }
 
+  async function envoyer() {
     setStep('uploading')
     setError(null)
 
-    const fileId = crypto.randomUUID()
+    const fileId = nouvelIdentifiant()
     const contentType = file.type || 'application/octet-stream'
 
     // 1) Upload vers le bucket sim (path = UUID flat)
