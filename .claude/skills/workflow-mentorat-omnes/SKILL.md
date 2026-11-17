@@ -24,16 +24,19 @@ par Claude.ai à intégrer.
 
 ## Rythme de validation
 
-Ne pas enchaîner plusieurs sous-étapes d'affilée sans repasser par Matthieu :
+**Règle modifiée le 17/11/2026, à la demande de Matthieu** (même texte que
+CLAUDE.md, qui fait foi) :
 
-1. Travailler **par phases explicitement découpées** (comme le plan de
-   développement du projet le fait : étape → sous-étapes A, B, C...).
-2. Après chaque sous-bloc, **afficher (`cat`) le ou les fichiers modifiés**
-   pour que Matthieu puisse relire avant de continuer, plutôt que d'enchaîner
-   silencieusement sur la sous-étape suivante.
-3. Attendre une confirmation explicite avant de passer à la suite, sauf si
-   Matthieu a déjà donné une consigne du type "fais tout d'un coup" pour la
-   tâche en cours.
+1. **Un plan d'abord** : en début d'étape, proposer le plan (découpage,
+   choix d'architecture, questions de cadrage) et attendre son accord.
+2. Une fois le plan accepté, **enchaîner le travail de l'étape** sans faire
+   valider chaque sous-étape ni afficher chaque fichier au fil de l'eau.
+3. **S'arrêter et demander** seulement : en cas de doute ou de choix entre
+   options qui lui revient (produit, droits, sécurité, juridique) ; quand un
+   essai en réel est nécessaire ; **avant toute écriture en production**
+   (SQL sur la prod, déploiement de fonction, secret, push sur `main`).
+4. En fin d'étape, résumer ce qui a été fait, les fichiers touchés et ce qui
+   a été vérifié (lint, build, suites de test).
 
 ## Installation de paquets
 
@@ -54,17 +57,14 @@ si le concept est simple ou déjà vu dans le projet.
 
 ## Git
 
-**Règle modifiée le 01/08/2026, à la demande de Matthieu.** Claude Code
-propose lui-même le `git add` + `commit`, et le `push` quand c'est pertinent,
-dès qu'une sous-étape validée le mérite : Matthieu approuve d'un clic via la
-demande de permission. Ne plus lui faire coller les commandes à la main, ne
-plus attendre qu'il le demande.
+**Règle modifiée le 01/08/2026, puis le 17/11/2026.** Claude Code propose
+lui-même le `git add` + `commit` dès qu'un bloc cohérent est terminé et
+vérifié (lint, build, tests) : Matthieu approuve d'un clic via la demande de
+permission. Ne pas lui faire coller les commandes à la main.
 
 Message de commit clair et **sans accent** (cf. tableau des accents).
 
-Ce qui n'a pas changé : ne rien committer tant que Matthieu n'a pas validé le
-travail, et ne jamais regrouper dans un même commit des sous-étapes qu'il n'a
-pas encore vues. Le commit vient **après** la validation, pas à la place.
+Le push sur `main` (= mise en production Vercel) attend toujours son « go ».
 
 ## Documentation projet
 
