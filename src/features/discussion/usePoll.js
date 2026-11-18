@@ -2,12 +2,19 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { notifyUsers, nomExpediteur, titreNotif } from '../../lib/notify'
 
+/** Nombre maximum d'options d'un sondage (creation + ajout apres coup). */
+export const POLL_OPTIONS_MAX = 20
+
 /**
  * Hook du sondage d'une carte de discussion (etape 16 ter).
  *
  * Charge le sondage rattache a une carte (0 ou 1), ses options et ses votes,
  * puis expose les mutations de gestion (creer / editer / cloturer / supprimer)
  * et de vote (voter / changer / retirer).
+ *
+ * Etape 16 quater : un sondage peut etre a choix multiple (poll.multiple). Une ligne
+ * de vote = une option cochee par une personne ; en choix unique, la base
+ * garantit qu'il n'y en a qu'une par personne (declencheur 16quater-1).
  *
  * Pas de Realtime en V1 (comme le sondage Evenements) : on refetch apres
  * chaque mutation, avec optimistic UI sur le vote. Comme useCard, ce hook
@@ -34,7 +41,7 @@ export function usePoll(cardId, userId) {
     try {
       const { data: pollRow, error: pErr } = await supabase
         .from('discussion_polls')
-        .select('id, card_id, question, closed, created_by, created_at')
+        .select('id, card_id, question, multiple, closed, created_by, created_at')
         .eq('card_id', cardId)
         .maybeSingle()
       if (pErr) throw pErr
@@ -50,6 +57,7 @@ export function usePoll(cardId, userId) {
         id: pollRow.id,
         cardId: pollRow.card_id,
         question: pollRow.question,
+        multiple: pollRow.multiple,
         closed: pollRow.closed,
         createdBy: pollRow.created_by,
         createdAt: pollRow.created_at,
@@ -129,20 +137,23 @@ export function usePoll(cardId, userId) {
    * Sequence : INSERT sondage -> INSERT options. Si les options echouent,
    * on supprime le sondage pour ne pas laisser un sondage vide (inutilisable).
    *
-   * @param {{ question: string, options: string[] }} args
+   * @param {{ question: string, options: string[], multiple?: boolean }} args
    */
   const createPoll = useCallback(
-    async ({ question, options: labels }) => {
+    async ({ question, options: labels, multiple = false }) => {
       if (!userId) throw new Error('Utilisateur non connecte')
       if (!cardId) throw new Error('Carte introuvable')
       const q = (question || '').trim()
       if (!q) throw new Error('La question est obligatoire')
       const cleanLabels = (labels || []).map((l) => (l || '').trim()).filter(Boolean)
       if (cleanLabels.length < 2) throw new Error('Ajoutez au moins deux options')
+      if (cleanLabels.length > POLL_OPTIONS_MAX) {
+        throw new Error(`${POLL_OPTIONS_MAX} options au maximum`)
+      }
 
       const { data: pollRow, error: pErr } = await supabase
         .from('discussion_polls')
-        .insert({ card_id: cardId, question: q, created_by: userId })
+        .insert({ card_id: cardId, question: q, multiple: Boolean(multiple), created_by: userId })
         .select('id')
         .single()
       if (pErr) throw pErr
@@ -226,6 +237,50 @@ export function usePoll(cardId, userId) {
   const closePoll = useCallback(() => setPollClosed(true), [setPollClosed])
   const reopenPoll = useCallback(() => setPollClosed(false), [setPollClosed])
 
+  /**
+   * Passe un sondage a choix unique en choix multiple. Les votes deja donnes
+   * restent valables. Le retour en arriere n'est pas propose : la base le
+   * refuse des que quelqu'un a coche plusieurs options.
+   */
+  const allowMultiple = useCallback(async () => {
+    if (!poll) throw new Error('Aucun sondage')
+    const { error: e } = await supabase
+      .from('discussion_polls')
+      .update({ multiple: true })
+      .eq('id', poll.id)
+    if (e) throw e
+    await load()
+  }, [poll, load])
+
+  /**
+   * Ajoute une ou plusieurs options a un sondage deja lance (ex. completer
+   * les dates). Placees apres les options existantes. Sondage ouvert
+   * uniquement (la RLS le verifie aussi).
+   *
+   * @param {string[]} labels
+   */
+  const addOptions = useCallback(
+    async (labels) => {
+      if (!poll) throw new Error('Aucun sondage')
+      if (poll.closed) throw new Error('Le sondage est clôturé')
+      const clean = (labels || []).map((l) => (l || '').trim()).filter(Boolean)
+      if (clean.length === 0) throw new Error('Saisissez au moins une option')
+      if (options.length + clean.length > POLL_OPTIONS_MAX) {
+        throw new Error(`${POLL_OPTIONS_MAX} options au maximum`)
+      }
+      const start = options.reduce((max, o) => Math.max(max, o.position), -1) + 1
+      const rows = clean.map((label, i) => ({
+        poll_id: poll.id,
+        label,
+        position: start + i,
+      }))
+      const { error: e } = await supabase.from('discussion_poll_options').insert(rows)
+      if (e) throw e
+      await load()
+    },
+    [poll, options, load]
+  )
+
   /** Supprime le sondage (cascade SQL sur options + votes). */
   const deletePoll = useCallback(async () => {
     if (!poll) throw new Error('Aucun sondage')
@@ -239,7 +294,13 @@ export function usePoll(cardId, userId) {
   // confirmation serveur, et on restaure en cas d'echec).
   // -------------------------------------------------------------------------
 
-  /** Vote (ou change de vote) pour une option. Upsert sur (poll_id, user_id). */
+  /**
+   * Geste de vote sur une option.
+   * - Choix unique : vote pour l'option (ou deplace son vote existant :
+   *   UPDATE de la ligne plutot que DELETE + INSERT, pour ne jamais perdre
+   *   le vote si la 2e requete echouait).
+   * - Choix multiple : coche l'option, ou la decoche si elle l'etait deja.
+   */
   const castVote = useCallback(
     async (optionId) => {
       if (!userId) throw new Error('Utilisateur non connecte')
@@ -247,25 +308,53 @@ export function usePoll(cardId, userId) {
       if (!optionId) throw new Error('Option invalide')
 
       const previous = votes
-      setVotes((cur) => [
-        ...cur.filter((v) => v.userId !== userId),
-        {
-          id: `optimistic-${userId}`,
-          pollId: poll.id,
-          optionId,
-          userId,
-          createdAt: new Date().toISOString(),
-        },
-      ])
+      const mine = votes.filter((v) => v.userId === userId)
+      const alreadyChecked = mine.some((v) => v.optionId === optionId)
+      const optimistic = {
+        id: `optimistic-${userId}-${optionId}`,
+        pollId: poll.id,
+        optionId,
+        userId,
+        createdAt: new Date().toISOString(),
+      }
 
       try {
-        const { error: e } = await supabase
-          .from('discussion_poll_votes')
-          .upsert(
-            { poll_id: poll.id, option_id: optionId, user_id: userId },
-            { onConflict: 'poll_id,user_id' }
-          )
-        if (e) throw e
+        if (poll.multiple) {
+          if (alreadyChecked) {
+            setVotes((cur) =>
+              cur.filter((v) => !(v.userId === userId && v.optionId === optionId))
+            )
+            const { error: e } = await supabase
+              .from('discussion_poll_votes')
+              .delete()
+              .eq('poll_id', poll.id)
+              .eq('user_id', userId)
+              .eq('option_id', optionId)
+            if (e) throw e
+          } else {
+            setVotes((cur) => [...cur, optimistic])
+            const { error: e } = await supabase
+              .from('discussion_poll_votes')
+              .insert({ poll_id: poll.id, option_id: optionId, user_id: userId })
+            if (e) throw e
+          }
+        } else {
+          if (alreadyChecked) return
+          setVotes((cur) => [...cur.filter((v) => v.userId !== userId), optimistic])
+          if (mine.length > 0) {
+            const { error: e } = await supabase
+              .from('discussion_poll_votes')
+              .update({ option_id: optionId })
+              .eq('poll_id', poll.id)
+              .eq('user_id', userId)
+            if (e) throw e
+          } else {
+            const { error: e } = await supabase
+              .from('discussion_poll_votes')
+              .insert({ poll_id: poll.id, option_id: optionId, user_id: userId })
+            if (e) throw e
+          }
+        }
         await load()
       } catch (err) {
         setVotes(previous)
@@ -275,7 +364,7 @@ export function usePoll(cardId, userId) {
     [userId, poll, votes, load]
   )
 
-  /** Retire son propre vote. */
+  /** Retire toutes ses reponses au sondage. */
   const clearVote = useCallback(async () => {
     if (!userId) throw new Error('Utilisateur non connecte')
     if (!poll) throw new Error('Aucun sondage')
@@ -300,10 +389,12 @@ export function usePoll(cardId, userId) {
   // -------------------------------------------------------------------------
   // Valeurs derivees (recalculees a chaque rendu, volume minuscule).
   // -------------------------------------------------------------------------
-  const myOptionId = userId
-    ? votes.find((v) => v.userId === userId)?.optionId ?? null
-    : null
-  const totalVotes = votes.length
+  const myOptionIds = userId
+    ? votes.filter((v) => v.userId === userId).map((v) => v.optionId)
+    : []
+  // Nombre de PERSONNES qui ont repondu (en choix multiple, une personne
+  // peut avoir plusieurs lignes de vote).
+  const totalVoters = new Set(votes.map((v) => v.userId)).size
   const voteCounts = options.reduce((acc, o) => {
     acc[o.id] = votes.filter((v) => v.optionId === o.id).length
     return acc
@@ -315,9 +406,9 @@ export function usePoll(cardId, userId) {
     hasPoll: Boolean(poll),
     options,
     votes,
-    myOptionId,
+    myOptionIds,
     voteCounts,
-    totalVotes,
+    totalVoters,
     isLoading,
     error,
     // Rechargement
@@ -328,6 +419,8 @@ export function usePoll(cardId, userId) {
     closePoll,
     reopenPoll,
     deletePoll,
+    allowMultiple,
+    addOptions,
     // Vote
     castVote,
     clearVote,
